@@ -1,7 +1,8 @@
 """Measure a liszt_render output instead of trusting it.
 
     python tools/analyze.py seed1.wav            loudness per section, silent gaps
-    python tools/analyze.py bass.wav --timing    onset timing against the sixteenth grid (solo renders)
+    python tools/analyze.py sq.wav --timing      onset timing vs the .mid
+        (render it with: liszt_render --solo bass --patch "bass=Templates/Init Square" --out sq.wav)
 """
 import sys
 import numpy as np
@@ -55,20 +56,34 @@ def overview(path):
     # waveform itself. Clicks are checked by ear until there is a detector that survives that.
 
 
-def timing(path):
+def timing(path, track='bass'):
+    """Onset timing against the true note times in the render's .mid. Render a solo with a
+    patch that starts instantly (Templates/Init Square): only notes that start from digital
+    silence are measured, and the onset is the first non-zero sample, so the attack shape and
+    velocity cannot move it. (A level-threshold onset reported +-35 ms of "jitter" that was
+    only the envelopes.)"""
+    import mido
     sr, x, mono, bpm, sections = load(path)
-    hop = int(0.001 * sr)
-    env = windows_rms(mono, hop)  # 1 ms frames
-    e = db(env)
-    onsets = []
-    for i in range(10, len(e)):
-        if e[i] > -50 and e[i] - e[i - 10: i].min() > 12 and (not onsets or i - onsets[-1] > 40):
-            onsets.append(i)
-    t = np.array(onsets) * hop / sr
-    grid = 60 / bpm / 4
-    dev = (t - np.round(t / grid) * grid) * 1000
-    print(f'{path}: {len(t)} onsets at {bpm} bpm; offset from the sixteenth grid: '
-          f'mean {dev.mean():.2f} ms, SD {dev.std():.3f} ms, worst {np.abs(dev - dev.mean()).max():.2f} ms')
+    spq = 60 / bpm
+    ons, name = [], None
+    for tr in mido.MidiFile(path.rsplit('.', 1)[0] + '.mid').tracks:
+        t = 0
+        for m in tr:
+            t += m.time
+            if m.type == 'track_name':
+                name = m.name
+            if name == track and m.type == 'note_on' and m.velocity > 0:
+                ons.append(t / 960 * spq)
+    delays = []
+    for o in ons:
+        i0 = int(round(o * sr))
+        if i0 + int(0.02 * sr) >= len(mono) or np.abs(mono[i0 - int(0.02 * sr): i0 - 48]).max() > 0:
+            continue
+        seg = np.abs(mono[i0 - 48: i0 + int(0.02 * sr)])
+        delays.append(i0 - 48 + int(np.argmax(seg > 0)) - i0)
+    d = np.array(delays)
+    print(f'{path}: {len(d)} {track} onsets from silence; first sound minus true note time: '
+          f'mean {d.mean() / sr * 1000:.2f} ms, SD {d.std() / sr * 1000:.3f} ms, range {d.min()}..{d.max()} samples')
 
 
 if __name__ == '__main__':
