@@ -75,7 +75,7 @@ public:
 
         preview();
         setWantsKeyboardFocus(true);
-        setSize(860, 400);
+        setSize(900, 430);
         startTimerHz(20);
     }
 
@@ -120,7 +120,25 @@ public:
         g.drawText(clock(now) + " / " + clock(total) + "   bar " + juce::String(bar + 1) + " / " + juce::String(composer->totalBars()),
                    title, juce::Justification::right);
         g.drawText(composer->describe(), r.removeFromTop(22), juce::Justification::left);
-        r.removeFromTop(tok::s4);
+        r.removeFromTop(tok::s2);
+
+        // What each part is playing now: the palette rotates these over the concert.
+        if (engine && playing)
+        {
+            auto row = r.removeFromTop(20);
+            g.setFont(juce::FontOptions(13.0f));
+            for (int t = 0; t < kNumTracks; ++t)
+            {
+                auto cell = row.removeFromLeft(row.getWidth() / (kNumTracks - t));
+                g.setColour(tok::faint);
+                g.drawText(juce::String(kTrackNames[t]).toUpperCase(), cell.removeFromLeft(44), juce::Justification::left);
+                g.setColour(tok::ink);
+                g.drawText(engine->currentPatch(t).fromFirstOccurrenceOf("/", false, false), cell, juce::Justification::left);
+            }
+        }
+        else
+            r.removeFromTop(20);
+        r.removeFromTop(tok::s3);
 
         // The form: one block per section, its height the section's energy.
         auto form = r.removeFromTop(150);
@@ -204,7 +222,10 @@ private:
         loadedRate = dev ? dev->getCurrentSampleRate() : 48000.0;
         loadedBlock = dev ? dev->getCurrentBufferSizeSamples() : 512;
         engine = std::make_unique<Engine>();
-        error = dev ? engine->load(loadedRate, juce::jmax(512, loadedBlock)) : juce::String("no audio output device");
+        Palette palette;
+        error = palette.load(findPalette("berlin"));
+        if (error.isEmpty())
+            error = dev ? engine->load(loadedRate, juce::jmax(512, loadedBlock), palette) : juce::String("no audio output device");
         if (error.isNotEmpty()) engine.reset();
         deviceManager.addAudioCallback(this);
         repaint();
@@ -235,6 +256,7 @@ private:
         if (engine)
         {
             meterPeak = engine->peakPost.exchange(0);
+            engine->service(); // load each part's next sound ahead of its change
             if (engine->isPlaying() || engine->isFinished()) composer = engine->composer();
         }
         play.setButtonText(engine && engine->isPlaying() ? "Stop" : "Play");
@@ -277,7 +299,7 @@ struct App : juce::JUCEApplication
         window->setUsingNativeTitleBar(true);
         window->setContentOwned(new MainComponent(), true);
         window->setResizable(true, false);
-        window->setResizeLimits(760, 380, 4000, 2000);
+        window->setResizeLimits(800, 410, 4000, 2000);
         window->centreWithSize(window->getWidth(), window->getHeight());
         window->setVisible(true);
     }

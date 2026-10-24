@@ -222,48 +222,112 @@ void PeakLimiter::process(float* l, float* r, int n)
     }
 }
 
+juce::String Palette::load(const juce::File& file)
+{
+    for (auto& p : parts) p.clear();
+    if (!file.existsAsFile()) return "no palette at " + file.getFullPathName();
+
+    juce::StringArray lines;
+    file.readLines(lines);
+    for (int n = 0; n < lines.size(); ++n)
+    {
+        auto line = lines[n].upToFirstOccurrenceOf("#", false, false).trim();
+        if (line.isEmpty()) continue;
+        auto tokens = juce::StringArray::fromTokens(line, " \t", "");
+        tokens.removeEmptyStrings();
+        int track = -1;
+        for (int t = 0; t < kNumTracks; ++t)
+            if (tokens[0] == kTrackNames[t]) track = t;
+        if (track < 0 || tokens.size() < 4)
+            return file.getFileName() + " line " + juce::String(n + 1) + ": expected 'part gain bright Category/Patch'";
+        // The patch name is the rest of the line: it may contain spaces.
+        auto patch = line.fromFirstOccurrenceOf(tokens[2], false, false).trim();
+        if (!findSurgePatch(patch).existsAsFile())
+            return file.getFileName() + " line " + juce::String(n + 1) + ": no Surge patch '" + patch + "'";
+        parts[track].push_back({ patch, tokens[1].getFloatValue(), tokens[2].getFloatValue() });
+    }
+    for (auto& p : parts)
+        std::stable_sort(p.begin(), p.end(), [](auto& a, auto& b) { return a.brightness < b.brightness; });
+    for (int t = 0; t < kNumTracks; ++t)
+        if (parts[t].empty()) return file.getFileName() + ": no patches for " + kTrackNames[t];
+    return {};
+}
+
+juce::File findPalette(const juce::String& name)
+{
+    // Next to the executable, or in a sounds/ folder of any parent (the repo, in development).
+    auto dir = juce::File::getSpecialLocation(juce::File::currentExecutableFile).getParentDirectory();
+    for (int up = 0; up < 8 && dir.exists(); ++up, dir = dir.getParentDirectory())
+        if (auto f = dir.getChildFile("sounds").getChildFile(name + ".txt"); f.existsAsFile()) return f;
+    return juce::File("C:/Users/kerem/OneDrive/Desktop/Claude/Projects/Lisztmachine/sounds").getChildFile(name + ".txt");
+}
+
+std::vector<SoundChange> planSounds(const Composer& composer, const Palette& palette, uint64_t seed)
+{
+    static constexpr int offsetBars[kNumTracks] = { 0, 4, 2, 0 }; // pad, bass, seq, lead
+    Rng rng(seed * 0x9E3779B97F4A7C15ull + 7);
+    std::vector<SoundChange> plan;
+    const auto& sections = composer.sections();
+    for (int t = 0; t < kNumTracks; ++t)
+    {
+        const int n = int(palette.parts[t].size());
+        int last = -1, beforeLast = -1;
+        for (int s = 0; s < int(sections.size()); ++s)
+        {
+            // Pad and sequence change on even sections, bass and lead on odd ones.
+            const bool evenPart = t == Pad || t == Seq;
+            if (s > 0 && (s % 2 == 0) != evenPart) continue;
+
+            // Energy picks a place on the dark-to-bright line, with a little seeded wander,
+            // and never one of the last two sounds again.
+            const double target = sections[size_t(s)].energy * (n - 1) + (rng.uniform() - 0.5) * n * 0.3;
+            int best = -1;
+            for (int e = 0; e < n; ++e)
+                if ((n <= 2 || (e != last && e != beforeLast)) && (best < 0 || std::abs(e - target) < std::abs(best - target)))
+                    best = e;
+            const auto& sec = sections[size_t(s)];
+            const int bar = s == 0 ? 0 : juce::jmin(sec.startBar + offsetBars[t], sec.startBar + sec.bars - 1);
+            plan.push_back({ bar, t, best });
+            beforeLast = last;
+            last = best;
+        }
+    }
+    std::sort(plan.begin(), plan.end(), [](auto& a, auto& b) { return a.bar != b.bar ? a.bar < b.bar : a.track < b.track; });
+    return plan;
+}
+
 Engine::Engine() { events_.reserve(1 << 15); }
 
 Engine::~Engine()
 {
     for (auto& t : tracks_)
-        if (t.plugin) t.plugin->releaseResources();
+        for (auto& s : t.slots)
+            if (s.plugin) s.plugin->releaseResources();
 }
 
-juce::String Engine::load(double sampleRate, int maxBlock)
+juce::String Engine::load(double sampleRate, int maxBlock, const Palette& palette)
 {
     sampleRate_ = sampleRate;
     maxBlock_ = maxBlock;
+    palette_ = palette;
     gains_.assign(size_t(maxBlock), 0);
 
     for (int i = 0; i < kNumTracks; ++i)
     {
         auto& t = tracks_[i];
-        juce::String err;
-        t.plugin = createSurge(sampleRate, maxBlock, err);
-        if (!t.plugin) return err;
-        auto patch = patchOverride[i].isNotEmpty() ? patchOverride[i] : juce::String(kBerlinSounds[i].patch);
-        if (auto e = loadSurgePatch(*t.plugin, findSurgePatch(patch)); e.isNotEmpty())
-            return juce::String(kTrackNames[i]) + ": " + e;
-
-        t.plugin->prepareToPlay(sampleRate, maxBlock);
-        int channels = juce::jmax(2, t.plugin->getTotalNumInputChannels(), t.plugin->getTotalNumOutputChannels());
-        t.inserts.clear();
-        for (auto& spec : kBerlinSounds[i].inserts)
+        int channels = 2;
+        for (auto& s : t.slots)
         {
-            auto fx = createSurgeEffect(spec, sampleRate, maxBlock, err);
-            if (!fx) return juce::String(kTrackNames[i]) + " insert " + err;
-            channels = juce::jmax(channels, fx->getTotalNumInputChannels(), fx->getTotalNumOutputChannels());
-            t.inserts.push_back(std::move(fx));
+            juce::String err;
+            s.plugin = createSurge(sampleRate, maxBlock, err);
+            if (!s.plugin) return err;
+            s.plugin->prepareToPlay(sampleRate, maxBlock);
+            s.midi.ensureSize(8192);
+            s.state = Idle;
+            s.entry = -1;
+            channels = juce::jmax(channels, s.plugin->getTotalNumInputChannels(), s.plugin->getTotalNumOutputChannels());
         }
-        t.delaySend = kBerlinSounds[i].delaySend;
-        t.reverbSend = kBerlinSounds[i].reverbSend;
         t.buffer.setSize(channels, maxBlock);
-        t.midi.ensureSize(8192);
-        t.trim = juce::Decibels::decibelsToGain(kBerlinSounds[i].trimDb);
-        t.cutoff = nullptr;
-        for (auto* p : t.plugin->getParameters())
-            if (p->getName(64) == "A Filter 1 Cutoff") { t.cutoff = p; t.cutoffBase = p->getValue(); }
     }
 
     juce::String err;
@@ -279,10 +343,33 @@ juce::String Engine::load(double sampleRate, int maxBlock)
     return {};
 }
 
+// Message thread, on an instance the audio thread is not touching (Idle or Loading).
+juce::String Engine::loadInto(Slot& slot, int track, int entry)
+{
+    const auto& e = palette_.parts[track][size_t(entry)];
+    if (auto err = loadSurgePatch(*slot.plugin, findSurgePatch(e.patch)); err.isNotEmpty()) return err;
+    slot.plugin->reset();
+    slot.cutoff = nullptr;
+    for (auto* p : slot.plugin->getParameters())
+        if (p->getName(64) == "A Filter 1 Cutoff") { slot.cutoff = p; slot.cutoffBase = p->getValue(); }
+    slot.gain = juce::Decibels::decibelsToGain(e.gainDb);
+    slot.entry = entry;
+    slot.quiet = 0;
+    slot.midi.clear();
+    return {};
+}
+
 juce::String Engine::delayDescription() const
 {
     const auto dot = juce::String::fromUTF8(" \xc2\xb7 ");
     return "1/8." + dot + juce::String(delaySeconds_[0], 2) + " s | 1/4" + dot + juce::String(delaySeconds_[1], 2) + " s";
+}
+
+juce::String Engine::currentPatch(int track) const
+{
+    const auto& t = tracks_[track];
+    const int e = t.slots[t.live.load()].entry;
+    return e < 0 ? juce::String() : palette_.parts[track][size_t(e)].patch;
 }
 
 void Engine::start(uint64_t seed, int startBar)
@@ -320,6 +407,8 @@ void Engine::start(uint64_t seed, int startBar)
             if (held[t][p] > 0) carried.push_back({ startTick, Event::NoteOn, uint8_t(t), uint8_t(p), held[t][p] });
     std::sort(carried.begin(), carried.end());
 
+    auto plan = planSounds(*next, palette_, seed);
+
     // The delay is a division of the bar (A-9): dotted eighth left, quarter right; the
     // tape wobble takes one bar per cycle.
     const double beat = 60.0 / next->bpm();
@@ -332,8 +421,10 @@ void Engine::start(uint64_t seed, int startBar)
         setParameterText(*delay_, "Modulation Rate", juce::String(1.0 / (4 * beat), 3) + " Hz");
     }
 
+    // Hold the lock for the whole reload: the audio thread plays silence meanwhile.
     const juce::SpinLock::ScopedLockType sl(lock_);
     composer_ = std::move(next);
+    plan_ = std::move(plan);
     samplesPerTick_ = sampleRate_ * 60.0 / (composer_->bpm() * kPPQ);
     endSample_ = sampleOf(int64_t(composer_->totalBars()) * kBarTicks);
     events_.assign(carried.begin(), carried.end());
@@ -348,7 +439,23 @@ void Engine::start(uint64_t seed, int startBar)
         t.gain.reset(sampleRate_, barSeconds); // level changes glide across a whole bar
         t.gain.setCurrentAndTargetValue(level[i]);
         t.filterNow = t.filterTarget = filter[i];
+        std::copy(std::begin(held[i]), std::end(held[i]), std::begin(t.held));
+
+        // This part's sound at the start bar is the last change at or before it.
+        t.changes.clear();
+        int entry = 0;
+        for (auto& c : plan_)
+            if (c.track == i && c.bar <= startBar) entry = c.entry;
+            else if (c.track == i) t.changes.push_back(c);
+        t.nextChange = 0;
+        t.live = 0;
+        t.slots[1].state = Idle;
+        t.slots[1].entry = -1;
+        if (auto e = loadInto(t.slots[0], i, entry); e.isNotEmpty()) DBG(e);
+        t.slots[0].state = Live;
     }
+    changesMade = 0;
+    missedChanges = 0;
     limiter.reset();
     bar = startBar;
     finished_ = false;
@@ -360,6 +467,72 @@ void Engine::stop()
 {
     playing_ = false;
     panic_ = true;
+}
+
+void Engine::service()
+{
+    for (int i = 0; i < kNumTracks; ++i)
+    {
+        auto& t = tracks_[i];
+        const size_t next = t.nextChange.load();
+        if (next >= t.changes.size()) continue;
+        auto& spare = t.slots[1 - t.live.load()];
+        int expected = Idle;
+        if (!spare.state.compare_exchange_strong(expected, Loading)) continue; // still ringing out, or already loaded
+        if (auto e = loadInto(spare, i, t.changes[next].entry); e.isNotEmpty())
+        {
+            DBG(e);
+            spare.state = Idle;
+            continue;
+        }
+        spare.state = Ready;
+    }
+}
+
+// Audio thread. Hands the part to its other instance at sample `at`: the notes still held
+// move across (released on the old sound, struck on the new), and the old one rings out.
+void Engine::changeSound(int track, int at)
+{
+    auto& t = tracks_[track];
+    const size_t next = t.nextChange.load();
+    auto& from = t.slots[t.live.load()];
+    auto& to = t.slots[1 - t.live.load()];
+    const int64_t tick = int64_t(t.changes[next].bar) * kBarTicks;
+    if (to.state.load() == Ready && to.entry == t.changes[next].entry)
+    {
+        for (int p = 0; p < 128; ++p)
+            if (t.held[p] > 0)
+            {
+                from.releasing[p] = true;
+                // A note released on this very tick (the pad's old chord) is not carried over:
+                // striking it on the new sound only to release it at once would blip.
+                bool endsHere = false;
+                for (size_t k = head_; k < events_.size() && events_[k].tick == tick && !endsHere; ++k)
+                    endsHere = events_[k].type == Event::NoteOff && events_[k].track == track && events_[k].pitch == p;
+                if (endsHere)
+                {
+                    from.releasing[p] = false;
+                    from.midi.addEvent(juce::MidiMessage::noteOff(1, p), at);
+                }
+                else
+                    to.midi.addEvent(juce::MidiMessage::noteOn(1, p, t.held[p]), at);
+            }
+        // The old sound holds its notes for one more bar while the new one fades in, so a
+        // slow-attack pad crossfades instead of dipping (measured: a 7.6 dB dip without this).
+        from.releaseAt = pos_ + at + int64_t(4 * kPPQ * samplesPerTick_);
+        from.quiet = 0;
+        from.tailed = 0;
+        from.state = Tail;
+        to.state = Live;
+        t.live = 1 - t.live.load();
+        ++changesMade;
+    }
+    else
+    {
+        ++missedChanges;
+        if (to.state.load() == Ready) to.state = Idle; // loaded for a change that has passed
+    }
+    t.nextChange = next + 1;
 }
 
 void Engine::render(float* const* out, int numChannels, int numSamples)
@@ -385,10 +558,11 @@ void Engine::renderChunk(float* const* out, int numChannels, int offset, int len
 
     if (panic_.exchange(false))
         for (auto& t : tracks_)
-        {
-            t.midi.addEvent(juce::MidiMessage::allNotesOff(1), 0);
-            t.midi.addEvent(juce::MidiMessage::allSoundOff(1), 0);
-        }
+            for (auto& s : t.slots)
+            {
+                s.midi.addEvent(juce::MidiMessage::allNotesOff(1), 0);
+                s.midi.addEvent(juce::MidiMessage::allSoundOff(1), 0);
+            }
 
     if (playing)
     {
@@ -400,6 +574,17 @@ void Engine::renderChunk(float* const* out, int numChannels, int offset, int len
             std::sort(events_.begin() + long(head_), events_.end());
         }
 
+        // A part's sound changes at its bar: everything before it plays on the old sound.
+        auto changesDue = [&](int track, int64_t uptoSample) {
+            auto& t = tracks_[track];
+            while (t.nextChange.load() < t.changes.size())
+            {
+                const int64_t s = sampleOf(int64_t(t.changes[t.nextChange.load()].bar) * kBarTicks);
+                if (s > uptoSample) break;
+                changeSound(track, int(juce::jlimit<int64_t>(0, len - 1, s - pos_)));
+            }
+        };
+
         for (; head_ < events_.size(); ++head_)
         {
             const auto& e = events_[head_];
@@ -407,14 +592,18 @@ void Engine::renderChunk(float* const* out, int numChannels, int offset, int len
             if (s >= end) break;
             const int at = int(juce::jlimit<int64_t>(0, len - 1, s - pos_));
             auto& t = tracks_[e.track];
+            changesDue(e.track, s);
+            auto& live = t.slots[t.live.load()];
             switch (e.type)
             {
-                case Event::NoteOn:  t.midi.addEvent(juce::MidiMessage::noteOn(1, e.pitch, e.value), at); break;
-                case Event::NoteOff: t.midi.addEvent(juce::MidiMessage::noteOff(1, e.pitch), at); break;
+                case Event::NoteOn:  live.midi.addEvent(juce::MidiMessage::noteOn(1, e.pitch, e.value), at); t.held[e.pitch] = e.value; break;
+                case Event::NoteOff: live.midi.addEvent(juce::MidiMessage::noteOff(1, e.pitch), at); t.held[e.pitch] = 0; break;
                 case Event::Level:   t.gain.setTargetValue(e.value); break;
                 case Event::Filter:  t.filterTarget = e.value; break;
             }
         }
+        for (int i = 0; i < kNumTracks; ++i) changesDue(i, end - 1);
+
         if (head_ > 8192) // keep the queue's memory; just drop what has played
         {
             events_.erase(events_.begin(), events_.begin() + long(head_));
@@ -437,37 +626,69 @@ void Engine::renderChunk(float* const* out, int numChannels, int offset, int len
     for (int i = 0; i < kNumTracks; ++i)
     {
         auto& t = tracks_[i];
-        if (!t.plugin || !(enabledTracks & (1 << i))) continue;
-
-        if (t.cutoff)
+        // Glide the filter towards its target over about a quarter second.
+        t.filterNow += (t.filterTarget - t.filterNow) * juce::jmin(1.0f, float(len / (0.25 * sampleRate_)));
+        for (int n = 0; n < len; ++n) gains_[size_t(n)] = t.gain.getNextValue();
+        if (!(enabledTracks & (1 << i)))
         {
-            // Glide the filter towards its target over about a quarter second.
-            t.filterNow += (t.filterTarget - t.filterNow) * juce::jmin(1.0f, float(len / (0.25 * sampleRate_)));
-            float v = juce::jlimit(0.0f, 1.0f, t.cutoffBase + 0.2f * t.filterNow);
-            if (std::abs(v - t.cutoff->getValue()) > 1e-4f) t.cutoff->setValue(v);
+            for (auto& slot : t.slots)
+            {
+                slot.midi.clear();
+                if (slot.state.load() == Tail) slot.state = Idle;
+            }
+            continue;
         }
 
-        t.buffer.clear();
-        juce::AudioBuffer<float> view(t.buffer.getArrayOfWritePointers(), t.buffer.getNumChannels(), len);
-        t.plugin->processBlock(view, t.midi);
-        t.midi.clear();
-        if (effects && inserts)
-            for (auto& fx : t.inserts) runFx(*fx, view);
-
-        for (int n = 0; n < len; ++n) gains_[size_t(n)] = t.gain.getNextValue() * t.trim;
         float peak = 0;
         double sq = 0;
-        for (int c = 0; c < 2; ++c)
+        for (auto& slot : t.slots)
         {
-            const float* src = view.getReadPointer(juce::jmin(c, view.getNumChannels() - 1));
-            for (int n = 0; n < len; ++n)
+            const int state = slot.state.load();
+            if (state != Live && state != Tail) { slot.midi.clear(); continue; }
+            if (state == Tail && slot.releaseAt >= 0 && slot.releaseAt < pos_ + len)
             {
-                float x = src[n] * gains_[size_t(n)];
-                pa[c][n] += x;
-                delayIn.getWritePointer(c)[n] += x * t.delaySend;
-                reverbIn.getWritePointer(c)[n] += x * t.reverbSend;
-                peak = juce::jmax(peak, std::abs(x));
-                sq += double(x) * x;
+                const int at = int(juce::jlimit<int64_t>(0, len - 1, slot.releaseAt - pos_));
+                for (int p = 0; p < 128; ++p)
+                    if (slot.releasing[p]) { slot.midi.addEvent(juce::MidiMessage::noteOff(1, p), at); slot.releasing[p] = false; }
+                slot.releaseAt = -1;
+                slot.quiet = 0;
+            }
+            if (slot.cutoff)
+            {
+                float v = juce::jlimit(0.0f, 1.0f, slot.cutoffBase + 0.2f * t.filterNow);
+                if (std::abs(v - slot.cutoff->getValue()) > 1e-4f) slot.cutoff->setValue(v);
+            }
+            t.buffer.clear();
+            juce::AudioBuffer<float> view(t.buffer.getArrayOfWritePointers(), t.buffer.getNumChannels(), len);
+            slot.plugin->processBlock(view, slot.midi);
+            slot.midi.clear();
+
+            float slotPeak = 0;
+            for (int c = 0; c < 2; ++c)
+            {
+                const float* src = view.getReadPointer(juce::jmin(c, view.getNumChannels() - 1));
+                for (int n = 0; n < len; ++n)
+                {
+                    float x = src[n] * gains_[size_t(n)] * slot.gain;
+                    pa[c][n] += x;
+                    delayIn.getWritePointer(c)[n] += x * kSends[i][0];
+                    reverbIn.getWritePointer(c)[n] += x * kSends[i][1];
+                    slotPeak = juce::jmax(slotPeak, std::abs(src[n]));
+                    sq += double(x) * x;
+                }
+            }
+            peak = juce::jmax(peak, slotPeak * slot.gain);
+            // A sound that has rung out for two seconds frees its instance for the next one;
+            // one that never quite falls silent (a noise layer) is cut after 20 seconds.
+            if (state == Tail)
+            {
+                slot.quiet = slotPeak < 1e-5f && slot.releaseAt < 0 ? slot.quiet + len : slot.quiet;
+                slot.tailed += len;
+                if (slot.quiet > int64_t(2 * sampleRate_) || slot.tailed > int64_t(20 * sampleRate_))
+                {
+                    slot.midi.addEvent(juce::MidiMessage::allSoundOff(1), 0);
+                    slot.state = Idle;
+                }
             }
         }
         meters[i].peak = juce::jmax(meters[i].peak.load(), peak);

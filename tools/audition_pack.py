@@ -55,7 +55,7 @@ def main(out_dir):
     os.makedirs(out_dir, exist_ok=True)
     lines = ['Lisztmachine audition pack, round 1: character',
              f'Every clip: seed {SEED}, the first {BARS} bars of "{SECTION}", that part alone, through the shared',
-             'delay and reverb, without the per-track distortion (that is round 2). Loudness-matched.',
+             'delay and reverb. Loudness-matched.',
              '', '00-reference: the whole mix as it is now.', '']
     wav = os.path.join(out_dir, '00-reference.wav')
     render(wav, [])
@@ -65,7 +65,7 @@ def main(out_dir):
         for i, patch in enumerate(patches, 1):
             name = f'{part}-{i:02d} {patch.split("/")[1]}'
             wav = os.path.join(out_dir, name + '.wav')
-            render(wav, ['--solo', part, '--no-inserts', '--patch', f'{part}={patch}'])
+            render(wav, ['--solo', part, '--patch', f'{part}={patch}'])
             level = to_mp3(wav, os.path.join(out_dir, name + '.mp3'))
             note = '' if level is not None else '  (SILENT: no clip)'
             lines.append(f'  {i:2d}  {patch}{note}')

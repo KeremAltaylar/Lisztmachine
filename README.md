@@ -28,5 +28,11 @@ Needs Surge XT installed. The build directory lives outside OneDrive on purpose.
     liszt_render --seed 7 --seconds 120 --solo seq --patch "seq=Plucks/Saw Pluck" --out try.wav
     liszt_render --audition "Pads/Juno-60 Strings"
 
-Any Surge XT factory patch can stand in for a track with `--patch track=Category/Name`.
-The defaults are in `kBerlinSounds` in `src/engine/Engine.h`.
+## Sounds
+
+Each part rotates through a palette of Surge XT patches over the concert: calm sections
+take the darker ones, the peak the brightest, and the parts change at different times with
+a one-bar crossfade. The palette is a text file, `sounds/berlin.txt`: one patch per line
+with its level (dB) and measured brightness. Edit it to add, drop or rebalance sounds.
+
+`--patch track=Category/Name` makes one part play a single patch instead.

@@ -2,8 +2,8 @@
 //   liszt_render [--seed N] [--seconds S] [--out file.wav] [--solo pad|bass|seq|lead]
 //                [--patch bass="Basses/Bass 1"]  (repeatable; any Surge factory patch)
 //                [--from Summit|<bar>] [--bars N]  start at a section or bar; render N bars + tail
-//                [--dry]                           no inserts, no delay or reverb
-//                [--no-inserts]                    shared delay and reverb only
+//                [--dry]                           no delay or reverb
+//                [--palette berlin]                sounds/<name>.txt
 //                                                             render a concert (+ .mid and .sections.txt)
 //   liszt_render --audition "Category/Patch" [note]           hold one note on a Surge patch, measure it
 //   liszt_render --probe <plugin.vst3>                        list what a plugin exposes
@@ -166,22 +166,23 @@ static void writeMidi(uint64_t seed, const juce::File& file)
     if (os.openedOk()) { os.setPosition(0); os.truncate(); mf.writeTo(os); }
 }
 
-static bool noInserts = false; // --no-inserts: hear a patch through the shared buses only
+static juce::String paletteName = "berlin"; // --palette <name>: sounds/<name>.txt
 
 static int renderConcert(uint64_t seed, double seconds, const juce::File& out, int solo, const juce::StringArray& patches, bool dry,
                          const juce::String& from, int bars)
 {
     const double sr = 48000;
     const int block = 512;
-    Engine engine;
-    for (auto& p : patches) // "bass=Templates/Init Square"
+    Palette palette;
+    if (auto e = palette.load(findPalette(paletteName)); e.isNotEmpty()) { std::cerr << e << "\n"; return 1; }
+    for (auto& p : patches) // "bass=Templates/Init Square": that part plays only this patch
         for (int t = 0; t < kNumTracks; ++t)
             if (p.upToFirstOccurrenceOf("=", false, false) == kTrackNames[t])
-                engine.patchOverride[t] = p.fromFirstOccurrenceOf("=", false, false);
-    if (auto e = engine.load(sr, block); e.isNotEmpty()) { std::cerr << e << "\n"; return 1; }
+                palette.parts[t] = { { p.fromFirstOccurrenceOf("=", false, false), 0.0f, 0.0f } };
+    Engine engine;
+    if (auto e = engine.load(sr, block, palette); e.isNotEmpty()) { std::cerr << e << "\n"; return 1; }
     if (solo >= 0) engine.enabledTracks = uint8_t(1 << solo);
     engine.effects = !dry;
-    engine.inserts = !noInserts;
     int startBar = 0;
     {
         Composer plan(seed);
@@ -202,6 +203,13 @@ static int renderConcert(uint64_t seed, double seconds, const juce::File& out, i
     }
     sections << c->totalBars() * 4 * 60.0 / c->bpm() << " 0 end\n";
     out.withFileExtension("sections.txt").replaceWithText(sections);
+    std::cout << "sounds:\n";
+    for (auto& ch : engine.soundPlan())
+    {
+        double t = ch.bar * 4 * 60.0 / c->bpm();
+        std::cout << "  " << int(t) / 60 << ":" << juce::String(int(t) % 60).paddedLeft('0', 2) << "  " << kTrackNames[ch.track]
+                  << " -> " << engine.palette().parts[ch.track][size_t(ch.entry)].patch << "\n";
+    }
 
     out.deleteFile();
     std::unique_ptr<juce::OutputStream> stream = std::make_unique<juce::FileOutputStream>(out);
@@ -219,6 +227,7 @@ static int renderConcert(uint64_t seed, double seconds, const juce::File& out, i
     int64_t done = 0;
     while (done < total && !engine.isFinished())
     {
+        engine.service(); // what the app's timer does: load each part's next sound ahead
         engine.render(buf.getArrayOfWritePointers(), 2, block);
         writer->writeFromAudioSampleBuffer(buf, 0, block);
         done += block;
@@ -239,6 +248,7 @@ static int renderConcert(uint64_t seed, double seconds, const juce::File& out, i
     show("delay return", engine.delayMeter);
     show("reverb return", engine.reverbMeter);
     std::cout << "  delay " << engine.delayDescription() << "\n";
+    std::cout << "sound changes made " << engine.changesMade << ", missed " << engine.missedChanges << "\n";
     return 0;
 }
 
@@ -270,6 +280,6 @@ int main(int argc, char** argv)
         if (args[i] == "--from") from = args[i + 1];
         if (args[i] == "--bars") bars = args[i + 1].getIntValue();
     }
-    noInserts = args.contains("--no-inserts");
+    if (int i = args.indexOf("--palette"); i >= 0) paletteName = args[i + 1];
     return renderConcert(seed, seconds, out, solo, patches, args.contains("--dry"), from, bars);
 }

@@ -1,0 +1,59 @@
+# Lisztmachine sound palette: Berlin scene.
+# One patch per line. Each part rotates through its patches over the concert:
+# calm sections get the darker ones, the peak the brightest. Edit freely:
+#   part     pad | bass | seq | lead
+#   gain     dB applied to this patch (sets its level in the mix)
+#   bright   measured spectral centroid in Hz (orders the patches dark -> bright)
+#   patch    Surge XT factory patch, Category/Name
+# part  gain   bright  patch
+pad     -9.1    576  Polysynths/Disturbing Resonance
+pad     -8.7    773  Pads/Smooth Dist
+pad     -8.8   1080  Polysynths/Dirty Hole
+pad     -5.8   1131  Polysynths/Havoc
+pad     -6.8   1427  Polysynths/Uni Saw FB
+pad      4.7   1869  Polysynths/Serious Distortion
+pad     -3.7   1921  Pads/Harsh Saw
+pad     -3.9   2263  Pads/Endgame
+pad     -4.3   2369  Polysynths/Hugeness
+pad     -5.3   2601  Polysynths/Megasynth 1
+pad     -7.7   2916  Polysynths/Megasynth 3
+pad     -8.8   5053  Polysynths/Zizzly Saw
+
+bass   -11.3    316  Basses/Behemoth
+bass    -7.0    688  Basses/Distorted FM
+bass    -7.9    845  Basses/Distorted MW
+bass    -2.9    851  Basses/Doomsday
+bass    -3.1   1070  Basses/Dist Bass 2
+bass    -6.7   1207  Basses/Dist Bass 1
+bass    -1.9   1265  Basses/Metal Square
+bass    -8.3   1290  Basses/Evilous
+bass    -5.1   1579  Basses/Distorted Bass
+bass    -4.2   1959  Basses/Lord Sawtooth
+bass    -7.5   2115  Basses/Static 1
+bass    -7.3   2230  Basses/Saw Lo-Fi
+
+seq    -12.4    687  Sequences/Acid Seq 3
+seq     -6.5   1141  Sequences/Damn Aliens
+seq    -13.5   1301  Sequences/Evilish
+seq    -10.3   1358  Sequences/Acid Seq 2
+seq     -9.1   1391  Sequences/FB Seq
+seq     -3.3   1703  Sequences/Madness
+seq      1.3   2129  Sequences/Distorted Glassy Seq
+seq     -4.4   2491  Sequences/Acid Seq 1
+seq     -3.7   3869  Sequences/Fold Sseq
+seq     -3.9   3945  Sequences/Tyskland
+seq      4.1   4090  Sequences/Burial Ground
+seq     -1.5   4194  Sequences/Sync Accident
+
+lead    -6.4   1236  Leads/Rough
+lead   -16.8   1504  Leads/Scream Lead
+lead    -9.4   1997  Leads/Turbo
+lead   -15.7   2122  Leads/Untamed
+lead   -12.4   2405  Leads/Synth Guitar 1
+lead    -7.4   2469  Leads/Synth Guitar 2
+lead   -11.4   3065  Leads/Resofest 2
+lead    -9.3   3154  Leads/Harsh
+lead   -10.7   3387  Leads/Turbo Solo
+lead   -10.5   3669  Leads/Distortionworks
+lead   -11.1   3765  Leads/Nastyfication
+lead    -8.8   4138  Leads/Squelch
