@@ -45,7 +45,7 @@ target_link_libraries(Lisztmachine PRIVATE liszt_engine)
 # Offline renderer: N minutes of the concert to a WAV, as fast as the CPU allows.
 juce_add_console_app(liszt_render PRODUCT_NAME "liszt_render")
 target_sources(liszt_render PRIVATE src/render/RenderMain.cpp)
-target_link_libraries(liszt_render PRIVATE liszt_engine)
+target_link_libraries(liszt_render PRIVATE liszt_engine juce::juce_dsp)
 
 add_executable(liszt_tests tests/CoreTests.cpp)
 target_link_libraries(liszt_tests PRIVATE liszt_core)

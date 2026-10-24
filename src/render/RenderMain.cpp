@@ -2,10 +2,11 @@
 //   liszt_render [--seed N] [--seconds S] [--out file.wav] [--solo pad|bass|seq|lead]
 //                [--patch bass="Basses/Bass 1"]  (repeatable; any Surge factory patch)
 //                                                             render a concert (+ .mid and .sections.txt)
-//   liszt_render --audition "Category/Patch"                  hold one note on a Surge patch, measure it
+//   liszt_render --audition "Category/Patch" [note]           hold one note on a Surge patch, measure it
 //   liszt_render --probe <plugin.vst3>                        list what a plugin exposes
 #include "Engine.h"
 #include <juce_audio_formats/juce_audio_formats.h>
+#include <juce_dsp/juce_dsp.h>
 #include <iostream>
 
 using namespace liszt;
@@ -24,8 +25,33 @@ static int probe(const juce::String& path)
     std::cout << p->getName() << ": " << p->getNumPrograms() << " programs, "
               << p->getParameters().size() << " parameters\n";
     for (auto* prm : p->getParameters())
-        if (prm->getName(64).containsIgnoreCase("cutoff"))
-            std::cout << "  " << prm->getParameterIndex() << " " << prm->getName(64) << " = " << prm->getValue() << "\n";
+        if (p->getParameters().size() < 200 || prm->getName(64).containsIgnoreCase("cutoff"))
+            std::cout << "  " << prm->getParameterIndex() << " " << prm->getName(64) << " = " << prm->getValue()
+                      << " (" << prm->getCurrentValueAsText() << ")\n";
+
+    // A plugin with an "FX Type" switch (Surge XT Effects): walk every type and show what its
+    // generic parameters mean there, by name and by value text.
+    p->prepareToPlay(48000.0, 512);
+    for (auto* type : p->getParameters())
+    {
+        if (type->getName(64) != "FX Type") continue;
+        juce::String last;
+        for (int s = 0; s <= 100; ++s) // the switch reports itself continuous, so sweep it
+        {
+            type->setValue(float(s) / 100.0f);
+            if (type->getCurrentValueAsText() == last) continue;
+            last = type->getCurrentValueAsText();
+            juce::AudioBuffer<float> buf(juce::jmax(2, p->getTotalNumOutputChannels()), 512);
+            juce::MidiBuffer midi;
+            for (int b = 0; b < 4; ++b) p->processBlock(buf, midi); // let the type change take
+            std::cout << "type " << s << " (" << type->getValue() << "): " << type->getCurrentValueAsText() << "\n   ";
+            for (auto* prm : p->getParameters())
+                if (prm != type && prm->getName(64) != "Bypass")
+                    std::cout << " [" << prm->getName(64).fromLastOccurrenceOf(" ", false, false) << "] "
+                              << p->getParameterName(prm->getParameterIndex()) << "=" << prm->getCurrentValueAsText();
+            std::cout << "\n";
+        }
+    }
     return 0;
 }
 
@@ -49,7 +75,27 @@ static double pitchOf(const float* x, int n, double sr)
     return 0;
 }
 
-static int audition(const juce::String& patch)
+// Spectral centroid of a stretch of audio: the "brightness". Lower is darker.
+static double centroidOf(const std::vector<float>& x, size_t from, double sr)
+{
+    constexpr int order = 12, n = 1 << order;
+    juce::dsp::FFT fft(order);
+    std::vector<float> win(n), work(2 * n);
+    juce::dsp::WindowingFunction<float>::fillWindowingTables(win.data(), n, juce::dsp::WindowingFunction<float>::hann, false);
+    std::vector<double> mag(n / 2, 0.0);
+    for (size_t at = from; at + n <= x.size(); at += n)
+    {
+        std::fill(work.begin(), work.end(), 0.0f);
+        for (int i = 0; i < n; ++i) work[size_t(i)] = x[at + size_t(i)] * win[size_t(i)];
+        fft.performFrequencyOnlyForwardTransform(work.data());
+        for (int k = 0; k < n / 2; ++k) mag[size_t(k)] += work[size_t(k)];
+    }
+    double num = 0, den = 0;
+    for (int k = 1; k < n / 2; ++k) { num += mag[size_t(k)] * k * sr / n; den += mag[size_t(k)]; }
+    return den > 0 ? num / den : 0;
+}
+
+static int audition(const juce::String& patch, int note)
 {
     const double sr = 48000;
     const int block = 256;
@@ -65,8 +111,8 @@ static int audition(const juce::String& patch)
     for (int b = 0; b < holdBlocks + tailBlocks; ++b)
     {
         juce::MidiBuffer midi;
-        if (b == 0) midi.addEvent(juce::MidiMessage::noteOn(1, 57, 0.8f), 0);
-        if (b == holdBlocks) midi.addEvent(juce::MidiMessage::noteOff(1, 57), 0);
+        if (b == 0) midi.addEvent(juce::MidiMessage::noteOn(1, note, 0.8f), 0);
+        if (b == holdBlocks) midi.addEvent(juce::MidiMessage::noteOff(1, note), 0);
         buf.clear();
         surge->processBlock(buf, midi);
         auto& dst = b < holdBlocks ? hold : tail;
@@ -78,14 +124,14 @@ static int audition(const juce::String& patch)
     std::vector<double> cents;
     for (size_t at = size_t(0.5 * sr); at + 2048 < hold.size(); at += size_t(0.05 * sr))
         if (double f = pitchOf(hold.data() + at, 2048, sr); f > 0)
-            cents.push_back(1200 * std::log2(f / 220.0));
+            cents.push_back(1200 * std::log2(f / (440.0 * std::pow(2.0, (note - 69) / 12.0))));
     std::sort(cents.begin(), cents.end());
     double tailSq = 0;
     for (size_t i = tail.size() - size_t(0.1 * sr); i < tail.size(); ++i) tailSq += tail[i] * tail[i];
 
     std::cout << patch << ": peak " << dbfs(peak) << " dBFS, rms " << dbfs(std::sqrt(sq / hold.size())) << " dBFS";
     if (!cents.empty())
-        std::cout << ", pitch vs A3 " << juce::roundToInt(cents[cents.size() / 2]) << " cents (spread "
+        std::cout << ", centroid " << juce::roundToInt(centroidOf(hold, size_t(0.5 * sr), sr)) << " Hz, pitch vs note " << juce::roundToInt(cents[cents.size() / 2]) << " cents (spread "
                   << juce::roundToInt(cents.back() - cents.front()) << ")";
     else
         std::cout << ", no stable pitch";
@@ -117,7 +163,7 @@ static void writeMidi(uint64_t seed, const juce::File& file)
     if (os.openedOk()) { os.setPosition(0); os.truncate(); mf.writeTo(os); }
 }
 
-static int renderConcert(uint64_t seed, double seconds, const juce::File& out, int solo, const juce::StringArray& patches)
+static int renderConcert(uint64_t seed, double seconds, const juce::File& out, int solo, const juce::StringArray& patches, bool dry)
 {
     const double sr = 48000;
     const int block = 512;
@@ -128,6 +174,7 @@ static int renderConcert(uint64_t seed, double seconds, const juce::File& out, i
                 engine.patchOverride[t] = p.fromFirstOccurrenceOf("=", false, false);
     if (auto e = engine.load(sr, block); e.isNotEmpty()) { std::cerr << e << "\n"; return 1; }
     if (solo >= 0) engine.enabledTracks = uint8_t(1 << solo);
+    engine.effects = !dry;
     engine.start(seed);
     auto* c = engine.composer();
     std::cout << "seed " << seed << ": " << c->describe() << "\n";
@@ -169,12 +216,14 @@ static int renderConcert(uint64_t seed, double seconds, const juce::File& out, i
               << out.getFullPathName() << "\n";
     std::cout << "master peak before limiter " << dbfs(engine.peakPre) << " dBFS, after " << dbfs(engine.peakPost) << " dBFS; limiter deepest "
               << engine.limiter.maxReductionDb << " dB, clamped samples " << engine.limiter.clipped << "\n";
-    for (int t = 0; t < kNumTracks; ++t)
-    {
-        auto& m = engine.meters[t];
-        std::cout << "  " << kTrackNames[t] << ": peak " << dbfs(m.peak) << " dBFS, rms "
+    auto show = [](const char* name, const Engine::Meter& m) {
+        std::cout << "  " << name << ": peak " << dbfs(m.peak) << " dBFS, rms "
                   << dbfs(std::sqrt(m.sumSquares / juce::jmax<int64_t>(1, m.samples))) << " dBFS\n";
-    }
+    };
+    for (int t = 0; t < kNumTracks; ++t) show(kTrackNames[t], engine.meters[t]);
+    show("delay return", engine.delayMeter);
+    show("reverb return", engine.reverbMeter);
+    std::cout << "  delay " << engine.delayDescription() << "\n";
     return 0;
 }
 
@@ -183,7 +232,7 @@ int main(int argc, char** argv)
     juce::ScopedJuceInitialiser_GUI init;
     juce::StringArray args(argv + 1, argc - 1);
     if (args[0] == "--probe") return probe(args[1]);
-    if (args[0] == "--audition") return audition(args[1]);
+    if (args[0] == "--audition") return audition(args[1], args.size() > 2 ? args[2].getIntValue() : 57);
 
     uint64_t seed = 1;
     double seconds = 0;
@@ -200,5 +249,5 @@ int main(int argc, char** argv)
             for (int t = 0; t < kNumTracks; ++t)
                 if (args[i + 1] == kTrackNames[t]) solo = t;
     }
-    return renderConcert(seed, seconds, out, solo, patches);
+    return renderConcert(seed, seconds, out, solo, patches, args.contains("--dry"));
 }

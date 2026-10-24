@@ -36,18 +36,110 @@ juce::File findSurgePatch(const juce::String& categoryAndName)
     return root.getChildFile(categoryAndName + ".fxp");
 }
 
-std::unique_ptr<juce::AudioPluginInstance> createSurge(double sampleRate, int maxBlock, juce::String& error)
+juce::File findSurgeEffects()
 {
-    auto file = findSurgePlugin();
-    if (!file.exists()) { error = "Surge XT is not installed (no Surge XT.vst3 found)"; return nullptr; }
+    return firstExisting({ "C:/Program Files/Common Files/VST3/Surge Synth Team/Surge XT Effects.vst3",
+                           "C:/Program Files/Common Files/VST3/Surge XT Effects.vst3",
+                           "/Library/Audio/Plug-Ins/VST3/Surge XT Effects.vst3" });
+}
 
+static std::unique_ptr<juce::AudioPluginInstance> createVst3(const juce::File& file, double sampleRate, int maxBlock,
+                                                             juce::String& error)
+{
+    if (!file.exists()) { error = "not installed: " + file.getFileName(); return nullptr; }
     juce::VST3PluginFormat vst3;
     juce::OwnedArray<juce::PluginDescription> types;
     vst3.findAllTypesForFile(types, file.getFullPathName());
     if (types.isEmpty()) { error = "could not read " + file.getFullPathName(); return nullptr; }
-    auto p = vst3.createInstanceFromDescription(*types[0], sampleRate, maxBlock, error);
+    return vst3.createInstanceFromDescription(*types[0], sampleRate, maxBlock, error);
+}
+
+std::unique_ptr<juce::AudioPluginInstance> createSurge(double sampleRate, int maxBlock, juce::String& error)
+{
+    auto file = findSurgePlugin();
+    if (!file.exists()) { error = "Surge XT is not installed (no Surge XT.vst3 found)"; return nullptr; }
+    auto p = createVst3(file, sampleRate, maxBlock, error);
     if (p) p->enableAllBuses();
     return p;
+}
+
+juce::String setParameterText(juce::AudioPluginInstance& plugin, const juce::String& name, const juce::String& value)
+{
+    juce::AudioProcessorParameter* p = nullptr;
+    for (auto* q : plugin.getParameters())
+        if (q->getName(128) == name) p = q;
+    if (!p)
+    {
+        juce::StringArray names;
+        for (auto* q : plugin.getParameters()) names.add(q->getName(128));
+        return "no parameter '" + name + "' (has: " + names.joinIntoString(", ") + ")";
+    }
+
+    // Numbers compare as numbers ("7 s" vs "7.00 s"); choices compare as text.
+    const bool numeric = value.trimStart().containsAnyOf("0123456789") && (juce::CharacterFunctions::isDigit(value.trimStart()[0]) || value.trimStart()[0] == '-');
+    auto num = [](const juce::String& s) { return s.retainCharacters("-0123456789.").getDoubleValue(); };
+    auto matches = [&] {
+        auto t = p->getCurrentValueAsText();
+        return numeric ? std::abs(num(t) - num(value)) <= 0.02 * std::abs(num(value)) + 0.011 : t.equalsIgnoreCase(value);
+    };
+
+    if (!numeric)
+    {
+        // A choice: set the middle of the range that shows this label. Its edges are where
+        // host and plugin round differently: "Distortion" at the edge ran as Rotary Speaker.
+        int first = -1, last = -1;
+        for (int i = 0; i <= 2000; ++i)
+        {
+            p->setValue(float(i) / 2000.0f);
+            if (p->getCurrentValueAsText().equalsIgnoreCase(value)) { if (first < 0) first = i; last = i; }
+            else if (first >= 0) break;
+        }
+        if (first >= 0) { p->setValue(float(first + last) / 4000.0f); return {}; }
+    }
+    else
+    {
+        p->setValue(p->getValueForText(value));
+        if (matches()) return {};
+    }
+
+    // The plugin did not parse the text: search the normalised range for it instead.
+    float best = -1;
+    double bestErr = 1e300;
+    juce::StringArray seen;
+    for (int i = 0; i <= 2000; ++i)
+    {
+        p->setValue(float(i) / 2000.0f);
+        auto t = p->getCurrentValueAsText();
+        seen.addIfNotAlreadyThere(t);
+        double err = numeric ? std::abs(num(t) - num(value)) : (t.equalsIgnoreCase(value) ? 0.0 : 1e300);
+        if (err < bestErr) { bestErr = err; best = float(i) / 2000.0f; }
+    }
+    if (best >= 0) p->setValue(best);
+    if (matches()) return {};
+    return "'" + name + "' wanted " + value + ", got " + p->getCurrentValueAsText()
+         + (numeric || seen.size() > 40 ? juce::String() : " (choices: " + seen.joinIntoString(", ") + ")");
+}
+
+std::unique_ptr<juce::AudioPluginInstance> createSurgeEffect(const FxSpec& spec, double sampleRate, int maxBlock,
+                                                             juce::String& error)
+{
+    auto fx = createVst3(findSurgeEffects(), sampleRate, maxBlock, error);
+    if (!fx) return nullptr;
+    fx->prepareToPlay(sampleRate, maxBlock);
+    if (auto e = setParameterText(*fx, "FX Type", spec.type); e.isNotEmpty()) { error = e; return nullptr; }
+
+    // The parameters take their names and ranges from the type once the plugin has run with it.
+    juce::AudioBuffer<float> buf(juce::jmax(2, fx->getTotalNumInputChannels(), fx->getTotalNumOutputChannels()), maxBlock);
+    juce::MidiBuffer midi;
+    for (int i = 0; i < 4; ++i) { buf.clear(); fx->processBlock(buf, midi); }
+
+    for (auto& prm : spec.params)
+        if (auto e = setParameterText(*fx, prm.name, prm.value); e.isNotEmpty())
+        {
+            error = juce::String(spec.type) + ": " + e;
+            return nullptr;
+        }
+    return fx;
 }
 
 juce::String loadSurgePatch(juce::AudioPluginInstance& surge, const juce::File& fxp)
@@ -155,7 +247,18 @@ juce::String Engine::load(double sampleRate, int maxBlock)
             return juce::String(kTrackNames[i]) + ": " + e;
 
         t.plugin->prepareToPlay(sampleRate, maxBlock);
-        t.buffer.setSize(juce::jmax(2, t.plugin->getTotalNumInputChannels(), t.plugin->getTotalNumOutputChannels()), maxBlock);
+        int channels = juce::jmax(2, t.plugin->getTotalNumInputChannels(), t.plugin->getTotalNumOutputChannels());
+        t.inserts.clear();
+        for (auto& spec : kBerlinSounds[i].inserts)
+        {
+            auto fx = createSurgeEffect(spec, sampleRate, maxBlock, err);
+            if (!fx) return juce::String(kTrackNames[i]) + " insert " + err;
+            channels = juce::jmax(channels, fx->getTotalNumInputChannels(), fx->getTotalNumOutputChannels());
+            t.inserts.push_back(std::move(fx));
+        }
+        t.delaySend = kBerlinSounds[i].delaySend;
+        t.reverbSend = kBerlinSounds[i].reverbSend;
+        t.buffer.setSize(channels, maxBlock);
         t.midi.ensureSize(8192);
         t.trim = juce::Decibels::decibelsToGain(kBerlinSounds[i].trimDb);
         t.cutoff = nullptr;
@@ -163,13 +266,41 @@ juce::String Engine::load(double sampleRate, int maxBlock)
             if (p->getName(64) == "A Filter 1 Cutoff") { t.cutoff = p; t.cutoffBase = p->getValue(); }
     }
 
+    juce::String err;
+    delay_ = createSurgeEffect(kDelayBus, sampleRate, maxBlock, err);
+    if (!delay_) return "delay bus: " + err;
+    reverb_ = createSurgeEffect(kReverbBus, sampleRate, maxBlock, err);
+    if (!reverb_) return "reverb bus: " + err;
+    auto busChannels = [](juce::AudioPluginInstance& p) { return juce::jmax(2, p.getTotalNumInputChannels(), p.getTotalNumOutputChannels()); };
+    delayBus_.setSize(busChannels(*delay_), maxBlock);
+    reverbBus_.setSize(busChannels(*reverb_), maxBlock);
+
     limiter.prepare(sampleRate, -1.0f, 150.0f);
     return {};
+}
+
+juce::String Engine::delayDescription() const
+{
+    const auto dot = juce::String::fromUTF8(" \xc2\xb7 ");
+    return "1/8." + dot + juce::String(delaySeconds_[0], 2) + " s | 1/4" + dot + juce::String(delaySeconds_[1], 2) + " s";
 }
 
 void Engine::start(uint64_t seed)
 {
     auto next = std::make_unique<Composer>(seed);
+
+    // The delay is a division of the bar (A-9): dotted eighth left, quarter right; the
+    // tape wobble takes one bar per cycle.
+    const double beat = 60.0 / next->bpm();
+    delaySeconds_[0] = float(0.75 * beat);
+    delaySeconds_[1] = float(beat);
+    if (delay_)
+    {
+        setParameterText(*delay_, "Delay Time Left", juce::String(delaySeconds_[0] * 1000.0, 2) + " ms");
+        setParameterText(*delay_, "Delay Time Right", juce::String(delaySeconds_[1] * 1000.0, 2) + " ms");
+        setParameterText(*delay_, "Modulation Rate", juce::String(1.0 / (4 * beat), 3) + " Hz");
+    }
+
     const juce::SpinLock::ScopedLockType sl(lock_);
     composer_ = std::move(next);
     samplesPerTick_ = sampleRate_ * 60.0 / (composer_->bpm() * kPPQ);
@@ -261,6 +392,16 @@ void Engine::renderChunk(float* const* out, int numChannels, int offset, int len
     }
 
     float* pa[2] = { out[0] + offset, (numChannels > 1 ? out[1] : out[0]) + offset };
+    juce::AudioBuffer<float> delayIn(delayBus_.getArrayOfWritePointers(), delayBus_.getNumChannels(), len);
+    juce::AudioBuffer<float> reverbIn(reverbBus_.getArrayOfWritePointers(), reverbBus_.getNumChannels(), len);
+    delayIn.clear();
+    reverbIn.clear();
+    auto runFx = [&](juce::AudioPluginInstance& fx, juce::AudioBuffer<float>& buf) {
+        for (int c = 2; c < buf.getNumChannels(); ++c) buf.clear(c, 0, len); // a side-chain input hears nothing
+        fx.processBlock(buf, noMidi_);
+        noMidi_.clear();
+    };
+
     for (int i = 0; i < kNumTracks; ++i)
     {
         auto& t = tracks_[i];
@@ -278,6 +419,8 @@ void Engine::renderChunk(float* const* out, int numChannels, int offset, int len
         juce::AudioBuffer<float> view(t.buffer.getArrayOfWritePointers(), t.buffer.getNumChannels(), len);
         t.plugin->processBlock(view, t.midi);
         t.midi.clear();
+        if (effects)
+            for (auto& fx : t.inserts) runFx(*fx, view);
 
         for (int n = 0; n < len; ++n) gains_[size_t(n)] = t.gain.getNextValue() * t.trim;
         float peak = 0;
@@ -289,6 +432,8 @@ void Engine::renderChunk(float* const* out, int numChannels, int offset, int len
             {
                 float x = src[n] * gains_[size_t(n)];
                 pa[c][n] += x;
+                delayIn.getWritePointer(c)[n] += x * t.delaySend;
+                reverbIn.getWritePointer(c)[n] += x * t.reverbSend;
                 peak = juce::jmax(peak, std::abs(x));
                 sq += double(x) * x;
             }
@@ -296,6 +441,30 @@ void Engine::renderChunk(float* const* out, int numChannels, int offset, int len
         meters[i].peak = juce::jmax(meters[i].peak.load(), peak);
         meters[i].sumSquares = meters[i].sumSquares.load() + sq;
         meters[i].samples = meters[i].samples.load() + 2 * len;
+    }
+
+    // The shared buses: the delay returns to the mix and also feeds the reverb.
+    auto meter = [len](Meter& m, const juce::AudioBuffer<float>& b) {
+        float peak = 0;
+        double sq = 0;
+        for (int c = 0; c < 2; ++c)
+            for (int n = 0; n < len; ++n) { float x = b.getSample(c, n); peak = juce::jmax(peak, std::abs(x)); sq += double(x) * x; }
+        m.peak = juce::jmax(m.peak.load(), peak);
+        m.sumSquares = m.sumSquares.load() + sq;
+        m.samples = m.samples.load() + 2 * len;
+    };
+    if (effects && delay_ && reverb_)
+    {
+        runFx(*delay_, delayIn);
+        for (int c = 0; c < 2; ++c)
+        {
+            juce::FloatVectorOperations::add(pa[c], delayIn.getReadPointer(c), len);
+            juce::FloatVectorOperations::addWithMultiply(reverbIn.getWritePointer(c), delayIn.getReadPointer(c), kDelayToReverb, len);
+        }
+        meter(delayMeter, delayIn);
+        runFx(*reverb_, reverbIn);
+        meter(reverbMeter, reverbIn);
+        for (int c = 0; c < 2; ++c) juce::FloatVectorOperations::add(pa[c], reverbIn.getReadPointer(c), len);
     }
 
     float pre = 0;
@@ -312,7 +481,7 @@ void Engine::renderChunk(float* const* out, int numChannels, int offset, int len
     if (playing && numChannels >= 4) renderClick(out, numChannels, offset, len);
 
     if (playing) { pos_ = end; seconds = double(pos_) / sampleRate_; }
-    if (playing && nextBar_ >= composer_->totalBars() && head_ >= events_.size() && pos_ > endSample_ + int64_t(6 * sampleRate_))
+    if (playing && nextBar_ >= composer_->totalBars() && head_ >= events_.size() && pos_ > endSample_ + int64_t(12 * sampleRate_)) // the reverb and delay tails
     {
         finished_ = true;
         playing_ = false;
