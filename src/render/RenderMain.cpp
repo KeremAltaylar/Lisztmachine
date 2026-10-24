@@ -1,6 +1,8 @@
 // liszt_render: the concert, offline and faster than real time.
 //   liszt_render [--seed N] [--seconds S] [--out file.wav] [--solo pad|bass|seq|lead]
 //                [--patch bass="Basses/Bass 1"]  (repeatable; any Surge factory patch)
+//                [--from Summit|<bar>] [--bars N]  start at a section or bar; render N bars + tail
+//                [--dry]                           no inserts, no delay or reverb
 //                                                             render a concert (+ .mid and .sections.txt)
 //   liszt_render --audition "Category/Patch" [note]           hold one note on a Surge patch, measure it
 //   liszt_render --probe <plugin.vst3>                        list what a plugin exposes
@@ -163,7 +165,8 @@ static void writeMidi(uint64_t seed, const juce::File& file)
     if (os.openedOk()) { os.setPosition(0); os.truncate(); mf.writeTo(os); }
 }
 
-static int renderConcert(uint64_t seed, double seconds, const juce::File& out, int solo, const juce::StringArray& patches, bool dry)
+static int renderConcert(uint64_t seed, double seconds, const juce::File& out, int solo, const juce::StringArray& patches, bool dry,
+                         const juce::String& from, int bars)
 {
     const double sr = 48000;
     const int block = 512;
@@ -175,7 +178,15 @@ static int renderConcert(uint64_t seed, double seconds, const juce::File& out, i
     if (auto e = engine.load(sr, block); e.isNotEmpty()) { std::cerr << e << "\n"; return 1; }
     if (solo >= 0) engine.enabledTracks = uint8_t(1 << solo);
     engine.effects = !dry;
-    engine.start(seed);
+    int startBar = 0;
+    {
+        Composer plan(seed);
+        for (auto& s : plan.sections())
+            if (from.equalsIgnoreCase(s.name)) startBar = s.startBar;
+        if (from.isNotEmpty() && from.containsOnly("0123456789")) startBar = from.getIntValue() - 1; // bars count from 1
+        if (bars > 0) seconds = bars * 4 * 60.0 / plan.bpm() + 4.0; // plus a tail for the delay and reverb
+    }
+    engine.start(seed, startBar);
     auto* c = engine.composer();
     std::cout << "seed " << seed << ": " << c->describe() << "\n";
     juce::String sections = "bpm " + juce::String(c->bpm()) + "\n";
@@ -236,7 +247,8 @@ int main(int argc, char** argv)
 
     uint64_t seed = 1;
     double seconds = 0;
-    int solo = -1;
+    int solo = -1, bars = 0;
+    juce::String from;
     juce::StringArray patches;
     juce::File out = juce::File::getCurrentWorkingDirectory().getChildFile("lisztmachine.wav");
     for (int i = 0; i + 1 < args.size(); ++i)
@@ -249,5 +261,10 @@ int main(int argc, char** argv)
             for (int t = 0; t < kNumTracks; ++t)
                 if (args[i + 1] == kTrackNames[t]) solo = t;
     }
-    return renderConcert(seed, seconds, out, solo, patches, args.contains("--dry"));
+    for (int i = 0; i + 1 < args.size(); ++i)
+    {
+        if (args[i] == "--from") from = args[i + 1];
+        if (args[i] == "--bars") bars = args[i + 1].getIntValue();
+    }
+    return renderConcert(seed, seconds, out, solo, patches, args.contains("--dry"), from, bars);
 }

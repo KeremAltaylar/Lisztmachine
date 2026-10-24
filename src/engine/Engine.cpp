@@ -285,9 +285,40 @@ juce::String Engine::delayDescription() const
     return "1/8." + dot + juce::String(delaySeconds_[0], 2) + " s | 1/4" + dot + juce::String(delaySeconds_[1], 2) + " s";
 }
 
-void Engine::start(uint64_t seed)
+void Engine::start(uint64_t seed, int startBar)
 {
     auto next = std::make_unique<Composer>(seed);
+    startBar = juce::jlimit(0, next->totalBars() - 1, startBar);
+
+    // Starting later: compose the bars before it silently (the sequences mutate as they go,
+    // so this is the only way to arrive at the same bar), keep the levels and filters they
+    // left behind, and re-strike every note still held at the start (A-15: a held pad must
+    // not wait for the next chord change).
+    const int64_t startTick = int64_t(startBar) * kBarTicks;
+    std::vector<Event> earlier, carried;
+    // Including the start bar itself: the pad releases its old chord on the first tick of
+    // the new bar, and without that release the re-struck old chord hung under the new one.
+    for (int b = 0; b <= startBar; ++b) next->generateBar(b, earlier);
+    std::sort(earlier.begin(), earlier.end());
+    float level[kNumTracks] = {}, filter[kNumTracks] = {}, held[kNumTracks][128] = {};
+    for (auto& e : earlier)
+    {
+        // A note-off on the start tick ends a note before it can be re-struck.
+        if (e.tick < startTick || (e.tick == startTick && e.type == Event::NoteOff))
+            switch (e.type)
+            {
+                case Event::Level:   level[e.track] = e.value; break;
+                case Event::Filter:  filter[e.track] = e.value; break;
+                case Event::NoteOn:  held[e.track][e.pitch] = e.value; break;
+                case Event::NoteOff: held[e.track][e.pitch] = 0; break;
+            }
+        else
+            carried.push_back(e);
+    }
+    for (int t = 0; t < kNumTracks; ++t)
+        for (int p = 0; p < 128; ++p)
+            if (held[t][p] > 0) carried.push_back({ startTick, Event::NoteOn, uint8_t(t), uint8_t(p), held[t][p] });
+    std::sort(carried.begin(), carried.end());
 
     // The delay is a division of the bar (A-9): dotted eighth left, quarter right; the
     // tape wobble takes one bar per cycle.
@@ -305,20 +336,21 @@ void Engine::start(uint64_t seed)
     composer_ = std::move(next);
     samplesPerTick_ = sampleRate_ * 60.0 / (composer_->bpm() * kPPQ);
     endSample_ = sampleOf(int64_t(composer_->totalBars()) * kBarTicks);
-    events_.clear();
+    events_.assign(carried.begin(), carried.end());
     head_ = 0;
-    nextBar_ = 0;
-    pos_ = -preRollSamples(); // 50 ms pre-roll: the all-notes-off sent on start must reach the plugins before bar 0. Sent in the same block, Surge applied it after the first notes and the opening pad was silent for 8 bars.
+    nextBar_ = startBar + 1;
+    pos_ = sampleOf(startTick) - preRollSamples(); // 50 ms pre-roll: the all-notes-off sent on start must reach the plugins before bar 0. Sent in the same block, Surge applied it after the first notes and the opening pad was silent for 8 bars.
     clickEnv_ = 0;
     const double barSeconds = 4 * 60.0 / composer_->bpm();
-    for (auto& t : tracks_)
+    for (int i = 0; i < kNumTracks; ++i)
     {
+        auto& t = tracks_[i];
         t.gain.reset(sampleRate_, barSeconds); // level changes glide across a whole bar
-        t.gain.setCurrentAndTargetValue(0);
-        t.filterNow = t.filterTarget = 0;
+        t.gain.setCurrentAndTargetValue(level[i]);
+        t.filterNow = t.filterTarget = filter[i];
     }
     limiter.reset();
-    bar = 0;
+    bar = startBar;
     finished_ = false;
     panic_ = true;
     playing_ = true;

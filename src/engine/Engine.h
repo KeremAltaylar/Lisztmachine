@@ -98,8 +98,8 @@ public:
 
     // Message thread. Loads one Surge per track with its patch. Returns an error or empty.
     juce::String load(double sampleRate, int maxBlock);
-    // Message thread. A new concert from this seed, starting at bar 0.
-    void start(uint64_t seed);
+    // Message thread. A new concert from this seed, from bar 0 or from any later bar.
+    void start(uint64_t seed, int startBar = 0);
     void stop();
 
     // Audio thread. Channels 0/1 are the PA mix; 2/3, when present, carry the click.
