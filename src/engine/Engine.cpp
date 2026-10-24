@@ -451,7 +451,7 @@ void Engine::renderChunk(float* const* out, int numChannels, int offset, int len
         juce::AudioBuffer<float> view(t.buffer.getArrayOfWritePointers(), t.buffer.getNumChannels(), len);
         t.plugin->processBlock(view, t.midi);
         t.midi.clear();
-        if (effects)
+        if (effects && inserts)
             for (auto& fx : t.inserts) runFx(*fx, view);
 
         for (int n = 0; n < len; ++n) gains_[size_t(n)] = t.gain.getNextValue() * t.trim;

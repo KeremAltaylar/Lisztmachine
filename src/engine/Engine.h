@@ -118,6 +118,7 @@ public:
     Meter meters[kNumTracks];
     Meter delayMeter, reverbMeter; // what the shared buses return to the mix
     bool effects = true;           // false: no inserts, no sends (the renderer's --dry)
+    bool inserts = true;           // false: keep the shared delay and reverb, skip the per-track chains
     float clickLevel = 0.5f;
     PeakLimiter limiter;
     uint8_t enabledTracks = 0x0F; // bit per Track; the renderer's --solo
