@@ -26,7 +26,6 @@ target_link_libraries(liszt_engine
     PUBLIC liszt_core
            juce::juce_audio_utils
            juce::juce_audio_processors
-           juce::juce_dsp
     PUBLIC juce::juce_recommended_config_flags
            juce::juce_recommended_warning_flags)
 target_compile_definitions(liszt_engine PUBLIC

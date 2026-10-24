@@ -1,39 +1,180 @@
-#include <juce_audio_processors/juce_audio_processors.h>
+// liszt_render: the concert, offline and faster than real time.
+//   liszt_render [--seed N] [--seconds S] [--out file.wav] [--solo pad|bass|seq|lead]
+//                [--patch bass="Basses/Bass 1"]  (repeatable; any Surge factory patch)
+//                                                             render a concert (+ .mid and .sections.txt)
+//   liszt_render --audition "Category/Patch"                  hold one note on a Surge patch, measure it
+//   liszt_render --probe <plugin.vst3>                        list what a plugin exposes
+#include "Engine.h"
+#include <juce_audio_formats/juce_audio_formats.h>
 #include <iostream>
 
-// --probe <plugin.vst3>: list what a plugin exposes (programs, parameters, state header).
+using namespace liszt;
+
+static float dbfs(double x) { return juce::Decibels::gainToDecibels(float(x), -150.0f); }
+
 static int probe(const juce::String& path)
 {
-    juce::AudioPluginFormatManager fm;
-    fm.addFormat(std::make_unique<juce::VST3PluginFormat>());
-    juce::OwnedArray<juce::PluginDescription> types;
     juce::VST3PluginFormat vst3;
+    juce::OwnedArray<juce::PluginDescription> types;
     vst3.findAllTypesForFile(types, path);
     if (types.isEmpty()) { std::cerr << "no plugin in " << path << "\n"; return 1; }
     juce::String err;
-    auto p = fm.createPluginInstance(*types[0], 48000.0, 512, err);
+    auto p = vst3.createInstanceFromDescription(*types[0], 48000.0, 512, err);
     if (!p) { std::cerr << "load failed: " << err << "\n"; return 1; }
-    std::cout << "name " << p->getName() << "  programs " << p->getNumPrograms()
-              << "  params " << p->getParameters().size() << "\n";
-    for (int i = 0; i < juce::jmin(15, p->getNumPrograms()); ++i)
-        std::cout << "  prog " << i << ": " << p->getProgramName(i) << "\n";
+    std::cout << p->getName() << ": " << p->getNumPrograms() << " programs, "
+              << p->getParameters().size() << " parameters\n";
     for (auto* prm : p->getParameters())
-        if (prm->getName(64).containsIgnoreCase("cutoff") || prm->getName(64).containsIgnoreCase("macro"))
-            std::cout << "  param " << prm->getParameterIndex() << ": " << prm->getName(64)
-                      << " = " << prm->getValue() << "\n";
-    juce::MemoryBlock mb;
-    p->getStateInformation(mb);
-    std::cout << "state " << mb.getSize() << " bytes\n";
-    if (auto xml = juce::AudioProcessor::getXmlFromBinary(mb.getData(), (int) mb.getSize()))
-        for (auto* c : xml->getChildIterator())
-        {
-            juce::MemoryBlock inner;
-            inner.fromBase64Encoding(c->getAllSubText());
-            std::cout << "  " << xml->getTagName() << "/" << c->getTagName() << " " << inner.getSize() << " bytes: ";
-            for (int i = 0; i < juce::jmin(120, (int) inner.getSize()); ++i)
-            { auto ch = ((const char*) inner.getData())[i]; std::cout << (ch >= 32 && ch < 127 ? ch : '.'); }
-            std::cout << "\n";
-        }
+        if (prm->getName(64).containsIgnoreCase("cutoff"))
+            std::cout << "  " << prm->getParameterIndex() << " " << prm->getName(64) << " = " << prm->getValue() << "\n";
+    return 0;
+}
+
+// Pitch of a window by autocorrelation; rough, but enough to catch a patch that bends or detunes.
+static double pitchOf(const float* x, int n, double sr)
+{
+    const int lo = int(sr / 1000), hi = std::min(int(sr / 50), n / 2);
+    std::vector<double> r(size_t(hi + 2), 0.0);
+    double best = 0;
+    for (int lag = lo; lag <= hi + 1; ++lag)
+    {
+        double num = 0, a = 0, b = 0;
+        for (int i = 0; i + lag < n; ++i) { num += x[i] * x[i + lag]; a += x[i] * x[i]; b += x[i + lag] * x[i + lag]; }
+        r[size_t(lag)] = num / std::sqrt(a * b + 1e-20);
+        best = std::max(best, r[size_t(lag)]);
+    }
+    // The first peak close to the best one is the period; later peaks are its multiples.
+    for (int lag = lo + 1; lag <= hi; ++lag)
+        if (r[size_t(lag)] >= 0.85 * best && r[size_t(lag)] >= r[size_t(lag - 1)] && r[size_t(lag)] >= r[size_t(lag + 1)] && best > 0.5)
+            return sr / lag;
+    return 0;
+}
+
+static int audition(const juce::String& patch)
+{
+    const double sr = 48000;
+    const int block = 256;
+    juce::String err;
+    auto surge = createSurge(sr, block, err);
+    if (!surge) { std::cerr << err << "\n"; return 1; }
+    if (auto e = loadSurgePatch(*surge, findSurgePatch(patch)); e.isNotEmpty()) { std::cerr << e << "\n"; return 1; }
+    surge->prepareToPlay(sr, block);
+
+    const int holdBlocks = int(3.0 * sr / block), tailBlocks = int(2.0 * sr / block);
+    juce::AudioBuffer<float> buf(juce::jmax(2, surge->getTotalNumOutputChannels()), block);
+    std::vector<float> hold, tail;
+    for (int b = 0; b < holdBlocks + tailBlocks; ++b)
+    {
+        juce::MidiBuffer midi;
+        if (b == 0) midi.addEvent(juce::MidiMessage::noteOn(1, 57, 0.8f), 0);
+        if (b == holdBlocks) midi.addEvent(juce::MidiMessage::noteOff(1, 57), 0);
+        buf.clear();
+        surge->processBlock(buf, midi);
+        auto& dst = b < holdBlocks ? hold : tail;
+        dst.insert(dst.end(), buf.getReadPointer(0), buf.getReadPointer(0) + block);
+    }
+
+    double peak = 0, sq = 0;
+    for (float v : hold) { peak = std::max(peak, double(std::abs(v))); sq += v * v; }
+    std::vector<double> cents;
+    for (size_t at = size_t(0.5 * sr); at + 2048 < hold.size(); at += size_t(0.05 * sr))
+        if (double f = pitchOf(hold.data() + at, 2048, sr); f > 0)
+            cents.push_back(1200 * std::log2(f / 220.0));
+    std::sort(cents.begin(), cents.end());
+    double tailSq = 0;
+    for (size_t i = tail.size() - size_t(0.1 * sr); i < tail.size(); ++i) tailSq += tail[i] * tail[i];
+
+    std::cout << patch << ": peak " << dbfs(peak) << " dBFS, rms " << dbfs(std::sqrt(sq / hold.size())) << " dBFS";
+    if (!cents.empty())
+        std::cout << ", pitch vs A3 " << juce::roundToInt(cents[cents.size() / 2]) << " cents (spread "
+                  << juce::roundToInt(cents.back() - cents.front()) << ")";
+    else
+        std::cout << ", no stable pitch";
+    std::cout << ", tail after 2s " << dbfs(std::sqrt(tailSq / (0.1 * sr))) << " dBFS\n";
+    return 0;
+}
+
+static void writeMidi(uint64_t seed, const juce::File& file)
+{
+    Composer c(seed);
+    std::vector<Event> ev;
+    for (int b = 0; b < c.totalBars(); ++b) c.generateBar(b, ev);
+    juce::MidiFile mf;
+    mf.setTicksPerQuarterNote(kPPQ);
+    juce::MidiMessageSequence tempo;
+    tempo.addEvent(juce::MidiMessage::tempoMetaEvent(int(60000000.0 / c.bpm())), 0);
+    mf.addTrack(tempo);
+    for (int t = 0; t < kNumTracks; ++t)
+    {
+        juce::MidiMessageSequence seq;
+        seq.addEvent(juce::MidiMessage::textMetaEvent(3, kTrackNames[t]), 0);
+        for (auto& e : ev)
+            if (e.track == t && e.type == Event::NoteOn) seq.addEvent(juce::MidiMessage::noteOn(t + 1, e.pitch, e.value), double(e.tick));
+            else if (e.track == t && e.type == Event::NoteOff) seq.addEvent(juce::MidiMessage::noteOff(t + 1, e.pitch), double(e.tick));
+        seq.sort();
+        mf.addTrack(seq);
+    }
+    juce::FileOutputStream os(file);
+    if (os.openedOk()) { os.setPosition(0); os.truncate(); mf.writeTo(os); }
+}
+
+static int renderConcert(uint64_t seed, double seconds, const juce::File& out, int solo, const juce::StringArray& patches)
+{
+    const double sr = 48000;
+    const int block = 512;
+    Engine engine;
+    for (auto& p : patches) // "bass=Templates/Init Square"
+        for (int t = 0; t < kNumTracks; ++t)
+            if (p.upToFirstOccurrenceOf("=", false, false) == kTrackNames[t])
+                engine.patchOverride[t] = p.fromFirstOccurrenceOf("=", false, false);
+    if (auto e = engine.load(sr, block); e.isNotEmpty()) { std::cerr << e << "\n"; return 1; }
+    if (solo >= 0) engine.enabledTracks = uint8_t(1 << solo);
+    engine.start(seed);
+    auto* c = engine.composer();
+    std::cout << "seed " << seed << ": " << c->describe() << "\n";
+    juce::String sections = "bpm " + juce::String(c->bpm()) + "\n";
+    for (auto& s : c->sections())
+    {
+        double t = s.startBar * 4 * 60.0 / c->bpm();
+        std::cout << "  " << int(t) / 60 << ":" << juce::String(int(t) % 60).paddedLeft('0', 2) << "  " << s.name << "\n";
+        sections << t << " " << s.energy << " " << s.name << "\n";
+    }
+    sections << c->totalBars() * 4 * 60.0 / c->bpm() << " 0 end\n";
+    out.withFileExtension("sections.txt").replaceWithText(sections);
+
+    out.deleteFile();
+    std::unique_ptr<juce::OutputStream> stream = std::make_unique<juce::FileOutputStream>(out);
+    auto writer = juce::WavAudioFormat().createWriterFor(
+        stream, juce::AudioFormatWriterOptions {}.withSampleRate(sr).withNumChannels(2).withBitsPerSample(24));
+    if (!writer) { std::cerr << "cannot write " << out.getFullPathName() << "\n"; return 1; }
+
+    // Play the pre-roll into nothing, so sample 0 of the WAV is bar 0 and lines up with the MIDI.
+    juce::AudioBuffer<float> preRoll(2, int(engine.preRollSamples()));
+    engine.render(preRoll.getArrayOfWritePointers(), 2, preRoll.getNumSamples());
+
+    juce::AudioBuffer<float> buf(2, block);
+    const int64_t total = seconds > 0 ? int64_t(seconds * sr) : std::numeric_limits<int64_t>::max();
+    const auto t0 = juce::Time::getMillisecondCounterHiRes();
+    int64_t done = 0;
+    while (done < total && !engine.isFinished())
+    {
+        engine.render(buf.getArrayOfWritePointers(), 2, block);
+        writer->writeFromAudioSampleBuffer(buf, 0, block);
+        done += block;
+    }
+    writer.reset();
+    writeMidi(seed, out.withFileExtension("mid"));
+
+    const double secs = double(done) / sr, took = (juce::Time::getMillisecondCounterHiRes() - t0) / 1000.0;
+    std::cout << "rendered " << secs << " s in " << took << " s (" << secs / took << "x real time) -> "
+              << out.getFullPathName() << "\n";
+    std::cout << "master peak before limiter " << dbfs(engine.peakPre) << " dBFS, after " << dbfs(engine.peakPost) << " dBFS; limiter deepest "
+              << engine.limiter.maxReductionDb << " dB, clamped samples " << engine.limiter.clipped << "\n";
+    for (int t = 0; t < kNumTracks; ++t)
+    {
+        auto& m = engine.meters[t];
+        std::cout << "  " << kTrackNames[t] << ": peak " << dbfs(m.peak) << " dBFS, rms "
+                  << dbfs(std::sqrt(m.sumSquares / juce::jmax<int64_t>(1, m.samples))) << " dBFS\n";
+    }
     return 0;
 }
 
@@ -42,5 +183,22 @@ int main(int argc, char** argv)
     juce::ScopedJuceInitialiser_GUI init;
     juce::StringArray args(argv + 1, argc - 1);
     if (args[0] == "--probe") return probe(args[1]);
-    return 0;
+    if (args[0] == "--audition") return audition(args[1]);
+
+    uint64_t seed = 1;
+    double seconds = 0;
+    int solo = -1;
+    juce::StringArray patches;
+    juce::File out = juce::File::getCurrentWorkingDirectory().getChildFile("lisztmachine.wav");
+    for (int i = 0; i + 1 < args.size(); ++i)
+    {
+        if (args[i] == "--seed") seed = uint64_t(args[i + 1].getLargeIntValue());
+        if (args[i] == "--seconds") seconds = args[i + 1].getDoubleValue();
+        if (args[i] == "--out") out = juce::File::getCurrentWorkingDirectory().getChildFile(args[i + 1]);
+        if (args[i] == "--patch") patches.add(args[i + 1]);
+        if (args[i] == "--solo")
+            for (int t = 0; t < kNumTracks; ++t)
+                if (args[i + 1] == kTrackNames[t]) solo = t;
+    }
+    return renderConcert(seed, seconds, out, solo, patches);
 }

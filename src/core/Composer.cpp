@@ -2,6 +2,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <cstring>
 
 namespace liszt {
 
@@ -309,7 +310,7 @@ void Composer::emitSequence(int track, int bar, std::vector<Event>& out)
     const float e = energyAt(bar);
     const int len = int(pat.size());
     const int limit = std::max(1, int(std::lround((track == Bass ? .5 + .5 * e : .45 + .55 * e) * len)));
-    const bool summit = std::string(sectionAt(bar).name) == "Summit";
+    const bool summit = std::strcmp(sectionAt(bar).name, "Summit") == 0;
 
     for (int i = 0; i < 16; ++i)
     {
@@ -340,7 +341,7 @@ void Composer::emitLeadPhrase(int bar, std::vector<Event>& out)
     const int phrase = (bar - sec.startBar) / 4;
     if (phrase % 3 == 2 && energyAt(bar) < .8f) return; // breathe: every third phrase rests
 
-    const bool summit = std::string(sec.name) == "Summit";
+    const bool summit = std::strcmp(sec.name, "Summit") == 0;
     for (int half = 0; half < 2; ++half)
     {
         const int b0 = bar + 2 * half;
