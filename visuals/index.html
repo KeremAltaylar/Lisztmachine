@@ -94,6 +94,12 @@ nav button[aria-pressed="true"] { color: var(--ember); }
     <label class="amt" for="cam-cuts">Cuts <input id="cam-cuts" type="range" min="0" max="100" value="70"> <span id="cam-cuts-v">70</span></label>
     <label class="amt" for="cam-shake">Shake <input id="cam-shake" type="range" min="0" max="100" value="50"> <span id="cam-shake-v">50</span></label>
   </div>
+  <div class="row pad cam">
+    <span>Look</span>
+    <label class="amt" for="look-wb">White balance <input id="look-wb" type="range" min="0" max="100" value="60"> <span id="look-wb-v">60</span></label>
+    <label class="amt" for="look-colour">Colour <input id="look-colour" type="range" min="0" max="100" value="70"> <span id="look-colour-v">70</span></label>
+    <label class="amt" for="look-churn">Churn <input id="look-churn" type="range" min="0" max="100" value="50"> <span id="look-churn-v">50</span></label>
+  </div>
   <div class="row pad">
     <button id="pad-go">Drum pad</button>
     <label for="pad-device" class="sr">Input device</label><select id="pad-device"><option value="">Default input</option></select>
@@ -110,10 +116,18 @@ nav button[aria-pressed="true"] { color: var(--ember); }
 // ---------------------------------------------------------------------------------------------
 // The pieces: their recording and data, and the pitch range of each role (harmony, bass and
 // drums, rhythm, melody), which the visuals map onto 0..1, and the study each piece is shown in.
+// A colour world per piece: the shadows lean to lo, the light to hi, and the director's cuts recolour
+// the light from its palette.
 const PIECES = {
-  chorale: { name: 'Chorale', study: 'lumen', media: 'media/chorale1', ranges: [[36, 81], [26, 64], [55, 108], [60, 100]] },
-  berlin: { name: 'Berlin', study: 'dust', media: 'media/seed1', ranges: [[48, 76], [28, 52], [52, 81], [60, 88]] },
-  yours: { name: 'Let All Be Yours', media: 'media/yours1', ranges: [[36, 76], [24, 56], [39, 74], [33, 77]] }, // study: Kerem's choice
+  chorale: { name: 'Chorale', study: 'lumen', media: 'media/chorale1', ranges: [[36, 81], [26, 64], [55, 108], [60, 100]],
+    world: { name: 'Cathedral', lo: [0.42, 0.32, 1.0], hi: [1.0, 0.82, 0.55],    // violet shadows, candle gold
+      palette: [[1, 0.66, 0.22], [1, 0.86, 0.5], [0.85, 0.12, 0.18], [0.55, 0.3, 1], [1, 0.95, 0.85], [0.95, 0.45, 0.2]] } },
+  berlin: { name: 'Berlin', study: 'dust', media: 'media/seed1', ranges: [[48, 76], [28, 52], [52, 81], [60, 88]],
+    world: { name: 'Sodium Night', lo: [0.2, 0.55, 1.0], hi: [0.92, 0.97, 1.0],  // cold teal night, steel white, sodium accents
+      palette: [[0.3, 0.9, 1], [0.5, 0.65, 1], [1, 0.55, 0.15], [0.9, 0.95, 1], [0.2, 1, 0.8], [1, 0.3, 0.55]] } },
+  yours: { name: 'Let All Be Yours', study: 'horizon', strobeBeats: 1, media: 'media/yours1', ranges: [[36, 76], [24, 56], [39, 74], [33, 77]],
+    world: { name: 'Acid', lo: [0.55, 0.15, 1.0], hi: [0.78, 1.0, 0.42],         // ultraviolet shadows, acid green light, blood
+      palette: [[0.6, 1, 0.15], [0.62, 0.2, 1], [1, 0.08, 0.12], [1, 1, 1], [1, 0.15, 0.75], [0.85, 1, 0.3]] } },
 };
 let RANGE = PIECES.chorale.ranges;
 const TAU = [1.2, 0.28, 0.16, 0.4];                          // how long a note-on lights up, seconds
@@ -333,13 +347,19 @@ fn down13(uv: vec2f, karis: bool) -> vec3f {
 }
 
 @group(0) @binding(3) var bloom: texture_2d<f32>;
-@group(0) @binding(4) var<uniform> post: vec4f; // exposure, bloom mix, grain, fade
+struct Post { a: vec4f, wb: vec4f, lo: vec4f, hi: vec4f };
+// a: exposure, bloom mix, grain, fade · wb: white balance gains · lo, hi: the colour world (w: its amount)
+@group(0) @binding(4) var<uniform> post: Post;
 fn aces(x: vec3f) -> vec3f { return clamp((x * (2.51 * x + 0.03)) / (x * (2.43 * x + 0.59) + 0.14), vec3f(0.0), vec3f(1.0)); }
 fn oetf(c: vec3f) -> vec3f { return select(1.055 * pow(c, vec3f(1.0 / 2.4)) - 0.055, c * 12.92, c <= vec3f(0.0031308)); }
 @fragment fn composite(i: VO) -> @location(0) vec4f {
   var c = tap(i.uv);
   let b = min(textureSampleLevel(bloom, smp, i.uv, 0.0).rgb, vec3f(6e4));
-  c = mix(c, b, post.y) * post.x;
+  c = mix(c, b, post.a.y) * post.a.x;
+  c *= post.wb.rgb;                                                          // automatic white balance
+  let l = luma(c);                                                           // the colour world: light by brightness
+  let tone = mix(post.lo.rgb, post.hi.rgb, smoothstep(0.0, 0.22, l / (1.0 + l)));   // only the deepest shadow takes lo: halfway they would meet in grey
+  c = mix(c, vec3f(l) * tone / max(luma(tone), 1e-3), post.lo.w);
   c = aces(c);
   let q = i.uv - 0.5;
   c *= 1.0 - dot(q, q) * 0.55;
@@ -350,9 +370,9 @@ fn oetf(c: vec3f) -> vec3f { return select(1.055 * pow(c, vec3f(1.0 / 2.4)) - 0.
   let n0 = rnd(px.x + px.y * 7919u + u32(u.frame) * 104729u);
   let n1 = rnd(px.x * 3u + px.y * 6151u + u32(u.frame) * 15731u + 77u);
   let lit = smoothstep(0.0, 0.04, max(c.r, max(c.g, c.b)));   // black stays black: no noise floor on the body
-  c *= 1.0 + (n0 - 0.5) * post.z * lit;
+  c *= 1.0 + (n0 - 0.5) * post.a.z * lit;
   c += (n0 + n1 - 1.0) * (1.0 / 255.0) * lit;
-  return vec4f(c * post.w, 1.0);
+  return vec4f(c * post.a.w, 1.0);
 }
 `;
 
@@ -1243,25 +1263,32 @@ STUDIES.push({
 });
 
 // 6 · Horizon: the pitch spectrum of the last seconds as a landscape that rolls toward the horizon.
-// The genome draws it as ridges, as furrows or as a grid, can mirror it into a canyon or wrap it into a
-// tube around you; drum hits send ripples across the land.
+// The genome draws it as ridges, as furrows or as a grid, or wraps it into a tube around you; drum hits
+// send ripples across the land. As the music drives, more planes of the same land fly in around the
+// line of flight (up to six: a canyon, a corridor, a turning kaleidoscope of planes), slide, tilt and
+// bank, and fly away again when it calms.
 STUDIES.push({
   id: 'horizon', name: 'Horizon', scale: 1, exposure: 1.0, bloom: 0.09,
-  about: 'Everything that sounds, laid out by pitch, rolling toward the horizon as ridges, furrows or a grid; sometimes mirrored into a canyon or wrapped into a tube. Drum hits ripple across the land.',
+  about: 'Everything that sounds, laid out by pitch, rolling toward the horizon as ridges, furrows or a grid. As the music drives, more planes of the land fly in around you, turning, sliding and banking; drum hits ripple across them.',
   init(g) {
     this.B = 128; this.R = 160; this.head = 0; this.acc = 0; this.lastT = -1;
+    this.S = 6;                                                     // planes at most
+    this.sheets = Array.from({ length: this.S }, (_, k) => ({ a: 0, d: k ? 6 : 1.55, x: 0, tilt: 0, gain: k ? 0 : 1 }));
     this.row = new Float32Array(this.B);
     this.rows = g.device.createBuffer({ size: this.B * this.R * 4, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST });
-    this.hp = [0, 1].map(() => g.device.createBuffer({ size: 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST }));
+    this.hp = Array.from({ length: this.S }, () => g.device.createBuffer({ size: 48, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST }));
     const code = COMMON + /* wgsl */`
       @group(0) @binding(1) var<storage, read> rows: array<f32>;
-      @group(0) @binding(2) var<uniform> hp: vec4f;   // head row, rows, bands, mirrored copy
+      struct HP { a: vec4f, s: vec4f, t: vec4f };
+      // a: head row, rows, bands, plane index · s: the plane's angle around the line of flight, its
+      // distance from it, sideways slide, brightness · t: tilt, -, -, -
+      @group(0) @binding(2) var<uniform> H: HP;
       fn val(b: u32, r: u32) -> f32 {
-        let R = u32(hp.y); let B = u32(hp.z);
-        return rows[((u32(hp.x) + R - r) % R) * B + b];
+        let R = u32(H.a.y); let B = u32(H.a.z);
+        return rows[((u32(H.a.x) + R - r) % R) * B + b];
       }
       fn world(b: u32, r: u32) -> vec3f {
-        let xn = f32(b) / (hp.z - 1.0) - 0.5;
+        let xn = f32(b) / (H.a.z - 1.0) - 0.5;
         let z = f32(r) * 0.11;
         var h = val(b, r) * (0.7 + 1.8 * gene(2)) * (1.0 + 0.9 * u.hit.y);
         for (var k = 0; k < 8; k++) {                                     // drum hits: ripples across the land
@@ -1270,12 +1297,18 @@ STUDIES.push({
           let d = length(vec2f(xn * 9.0 - hh.x * 4.0, z - 3.0 - (hh.y + 1.0) * 3.0)) - hh.z * 4.0;
           h += hh.w * exp(-hh.z * 1.4) * cos(d * 5.0) * exp(-d * d * 0.8) * 0.7;
         }
-        if (gene(3) > 0.72) {                                             // wrapped into a tube around the camera
-          let th = xn * 6.2831853 * 0.96;
-          let rad = 3.2 - h * 0.5;
+        if (gene(3) > 0.72) {                                             // wrapped into a tube around the camera (nested tubes for more planes)
+          let th = xn * 6.2831853 * 0.96 + H.s.x;
+          let rad = (3.2 - h * 0.5) * H.s.y / 1.55;
           return vec3f(sin(th) * rad, 1.6 - cos(th) * rad, z);
         }
-        return vec3f(xn * 9.0, select(h, 3.4 - h, hp.w > 0.5), z);
+        // the plane: its land at its distance below the line of flight, turned around that line, slid, tilted
+        let lx = xn * 9.0 + H.s.z;
+        let ly = h - H.s.y;
+        let ca = cos(H.s.x); let sa = sin(H.s.x);
+        let q = vec2f(lx * ca - ly * sa, lx * sa + ly * ca);
+        let zt = z * cos(H.t.x);
+        return vec3f(q.x, 1.55 + q.y + z * sin(H.t.x), zt);
       }
       fn clip(w: vec3f) -> vec4f {
         let j = traj(6.0);
@@ -1293,7 +1326,7 @@ STUDIES.push({
       }
       struct SV { @builtin(position) pos: vec4f, @location(0) c: vec3f, @location(1) e: f32 };
       @vertex fn vsFace(@builtin(vertex_index) vi: u32) -> @builtin(position) vec4f {
-        let B = u32(hp.z);
+        let B = u32(H.a.z);
         let cell = vi / 6u;
         var cr = array<vec2u, 6>(vec2u(0, 0), vec2u(1, 0), vec2u(0, 1), vec2u(0, 1), vec2u(1, 0), vec2u(1, 1));
         let k = cr[vi % 6u];
@@ -1316,17 +1349,17 @@ STUDIES.push({
         o.pos = vec4f(sp / (u.res * 0.5) * P.w, P.z - 0.0008 * P.w, P.w);
         let v = max(val(b0, r0), val(b1, r1));
         let r = f32(max(r0, r1));
-        let fog = exp(-r * 0.02) * (1.0 - smoothstep(hp.y - 30.0, hp.y, r));
-        o.c = tint(u.energy) * fog * (0.12 + 1.8 * v) * (0.3 + 1.2 * u.bus.z) * (1.0 + 1.6 * u.hit.y * exp(-r * 0.08));
+        let fog = exp(-r * 0.02) * (1.0 - smoothstep(H.a.y - 30.0, H.a.y, r));
+        o.c = H.s.w * tint(u.energy) * fog * (0.12 + 1.8 * v) * (0.3 + 1.2 * u.bus.z) * (1.0 + 1.6 * u.hit.y * exp(-r * 0.08));
         o.e = k.y * pad / hw;
         return o;
       }
       @vertex fn vsRow(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> SV {
-        let B = u32(hp.z);
+        let B = u32(H.a.z);
         return segment(vi, ii % (B - 1u), ii / (B - 1u), ii % (B - 1u) + 1u, ii / (B - 1u));
       }
       @vertex fn vsCol(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> SV {
-        let B = u32(hp.z);
+        let B = u32(H.a.z);
         let b = (ii % (B / 4u)) * 4u;                                      // every fourth band, along the depth
         let r = ii / (B / 4u);
         return segment(vi, b, r, b, r + 1u);
@@ -1367,17 +1400,34 @@ STUDIES.push({
     }
     this.lastT = t;
     this.mode = Math.min(2, Math.floor(D.gene[0] * 3));             // 0 ridges · 1 furrows · 2 grid
-    this.mirror = D.gene[1] > 0.6 && D.gene[3] <= 0.72;
-    this.hp.forEach((h, k) => g.device.queue.writeBuffer(h, 0, new Float32Array([this.head, this.R, this.B, k])));
+    // The planes: how many by energy (the genome sets how eager), arranged evenly around the line of
+    // flight and turning; each slides and tilts on its own slow curve; the ground banks a little.
+    const e = F.energy, n = Math.max(D.gene[1] > 0.6 ? 2 : 1, Math.min(this.S, 1 + Math.floor(e * (2.5 + 3.5 * D.gene[5]) + 0.2)));
+    const dt = Math.min(0.1, Math.max(0, t - (this.lastCpu ?? t))); this.lastCpu = t;
+    const glide = 1 - Math.exp(-dt / 1.6), spin = (D.gene[6] - 0.5) * 0.5 * (0.2 + e), turn = this.turn = (this.turn ?? 0) + spin * dt;
+    this.sheets.forEach((p, k) => {
+      const on = k < n, h = D.salt * 0.01 + k * 1.7;
+      const want = {
+        a: k === 0 ? Math.sin(t * 0.11 + h) * 0.22 * e : k * 2 * Math.PI / n + turn,          // banking ground; the others around the axis
+        d: on ? (k === 0 ? 1.55 : 1.55 * (0.8 + 0.9 * (0.5 + 0.5 * Math.sin(k * 2.3 + D.gene[7] * 6)))) : 7,   // off: flown away
+        x: k === 0 ? 0 : Math.sin(t * (0.13 + 0.05 * k) + h) * 2.5 * e,
+        tilt: Math.sin(t * (0.07 + 0.03 * k) + h * 2) * 0.1 * e,
+        gain: on ? (k === 0 ? 1 : 0.75) : 0,
+      };
+      for (const q of ['a', 'd', 'x', 'tilt', 'gain']) p[q] += (want[q] - p[q]) * glide;
+    });
+    this.hp.forEach((buf, k) => { const p = this.sheets[k];
+      g.device.queue.writeBuffer(buf, 0, new Float32Array([this.head, this.R, this.B, k, p.a, p.d, p.x, p.gain, p.tilt, 0, 0, 0])); });
   },
   frame(g, enc) {
     const pass = g.pass(enc, this.depth.createView());
-    for (const k of this.mirror ? [0, 1] : [0]) {
-      const bg = this.bg[k];
+    this.sheets.forEach((p, k) => {
+      if (p.gain < 0.01) return;
+      const bg = this.bg[k], mode = (this.mode + k) % 3;            // each plane its own drawing: ridges, furrows, grid
       pass.setPipeline(this.face); pass.setBindGroup(0, bg.face); pass.draw((this.B - 1) * (this.R - 1) * 6);
-      if (this.mode !== 1) { pass.setPipeline(this.rowPipe); pass.setBindGroup(0, bg.row); pass.draw(6, (this.B - 1) * this.R); }
-      if (this.mode !== 0) { pass.setPipeline(this.colPipe); pass.setBindGroup(0, bg.col); pass.draw(6, (this.B / 4) * (this.R - 1)); }
-    }
+      if (mode !== 1) { pass.setPipeline(this.rowPipe); pass.setBindGroup(0, bg.row); pass.draw(6, (this.B - 1) * this.R); }
+      if (mode !== 0) { pass.setPipeline(this.colPipe); pass.setBindGroup(0, bg.col); pass.draw(6, (this.B / 4) * (this.R - 1)); }
+    });
     pass.end();
   },
 });
@@ -1691,7 +1741,7 @@ async function boot() {
   const pComp = g.fullscreen(COMMON + POST, 'composite', format);
   const pMix = g.fullscreen(MIX, 'mixf');
   const pOuter = g.fullscreen(MIX, 'outerf');
-  const postU = device.createBuffer({ size: 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+  const postU = device.createBuffer({ size: 64, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
   const mixU = device.createBuffer({ size: 128, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
   const postIn = device.createBuffer({ size: Udata.byteLength, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });   // the composite's view of U
   // Every study has its own uniforms and its own target, so two can run at once during a transition.
@@ -1703,7 +1753,7 @@ async function boot() {
   }
 
   let study = STUDIES.find(s => s.id === piece.study) ?? STUDIES[0], next = null, tw = 0, mips = [], downBG = [], upBG = [], compBG = [], mixBG = [], fb = [], fbo = [], outerBG = [], fbi = 0;
-  const tex = (w, h) => device.createTexture({ size: [w, h], format: 'rgba16float', usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING });
+  const tex = (w, h) => device.createTexture({ size: [w, h], format: 'rgba16float', usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_SRC });
   let Q = 1;   // render quality, lowered when frames come late (see quality())
   function targets() {
     const pr = Math.min(devicePixelRatio || 1, 2, Math.sqrt(2.2e6 / (innerWidth * innerHeight))) * Q;
@@ -1946,7 +1996,7 @@ async function boot() {
   // The director: camera moves, strobe, colour and the feedback network, from the music's events.
   // Calm sections drift; loud ones whip to a new angle on every chord (and every bar at the top),
   // keep spinning between cuts, and flash on the bass.
-  const PALETTE = [[1, 0.2, 0.06], [0.45, 0.62, 1], [1, 1, 1], [0.85, 0.3, 1], [1, 0.62, 0.2], [0.25, 1, 0.85]];
+  const PALETTE = piece.world.palette;
   const D = { cam: [0, 0, 1, 0], fx: [0, 0, 0, 0], col: [1, 1, 1, 0], target: [0, 0, 1], spin: 0, cut: 0, chord: -1, bar: -1, si: -1, strobe: true, invertUntil: 0,
     feedback: true, gene: new Float32Array(16), fbg: new Float32Array(12), gen: 0, salt: Math.random() * 1000 };   // a fresh lineage every time the page opens
   const hash01 = k => { const x = Math.sin(k * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); };
@@ -1969,8 +2019,9 @@ async function boot() {
       D.spin = (r(8) - 0.5) * 2.4 * e * cu;
       D.col = [...PALETTE[Math.floor(r(4) * PALETTE.length)], Math.max(0, Math.min(1, (e - 0.35) * 2.2))];
       if (sectionStart) roll();
-      else for (let k = 5; k < 7; k++) D.gene[Math.floor(r(k) * 16)] = r(k + 10);
+      else for (let k = 0; k < Math.round(4 * LOOK.churn / 100); k++) D.gene[Math.floor(r(k + 5) * 16)] = r(k + 15);
     }
+    if (LOOK.churn > 75 && bar % 16 === 0 && bar !== D.rolledAt && !sectionStart) { D.rolledAt = bar; roll(); }
     D.chord = F.count[0]; D.bar = bar;
     D.target[0] += D.spin * dt;                                                   // keeps turning between cuts
     const glide = 1 - Math.exp(-dt / (0.12 + 1.6 * (1 - e) + 2.0 * (1 - CAM.cuts / 100)));   // a whip when loud, a drift when calm
@@ -1978,8 +2029,10 @@ async function boot() {
     D.cam[3] = (F.hit[1] * (0.05 + 0.35 * e) + pad.kick * 0.25) * CAM.shake / 50;
     let flash = D.fx[0] * Math.exp(-dt / 0.07);
     if (D.strobe && playing) {
-      if (F.since[1] < dt && e > 0.4) flash = Math.max(flash, F.vel[1] * (e - 0.2) * 1.2);
-      if (F.since[2] < dt && e > 0.85) flash = Math.max(flash, 0.35);
+      // a flash on the bass; a piece can limit it (Let All Be Yours: once a beat, or the rolling 16ths whiten every frame)
+      const gap = (piece.strobeBeats ?? 0) * 60 / show.bpm * 0.9;
+      if (F.since[1] < dt && e > 0.4 && t - (D.flashAt ?? -9) >= gap) { flash = Math.max(flash, F.vel[1] * (e - 0.2) * 1.2); D.flashAt = t; }
+      if (F.since[2] < dt && e > 0.85 && t - (D.flashAt ?? -9) >= gap) { flash = Math.max(flash, 0.35); D.flashAt = t; }
       if (sectionStart) { flash = 1; if (e > 0.5) D.invertUntil = t + 0.4; }
     }
     D.fx[0] = flash;
@@ -1996,7 +2049,8 @@ async function boot() {
   const FB_MODES = ['TUNNEL IN', 'TUNNEL OUT', 'SPIRAL', 'FRACTAL 3', 'FRACTAL 2', 'ECHO'];
   function network(dt, visT, aspect) {
     const f = Float32Array.from(D.fbg), e = F.energy, hit = F.hit[1];
-    for (const k of [1, 2, 3, 7, 9, 10, 11]) f[k] = Math.max(0, Math.min(0.999, f[k] + fbm1(visT * 0.04 + k * 7.7, k + 40) * 0.12));   // the continuous ones wander
+    const ch = LOOK.churn / 100;
+    for (const k of [1, 2, 3, 7, 9, 10, 11]) f[k] = Math.max(0, Math.min(0.999, f[k] + fbm1(visT * 0.04 * (0.3 + 1.4 * ch) + k * 7.7, k + 40) * 0.24 * ch));   // the continuous ones wander, as far as the churn lets them
     const mode = Math.min(5, Math.floor(f[0] * 6));
     const taps = [];
     if (mode === 0) taps.push([0.985 - 0.03 * f[7] - 0.05 * hit, (f[6] - 0.5) * 0.03 + D.spin * 0.01, Math.sin(visT * 0.3) * 0.006, Math.cos(visT * 0.23) * 0.006]);
@@ -2042,6 +2096,54 @@ async function boot() {
   // The camera settings (0-100): speed (0 nearly still, 100 moderately fast), range of travel, how hard
   // the chord cuts and whips are, and shake.
   const CAM = { speed: 40, range: 60, cuts: 70, shake: 50 };
+  // The look (0-100): white balance (how far the light is pulled to neutral, measured from the frame
+  // itself), colour (how much of the piece's colour world), churn (how restlessly the look mutates).
+  const LOOK = { wb: 60, colour: 70, churn: 50 };
+  try { Object.assign(LOOK, JSON.parse(localStorage.getItem('lisztmachine-look') || '{}')); } catch {}
+  for (const k of Object.keys(LOOK)) {
+    const el = $('look-' + k), out = $('look-' + k + '-v');
+    el.value = LOOK[k]; out.textContent = LOOK[k];
+    el.oninput = () => { LOOK[k] = +el.value; out.textContent = el.value; try { localStorage.setItem('lisztmachine-look', JSON.stringify(LOOK)); } catch {} };
+  }
+  // Grey world: the average colour of the frame (its smallest bloom level, read back every few frames)
+  // should be neutral. The gains glide over a second or two, so a cut does not jump the colour.
+  const WB = { gain: [1, 1, 1], buf: null, bpr: 0, w: 0, h: 0, busy: false, avg: [0, 0, 0] };
+  const half = h => { const s = h >> 15, e = (h >> 10) & 31, m = h & 1023;
+    return (s ? -1 : 1) * (e === 0 ? m / 16777216 : e === 31 ? 0 : Math.pow(2, e - 15) * (1 + m / 1024)); };
+  function meterWB(enc) {
+    if (WB.busy || frameNo % 6) return false;
+    const m = mips[5];
+    if (WB.w !== m.width || WB.h !== m.height) {
+      WB.buf?.destroy();
+      WB.w = m.width; WB.h = m.height; WB.bpr = Math.ceil(m.width * 8 / 256) * 256;
+      WB.buf = device.createBuffer({ size: WB.bpr * m.height, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
+    }
+    enc.copyTextureToBuffer({ texture: m }, { buffer: WB.buf, bytesPerRow: WB.bpr }, [WB.w, WB.h]);
+    return true;
+  }
+  function readWB() {
+    WB.busy = true;
+    const buf = WB.buf;
+    buf.mapAsync(GPUMapMode.READ).then(() => {
+      const d = new Uint16Array(buf.getMappedRange()), sum = [0, 0, 0];
+      for (let y = 0; y < WB.h; y++) for (let x = 0; x < WB.w; x++) for (let c = 0; c < 3; c++) sum[c] += Math.min(60, half(d[y * WB.bpr / 2 + x * 4 + c]));
+      buf.unmap();
+      WB.avg = sum.map(v => v / (WB.w * WB.h));
+      WB.busy = false;
+    }).catch(() => { WB.busy = false; });
+  }
+  function whiteBalance(dt) {
+    const a = WB.avg, l = 0.2126 * a[0] + 0.7152 * a[1] + 0.0722 * a[2], amt = LOOK.wb / 100;
+    const k = 1 - Math.exp(-dt / 1.2);
+    for (let c = 0; c < 3; c++) {
+      // a dark frame says nothing about the light: hold the last balance
+      const want = l > 0.004 ? Math.pow(Math.max(0.4, Math.min(2.5, l / Math.max(a[c], 1e-4))), amt) : WB.gain[c];
+      WB.gain[c] = Math.exp(Math.log(WB.gain[c]) + (Math.log(want) - Math.log(WB.gain[c])) * k);
+    }
+    const gl = 0.2126 * WB.gain[0] + 0.7152 * WB.gain[1] + 0.0722 * WB.gain[2];   // balance, never brighten
+    return WB.gain.map(v => v / gl);
+  }
+  window.__wb = () => ({ avg: WB.avg, gain: WB.gain });
   try { Object.assign(CAM, JSON.parse(localStorage.getItem('lisztmachine-camera') || '{}')); } catch {}
   for (const k of Object.keys(CAM)) {
     const el = $('cam-' + k), out = $('cam-' + k + '-v');
@@ -2097,7 +2199,8 @@ async function boot() {
     visT += dt;
     frameNo++;
     if (raw < 1) quality(raw);
-    for (let k = 0; k < 16; k++) geneNow[k] = Math.max(0, Math.min(0.999, D.gene[k] + fbm1(visT * 0.05 + k * 3.1, k) * 0.05));   // the genome wanders slowly between rolls
+    const ch = LOOK.churn / 100;
+    for (let k = 0; k < 16; k++) geneNow[k] = Math.max(0, Math.min(0.999, D.gene[k] + fbm1(visT * 0.05 * (0.3 + 1.4 * ch) + k * 3.1, k) * 0.1 * ch));   // the genome wanders between rolls: churn 50 = ±0.05
     if (next) { tw += Math.min(raw, 1) / BLEND;   // real time: a slow frame must not stretch the blend
       if (tw >= 1) { study = next; next = null; tw = 0; } }
 
@@ -2131,14 +2234,18 @@ async function boot() {
     device.queue.writeBuffer(postIn, 0, Udata);
     device.queue.writeBuffer(mixU, 0, M);
     const b = next ?? study;
-    device.queue.writeBuffer(postU, 0, new Float32Array([1.0, study.bloom + (b.bloom - study.bloom) * blend, 0.05, 1]));
+    const W = piece.world, wb = whiteBalance(dt);
+    device.queue.writeBuffer(postU, 0, new Float32Array([1.0, study.bloom + (b.bloom - study.bloom) * blend, 0.05, 1,
+      ...wb, 0, ...W.lo, 0.85 * LOOK.colour / 100, ...W.hi, 0]));
     fbi = 1 - fbi;
     g.draw(enc, pMix, mixGroup(study, b, fbi), g.fbViews[fbi]);
     g.draw(enc, pOuter, outerBG[fbi], g.fboViews[fbi]);
     for (let k = 0; k < 6; k++) g.draw(enc, k ? pDown : pKaris, downBG[fbi][k], g.mipViews[k]);
     for (let k = 4; k >= 0; k--) g.draw(enc, pUp, upBG[k], g.mipViews[k], 'load');
     g.draw(enc, pComp, compBG[fbi], ctx.getCurrentTexture().createView());
+    const metered = meterWB(enc);
     device.queue.submit([enc.finish()]);
+    if (metered) readWB();
     inFlight++;
     const sent = performance.now();
     device.queue.onSubmittedWorkDone().then(() => { inFlight--; gpuMs += (performance.now() - sent - gpuMs) * 0.1; });
