@@ -10,6 +10,7 @@
 #include "Engine.h"
 #include <juce_audio_formats/juce_audio_formats.h>
 #include <juce_dsp/juce_dsp.h>
+#include <array>
 #include <iostream>
 
 using namespace liszt;
@@ -166,6 +167,55 @@ static void writeMidi(uint64_t seed, const juce::File& file)
     if (os.openedOk()) { os.setPosition(0); os.truncate(); mf.writeTo(os); }
 }
 
+// What the visuals follow, for a render: sections, every note, and each part's level per
+// audio block. The live app will send the same over a socket.
+static void writeShow(uint64_t seed, double blockRate, const std::vector<std::array<float, 7>>& levels, const juce::File& file)
+{
+    Composer c(seed);
+    std::vector<Event> ev;
+    for (int b = 0; b < c.totalBars(); ++b) c.generateBar(b, ev);
+    std::stable_sort(ev.begin(), ev.end());
+    const double secPerTick = 60.0 / (c.bpm() * kPPQ);
+    auto num = [](double v) { return juce::String(v, 4).trimCharactersAtEnd("0").trimCharactersAtEnd("."); };
+
+    juce::MemoryOutputStream j; // a juce::String grown by << took 6 minutes for 57k level rows
+    j << "{\"seed\":" << juce::String(int64_t(seed)) << ",\"bpm\":" << num(c.bpm()) << ",\"key\":\"" << juce::String(c.describe()) << "\""
+      << ",\"tracks\":[\"pad\",\"bass\",\"seq\",\"lead\"],\"levelNames\":[\"pad\",\"bass\",\"seq\",\"lead\",\"delay\",\"reverb\",\"master\"]"
+      << ",\"levelRate\":" << num(blockRate) << ",\"sections\":[";
+    for (size_t i = 0; i < c.sections().size(); ++i)
+    {
+        auto& sc = c.sections()[i];
+        j << (i ? "," : "") << "{\"t\":" << num(sc.startBar * 4 * 60.0 / c.bpm()) << ",\"bars\":" << sc.bars
+          << ",\"energy\":" << num(sc.energy) << ",\"name\":\"" << sc.name << "\"}";
+    }
+    j << "],\"notes\":["; // [time s, duration s, track, pitch, velocity]
+    int64_t onAt[kNumTracks][128];
+    float velAt[kNumTracks][128] = {};
+    std::fill(&onAt[0][0], &onAt[0][0] + kNumTracks * 128, int64_t(-1));
+    bool first = true;
+    for (auto& e : ev)
+    {
+        if (e.type == Event::NoteOn) { onAt[e.track][e.pitch] = e.tick; velAt[e.track][e.pitch] = e.value; }
+        else if (e.type == Event::NoteOff && onAt[e.track][e.pitch] >= 0)
+        {
+            const int64_t on = onAt[e.track][e.pitch];
+            j << (first ? "" : ",") << "[" << num(on * secPerTick) << "," << num((e.tick - on) * secPerTick) << ","
+              << int(e.track) << "," << int(e.pitch) << "," << num(velAt[e.track][e.pitch]) << "]";
+            first = false;
+            onAt[e.track][e.pitch] = -1;
+        }
+    }
+    j << "],\"levels\":["; // RMS per audio block, linear
+    for (size_t i = 0; i < levels.size(); ++i)
+    {
+        j << (i ? ",[" : "[");
+        for (int k = 0; k < 7; ++k) j << (k ? "," : "") << num(levels[i][size_t(k)]);
+        j << "]";
+    }
+    j << "]}\n";
+    file.replaceWithText(j.toString());
+}
+
 static juce::String paletteName = "berlin"; // --palette <name>: sounds/<name>.txt
 
 static int renderConcert(uint64_t seed, double seconds, const juce::File& out, int solo, const juce::StringArray& patches, bool dry,
@@ -225,15 +275,30 @@ static int renderConcert(uint64_t seed, double seconds, const juce::File& out, i
     const int64_t total = seconds > 0 ? int64_t(seconds * sr) : std::numeric_limits<int64_t>::max();
     const auto t0 = juce::Time::getMillisecondCounterHiRes();
     int64_t done = 0;
+    std::vector<std::array<float, 7>> levels;
+    double lastSq[6] = {};
     while (done < total && !engine.isFinished())
     {
         engine.service(); // what the app's timer does: load each part's next sound ahead
         engine.render(buf.getArrayOfWritePointers(), 2, block);
         writer->writeFromAudioSampleBuffer(buf, 0, block);
+        std::array<float, 7> lv {};
+        const Engine::Meter* ms[6] = { &engine.meters[0], &engine.meters[1], &engine.meters[2], &engine.meters[3],
+                                       &engine.delayMeter, &engine.reverbMeter };
+        for (int k = 0; k < 6; ++k)
+        {
+            const double sq = ms[k]->sumSquares.load();
+            lv[size_t(k)] = float(std::sqrt(juce::jmax(0.0, sq - lastSq[k]) / block));
+            lastSq[k] = sq;
+        }
+        const float l = buf.getRMSLevel(0, 0, block), r = buf.getRMSLevel(1, 0, block);
+        lv[6] = std::sqrt(0.5f * (l * l + r * r));
+        levels.push_back(lv);
         done += block;
     }
     writer.reset();
     writeMidi(seed, out.withFileExtension("mid"));
+    if (startBar == 0) writeShow(seed, sr / block, levels, out.withFileExtension("show.json"));
 
     const double secs = double(done) / sr, took = (juce::Time::getMillisecondCounterHiRes() - t0) / 1000.0;
     std::cout << "rendered " << secs << " s in " << took << " s (" << secs / took << "x real time) -> "
