@@ -347,12 +347,16 @@ fn oetf(c: vec3f) -> vec3f { return select(1.055 * pow(c, vec3f(1.0 / 2.4)) - 0.
 // The mix pass: blends the outgoing and incoming studies (with an interference term halfway), then
 // feeds the previous frame back through up to three transforms. Its own module: no U here.
 const MIX = /* wgsl */`
-struct M { a: vec4f, b: vec4f, t0: vec4f, t1: vec4f, t2: vec4f };   // a: blend, fade, decay, taps · b: hue turn, flow, folds, aspect
+struct M { a: vec4f, b: vec4f, t0: vec4f, t1: vec4f, t2: vec4f, c: vec4f, o: vec4f, p: vec4f };
+// a: blend, fade, decay, taps · b: hue turn, edge flow, folds, aspect · c: water flow, its scale, sharpen, time
+// o: outer loop decay, zoom, turn, water flow · p: outer folds, outer hue turn, outer fade
 @group(0) @binding(0) var<uniform> m: M;
 @group(0) @binding(1) var A: texture_2d<f32>;
 @group(0) @binding(2) var B: texture_2d<f32>;
 @group(0) @binding(3) var prev: texture_2d<f32>;
 @group(0) @binding(4) var smp: sampler;
+@group(0) @binding(5) var X: texture_2d<f32>;       // the outer loop's input: this frame after the inner loop
+@group(0) @binding(6) var prevO: texture_2d<f32>;   // and the outer loop's own last frame
 struct VO { @builtin(position) pos: vec4f, @location(0) uv: vec2f };
 @vertex fn vs(@builtin(vertex_index) i: u32) -> VO {
   var p = array<vec2f, 3>(vec2f(-1.0, -1.0), vec2f(3.0, -1.0), vec2f(-1.0, 3.0));
@@ -374,12 +378,31 @@ fn fold(q: vec2f, n: f32) -> vec2f {
   a = abs(a - sector * floor(a / sector) - sector * 0.5);
   return vec2f(cos(a), sin(a)) * length(q);
 }
-fn tapf(q: vec2f, t: vec4f) -> vec3f {
+fn h21(p: vec2f) -> f32 { return fract(sin(dot(p, vec2f(127.1, 311.7))) * 43758.5453); }
+fn vnoise(p: vec2f) -> f32 {
+  let i = floor(p); let f = fract(p); let w = f * f * (3.0 - 2.0 * f);
+  return mix(mix(h21(i), h21(i + vec2f(1.0, 0.0)), w.x), mix(h21(i + vec2f(0.0, 1.0)), h21(i + vec2f(1.0, 1.0)), w.x), w.y);
+}
+// A slowly flowing displacement: the fed-back image passes through moving water each generation,
+// so the recursion grows organic instead of rigid.
+fn water(q: vec2f, amp: f32, sc: f32, t: f32) -> vec2f {
+  let a = vnoise(q * sc + vec2f(t * 0.11, -t * 0.07)) + 0.5 * vnoise(q * sc * 2.1 + vec2f(-t * 0.13, t * 0.05) + 9.0);
+  let b = vnoise(q * sc + vec2f(-t * 0.09, t * 0.12) + 31.0) + 0.5 * vnoise(q * sc * 2.1 + vec2f(t * 0.06, t * 0.1) + 47.0);
+  return (vec2f(a, b) - 0.75) * amp;
+}
+fn tapf(q: vec2f, t: vec4f, sharp: bool) -> vec3f {
   var s = rot(t.y) * q * t.x + t.zw;
+  s += water(s, m.c.x, m.c.y, m.c.w);
   if (m.b.z > 1.5) { s = fold(s, m.b.z); }
   let uv = s / vec2f(m.b.w, 1.0) + 0.5;
   if (uv.x < 0.0 || uv.y < 0.0 || uv.x > 1.0 || uv.y > 1.0) { return vec3f(0.0); }
-  return textureSampleLevel(prev, smp, uv, 0.0).rgb;
+  let c0 = textureSampleLevel(prev, smp, uv, 0.0).rgb;
+  if (!sharp) { return c0; }
+  // sharpening inside the loop: each generation edges get crisper, and fine textures grow out of it
+  let px = 1.0 / vec2f(textureDimensions(prev));
+  let nb = (textureSampleLevel(prev, smp, uv + vec2f(px.x, 0.0), 0.0).rgb + textureSampleLevel(prev, smp, uv - vec2f(px.x, 0.0), 0.0).rgb
+          + textureSampleLevel(prev, smp, uv + vec2f(0.0, px.y), 0.0).rgb + textureSampleLevel(prev, smp, uv - vec2f(0.0, px.y), 0.0).rgb) * 0.25;
+  return max(c0 + (c0 - nb) * m.c.z, vec3f(0.0));
 }
 @fragment fn mixf(i: VO) -> @location(0) vec4f {
   let a = textureSampleLevel(A, smp, i.uv, 0.0).rgb;
@@ -393,11 +416,26 @@ fn tapf(q: vec2f, t: vec4f) -> vec3f {
     let ly = luma(textureSampleLevel(prev, smp, i.uv + vec2f(0.0, px.y), 0.0).rgb) - luma(textureSampleLevel(prev, smp, i.uv - vec2f(0.0, px.y), 0.0).rgb);
     q += vec2f(-ly, lx) * m.b.y;
   }
-  var f = tapf(q, m.t0);
-  if (m.a.w > 1.5) { f = max(f, tapf(q, m.t1)); }
-  if (m.a.w > 2.5) { f = max(f, tapf(q, m.t2)); }
+  var f = tapf(q, m.t0, m.c.z > 0.0);
+  if (m.a.w > 1.5) { f = max(f, tapf(q, m.t1, false)); }
+  if (m.a.w > 2.5) { f = max(f, tapf(q, m.t2, false)); }
   f = max(hueTurn(f, m.b.x) * m.a.z - m.a.y * (0.5 + 0.5 * luma(f)), vec3f(0.0));   // dim generations die back to black, so the recursion never hazes
   return vec4f(min(max(c, f), vec3f(16.0)), 1.0);   // max, not sum: the recursion keeps the exposure
+}
+// The outer loop: a second, slower recursion around the first. It feeds on the inner loop's output, so
+// the inner recursion's patterns are themselves recursed: longer memory, its own zoom, turn and water.
+@fragment fn outerf(i: VO) -> @location(0) vec4f {
+  let x = textureSampleLevel(X, smp, i.uv, 0.0).rgb;
+  if (m.o.x <= 0.0) { return vec4f(x, 1.0); }
+  let q = (i.uv - 0.5) * vec2f(m.b.w, 1.0);
+  var s = rot(m.o.z) * q * m.o.y;
+  s += water(s, m.o.w, 1.3, m.c.w * 0.6 + 50.0);
+  if (m.p.x > 1.5) { s = fold(s, m.p.x); }
+  let uv = s / vec2f(m.b.w, 1.0) + 0.5;
+  var o = vec3f(0.0);
+  if (uv.x >= 0.0 && uv.y >= 0.0 && uv.x <= 1.0 && uv.y <= 1.0) { o = textureSampleLevel(prevO, smp, uv, 0.0).rgb; }
+  o = max(hueTurn(o, m.p.y) * m.o.x - m.p.z * (0.5 + 0.5 * luma(o)), vec3f(0.0));
+  return vec4f(min(max(x, o), vec3f(16.0)), 1.0);
 }
 `;
 
@@ -474,7 +512,7 @@ STUDIES.push({
         let j = traj(1.0);
         let a = 0.6 + u.cam.x * 0.7 + u.time * 0.015 + j.x;
         let el = u.cam.y + j.y;
-        let d = 4.4 * u.cam.z * j.z * (1.0 - 0.25 * u.hit.y);          // the bass pushes the camera in
+        let d = max(3.2, 4.4 * u.cam.z * j.z * (1.0 - 0.25 * u.hit.y));   // the bass pushes the camera in, never into the dust
         return aim() + vec3f(sin(a) * d * cos(el), 0.6 + sin(el) * d, -cos(a) * d * cos(el)) + shake() * 0.4;
       }
       fn basis() -> mat3x3f {
@@ -939,7 +977,7 @@ STUDIES.push({
 // space; drawn sharp, with half a million grains of dust gathering on it.
 const FIELD = binding => /* wgsl */`
       @group(0) @binding(${binding}) var<uniform> S: array<vec4f, 32>;
-      fn zoom() -> f32 { return (0.7 + 0.9 * gene(15)) * max(u.cam.z, 0.6) * traj(4.0).z; }
+      fn zoom() -> f32 { return max(0.75, (0.7 + 0.9 * gene(15)) * max(u.cam.z, 0.6) * traj(4.0).z); }
       fn pan() -> vec2f { let j = traj(4.0); return vec2f(sin(j.x) * 0.35, j.y * 0.5) + travel().xy * 0.4; }
       fn turn() -> f32 { return u.cam.x * 0.4 + u.time * 0.06 * (gene(13) - 0.5) + traj(4.0).w + traj(4.0).x * 0.25; }
       fn toWorld(px: vec2f) -> vec2f { return rot2(turn()) * ((px - u.res * 0.5) / u.res.y * 2.0 * zoom()) + shake().xy * 0.1 + pan(); }
@@ -1094,7 +1132,7 @@ STUDIES.push({
         let uv = (i.pos.xy - u.res * 0.5) / u.res.y * vec2f(1.0, -1.0);
         let j = traj(5.0);
         let ya = u.cam.x * 0.35 + j.x * 0.6;
-        let dist = 8.5 * (0.6 + 0.4 * u.cam.z) * j.z;
+        let dist = max(6.0, 8.5 * (0.6 + 0.4 * u.cam.z) * j.z);
         let aim = vec3f(0.0, 2.0, 0.0) + travel() * vec3f(1.5, 0.6, 1.5);
         let ro = aim + vec3f(sin(ya) * dist, -0.6 + (u.cam.y + j.y) * 4.0, -cos(ya) * dist) + shake();
         let fw = normalize(aim - ro);
@@ -1387,7 +1425,7 @@ STUDIES.push({
         let j = traj(7.0);
         let a = u.time * 0.031 + u.cam.x + j.x;
         let el = u.cam.y + j.y * 1.5;
-        let dist = select(5.4, 7.5, gene(4) > 0.7) * u.cam.z * j.z;
+        let dist = max(select(4.3, 6.0, gene(4) > 0.7), select(5.4, 7.5, gene(4) > 0.7) * u.cam.z * j.z);
         let ro = vec3f(sin(a) * dist * cos(el), sin(el) * dist, cos(a) * dist * cos(el)) + travel() * 0.8 + shake() * 0.4;
         let fw = normalize(-ro);
         var rt = normalize(cross(fw, vec3f(0, 1, 0)));
@@ -1631,8 +1669,9 @@ async function boot() {
   const pUp = g.fullscreen(COMMON + POST, 'up', 'rgba16float', add);
   const pComp = g.fullscreen(COMMON + POST, 'composite', format);
   const pMix = g.fullscreen(MIX, 'mixf');
+  const pOuter = g.fullscreen(MIX, 'outerf');
   const postU = device.createBuffer({ size: 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
-  const mixU = device.createBuffer({ size: 80, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+  const mixU = device.createBuffer({ size: 128, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
   const postIn = device.createBuffer({ size: Udata.byteLength, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });   // the composite's view of U
   // Every study has its own uniforms and its own target, so two can run at once during a transition.
   const use = s => { g.U = s.U; g.W = s.W; g.H = s.H; g.sceneView = s.view; };
@@ -1642,7 +1681,7 @@ async function boot() {
     await s.init(g, F);
   }
 
-  let study = STUDIES[0], next = null, tw = 0, mips = [], downBG = [], upBG = [], compBG = [], mixBG = [], fb = [], fbi = 0;
+  let study = STUDIES[0], next = null, tw = 0, mips = [], downBG = [], upBG = [], compBG = [], mixBG = [], fb = [], fbo = [], outerBG = [], fbi = 0;
   const tex = (w, h) => device.createTexture({ size: [w, h], format: 'rgba16float', usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING });
   let Q = 1;   // render quality, lowered when frames come late (see quality())
   function targets() {
@@ -1659,14 +1698,18 @@ async function boot() {
       s.resize(g);
     }
     fb.forEach(t => t.destroy()); mips.forEach(m => m.destroy());
+    fbo.forEach(t => t.destroy());
     fb = [tex(canvas.width, canvas.height), tex(canvas.width, canvas.height)];
-    const fbv = fb.map(t => t.createView());
+    fbo = [tex(canvas.width, canvas.height), tex(canvas.width, canvas.height)];   // the outer loop's two frames
+    const fbv = fb.map(t => t.createView()), fbov = fbo.map(t => t.createView());
+    outerBG = [0, 1].map(j => g.bind(pOuter, [mixU, smp, fbv[j], fbov[1 - j]], [0, 4, 5, 6]));
+    g.fboViews = fbov;
     mips = [];
     for (let k = 1, w = canvas.width, h = canvas.height; k <= 6; k++) { w = Math.max(1, w >> 1); h = Math.max(1, h >> 1); mips.push(tex(w, h)); }
     const views = mips.map(m => m.createView());
-    downBG = [0, 1].map(j => views.map((v, k) => g.bind(k ? pDown : pKaris, [k ? views[k - 1] : fbv[j], smp], [1, 2])));
+    downBG = [0, 1].map(j => views.map((v, k) => g.bind(k ? pDown : pKaris, [k ? views[k - 1] : fbov[j], smp], [1, 2])));
     upBG = views.slice(1).map(v => g.bind(pUp, [v, smp], [1, 2]));
-    compBG = [0, 1].map(j => g.bind(pComp, [postIn, fbv[j], smp, views[0], postU], [0, 1, 2, 3, 4]));
+    compBG = [0, 1].map(j => g.bind(pComp, [postIn, fbov[j], smp, views[0], postU], [0, 1, 2, 3, 4]));
     g.fbViews = fbv;
     g.mipViews = views;
     mixBG = {};
@@ -1884,14 +1927,14 @@ async function boot() {
   // keep spinning between cuts, and flash on the bass.
   const PALETTE = [[1, 0.2, 0.06], [0.45, 0.62, 1], [1, 1, 1], [0.85, 0.3, 1], [1, 0.62, 0.2], [0.25, 1, 0.85]];
   const D = { cam: [0, 0, 1, 0], fx: [0, 0, 0, 0], col: [1, 1, 1, 0], target: [0, 0, 1], spin: 0, cut: 0, chord: -1, bar: -1, si: -1, strobe: true, invertUntil: 0,
-    feedback: true, gene: new Float32Array(16), fbg: new Float32Array(8), gen: 0, salt: Math.random() * 1000 };   // a fresh lineage every time the page opens
+    feedback: true, gene: new Float32Array(16), fbg: new Float32Array(12), gen: 0, salt: Math.random() * 1000 };   // a fresh lineage every time the page opens
   const hash01 = k => { const x = Math.sin(k * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); };
   window.__D = D;
   // The genome: every section gets a new one, every cut mutates two of its numbers. G rolls by hand.
   const roll = () => {
     D.gen++;
     for (let k = 0; k < 16; k++) D.gene[k] = hash01(D.salt + D.gen * 97.13 + k * 13.7);
-    for (let k = 0; k < 8; k++) D.fbg[k] = hash01(D.salt + D.gen * 61.7 + k * 29.3 + 500);
+    for (let k = 0; k < 12; k++) D.fbg[k] = hash01(D.salt + D.gen * 61.7 + k * 29.3 + 500);
   };
   roll();
   function direct(t, dt) {
@@ -1901,7 +1944,7 @@ async function boot() {
       D.cut++;
       const r = k => hash01(D.cut * 7 + k);
       const cu = CAM.cuts / 100;
-      D.target = [D.cam[0] + (r(1) - 0.5) * 6.0 * (0.3 + e) * cu, (r(2) - 0.4) * 0.9 * e * cu, 1 + (r(3) * 0.9 - 0.45) * cu];
+      D.target = [D.cam[0] + (r(1) - 0.5) * 6.0 * (0.3 + e) * cu, (r(2) - 0.4) * 0.9 * e * cu, Math.max(0.85, 1 + (r(3) * 0.9 - 0.45) * cu)];
       D.spin = (r(8) - 0.5) * 2.4 * e * cu;
       D.col = [...PALETTE[Math.floor(r(4) * PALETTE.length)], Math.max(0, Math.min(1, (e - 0.35) * 2.2))];
       if (sectionStart) roll();
@@ -1928,11 +1971,11 @@ async function boot() {
   // zooming tap is a tunnel, a turning one a spiral, three shrunken copies an iterated-function
   // fractal of whatever is on screen. Each pass shifts the hue a little, and can flow along its own
   // edges. The genome picks the network; the bass punches into it.
-  const M = new Float32Array(20);
+  const M = new Float32Array(32);
   const FB_MODES = ['TUNNEL IN', 'TUNNEL OUT', 'SPIRAL', 'FRACTAL 3', 'FRACTAL 2', 'ECHO'];
   function network(dt, visT, aspect) {
     const f = Float32Array.from(D.fbg), e = F.energy, hit = F.hit[1];
-    for (const k of [1, 2, 3, 7]) f[k] = Math.max(0, Math.min(0.999, f[k] + fbm1(visT * 0.04 + k * 7.7, k + 40) * 0.12));   // the continuous ones wander
+    for (const k of [1, 2, 3, 7, 9, 10, 11]) f[k] = Math.max(0, Math.min(0.999, f[k] + fbm1(visT * 0.04 + k * 7.7, k + 40) * 0.12));   // the continuous ones wander
     const mode = Math.min(5, Math.floor(f[0] * 6));
     const taps = [];
     if (mode === 0) taps.push([0.985 - 0.03 * f[7] - 0.05 * hit, (f[6] - 0.5) * 0.03 + D.spin * 0.01, Math.sin(visT * 0.3) * 0.006, Math.cos(visT * 0.23) * 0.006]);
@@ -1958,8 +2001,13 @@ async function boot() {
     const blend = next ? tw * tw * (3 - 2 * tw) : 0;
     M.set([blend, 0.04 * dt * 60, decay, mode >= 3 && mode <= 4 ? (mode === 3 ? 3 : 2) : 1,
       (f[2] - 0.5) * 0.12 + pad.kick * 0.1, f[3] > 0.6 ? 0.004 + 0.012 * f[3] : 0, folds, aspect,
-      ...taps[0], ...taps[1], ...taps[2]]);
-    D.fbMode = FB_MODES[mode];
+      ...taps[0], ...taps[1], ...taps[2],
+      // water: how far each generation drifts, stirred by the bass and the pad; sharpening grows textures
+      (0.0012 + 0.005 * f[3]) * (1 + 2 * hit + 2 * pad.kick) * dt * 60, 1.5 + 4 * f[4], f[6] > 0.55 ? 0.15 + 0.3 * f[7] : 0, visT,
+      // the outer loop: on most of the time, slower and longer than the inner one
+      f[8] > 0.25 ? on * gain * Math.pow(0.9 + 0.075 * f[9], dt * 60) : 0, Math.pow(1 + (f[10] - 0.5) * 0.016, dt * 60), (f[11] - 0.5) * 0.008 * dt * 60, (0.001 + 0.004 * f[9]) * dt * 60,
+      f[10] > 0.85 ? 4 : 0, -(f[2] - 0.5) * 0.06, 0.03 * dt * 60, 0]);
+    D.fbMode = FB_MODES[mode] + (f[8] > 0.25 ? ' + OUTER' : '') + (f[6] > 0.55 ? ' · TEXTURE' : '');
     return blend;
   }
 
@@ -1998,7 +2046,7 @@ async function boot() {
     ];
     const o = [0, 0, 0, 0, 0, 0, 0];
     for (let m = 0; m < 4; m++) for (let a = 0; a < 7; a++) o[a] += types[m][a] * J.w[m];
-    journeyOut.set([o[0] * A, o[1] * A, 1 + (o[2] - 1) * A, o[3] * A, o[4] * A, o[5] * A, o[6] * A, 0]);
+    journeyOut.set([o[0] * A, o[1] * A, Math.max(0.85, Math.min(1.5, 1 + (o[2] - 1) * A)), o[3] * A, o[4] * A, o[5] * A, o[6] * A, 0]);   // never closer than 85%
     return journeyOut;
   }
 
@@ -2065,6 +2113,7 @@ async function boot() {
     device.queue.writeBuffer(postU, 0, new Float32Array([1.0, study.bloom + (b.bloom - study.bloom) * blend, 0.05, 1]));
     fbi = 1 - fbi;
     g.draw(enc, pMix, mixGroup(study, b, fbi), g.fbViews[fbi]);
+    g.draw(enc, pOuter, outerBG[fbi], g.fboViews[fbi]);
     for (let k = 0; k < 6; k++) g.draw(enc, k ? pDown : pKaris, downBG[fbi][k], g.mipViews[k]);
     for (let k = 4; k >= 0; k--) g.draw(enc, pUp, upBG[k], g.mipViews[k], 'load');
     g.draw(enc, pComp, compBG[fbi], ctx.getCurrentTexture().createView());
@@ -2092,6 +2141,7 @@ async function boot() {
       const enc = device.createCommandEncoder();
       s.frame(g, enc, 1);
       g.draw(enc, pMix, mixGroup(s, s, 0), g.fbViews[0]);
+      g.draw(enc, pOuter, outerBG[0], g.fboViews[0]);
       for (let k = 0; k < 6; k++) g.draw(enc, k ? pDown : pKaris, downBG[0][k], g.mipViews[k]);
       for (let k = 4; k >= 0; k--) g.draw(enc, pUp, upBG[k], g.mipViews[k], 'load');
       device.queue.submit([enc.finish()]);
