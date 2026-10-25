@@ -60,9 +60,9 @@ nav button[aria-pressed="true"] { color: var(--ember); }
   <div class="card">
     <h1>Lisztmachine</h1>
     <p class="meta" id="meta">Loading the concert…</p>
-    <p class="lede">Four generative light studies for projecting onto the drummer. Each one reads the music itself: every note, every chord and the level of each part, so the light lands exactly with the sound.</p>
+    <p class="lede">Four generative light studies for projecting onto the drummer, blending into each other. Each one reads the music itself: every note, every chord and the level of each part, so the light lands exactly with the sound.</p>
     <button class="go" id="go" disabled>Loading…</button>
-    <p class="keys"><kbd>1</kbd>–<kbd>4</kbd> study · <kbd>G</kbd> new look · <kbd>Space</kbd> pause · <kbd>←</kbd><kbd>→</kbd> 10 s · <kbd>↑</kbd><kbd>↓</kbd> section · <kbd>S</kbd> strobe on/off · <kbd>H</kbd> hide controls · <kbd>F</kbd> full screen</p>
+    <p class="keys"><kbd>1</kbd>–<kbd>4</kbd> study · <kbd>G</kbd> new look · <kbd>Space</kbd> pause · <kbd>←</kbd><kbd>→</kbd> 10 s · <kbd>↑</kbd><kbd>↓</kbd> section · <kbd>S</kbd> strobe on/off · <kbd>B</kbd> feedback on/off · <kbd>H</kbd> hide controls · <kbd>F</kbd> full screen</p>
     <p class="err" id="err" hidden></p>
   </div>
 </div>
@@ -314,6 +314,63 @@ fn oetf(c: vec3f) -> vec3f { return select(1.055 * pow(c, vec3f(1.0 / 2.4)) - 0.
 }
 `;
 
+// The mix pass: blends the outgoing and incoming studies (with an interference term halfway), then
+// feeds the previous frame back through up to three transforms. Its own module: no U here.
+const MIX = /* wgsl */`
+struct M { a: vec4f, b: vec4f, t0: vec4f, t1: vec4f, t2: vec4f };   // a: blend, fade, decay, taps · b: hue turn, flow, folds, aspect
+@group(0) @binding(0) var<uniform> m: M;
+@group(0) @binding(1) var A: texture_2d<f32>;
+@group(0) @binding(2) var B: texture_2d<f32>;
+@group(0) @binding(3) var prev: texture_2d<f32>;
+@group(0) @binding(4) var smp: sampler;
+struct VO { @builtin(position) pos: vec4f, @location(0) uv: vec2f };
+@vertex fn vs(@builtin(vertex_index) i: u32) -> VO {
+  var p = array<vec2f, 3>(vec2f(-1.0, -1.0), vec2f(3.0, -1.0), vec2f(-1.0, 3.0));
+  var o: VO;
+  o.pos = vec4f(p[i], 0.0, 1.0);
+  o.uv = p[i] * vec2f(0.5, -0.5) + 0.5;
+  return o;
+}
+fn luma(c: vec3f) -> f32 { return dot(c, vec3f(0.2126, 0.7152, 0.0722)); }
+fn hueTurn(c: vec3f, a: f32) -> vec3f {           // rotate about the grey axis: each generation drifts in colour
+  let k = vec3f(0.57735);
+  let ca = cos(a);
+  return c * ca + cross(k, c) * sin(a) + k * dot(k, c) * (1.0 - ca);
+}
+fn rot(a: f32) -> mat2x2f { return mat2x2f(cos(a), sin(a), -sin(a), cos(a)); }
+fn fold(q: vec2f, n: f32) -> vec2f {
+  let sector = 6.2831853 / n;
+  var a = atan2(q.y, q.x);
+  a = abs(a - sector * floor(a / sector) - sector * 0.5);
+  return vec2f(cos(a), sin(a)) * length(q);
+}
+fn tapf(q: vec2f, t: vec4f) -> vec3f {
+  var s = rot(t.y) * q * t.x + t.zw;
+  if (m.b.z > 1.5) { s = fold(s, m.b.z); }
+  let uv = s / vec2f(m.b.w, 1.0) + 0.5;
+  if (uv.x < 0.0 || uv.y < 0.0 || uv.x > 1.0 || uv.y > 1.0) { return vec3f(0.0); }
+  return textureSampleLevel(prev, smp, uv, 0.0).rgb;
+}
+@fragment fn mixf(i: VO) -> @location(0) vec4f {
+  let a = textureSampleLevel(A, smp, i.uv, 0.0).rgb;
+  let b = textureSampleLevel(B, smp, i.uv, 0.0).rgb;
+  let w = m.a.x;
+  let c = mix(a, b, w) + 4.0 * w * (1.0 - w) * (a * b * 2.0 + abs(a - b) * 0.35);
+  var q = (i.uv - 0.5) * vec2f(m.b.w, 1.0);
+  if (m.b.y > 0.0) {                                  // flow: light slides along its own edges
+    let px = 1.5 / vec2f(textureDimensions(prev));
+    let lx = luma(textureSampleLevel(prev, smp, i.uv + vec2f(px.x, 0.0), 0.0).rgb) - luma(textureSampleLevel(prev, smp, i.uv - vec2f(px.x, 0.0), 0.0).rgb);
+    let ly = luma(textureSampleLevel(prev, smp, i.uv + vec2f(0.0, px.y), 0.0).rgb) - luma(textureSampleLevel(prev, smp, i.uv - vec2f(0.0, px.y), 0.0).rgb);
+    q += vec2f(-ly, lx) * m.b.y;
+  }
+  var f = tapf(q, m.t0);
+  if (m.a.w > 1.5) { f = max(f, tapf(q, m.t1)); }
+  if (m.a.w > 2.5) { f = max(f, tapf(q, m.t2)); }
+  f = max(hueTurn(f, m.b.x) * m.a.z - m.a.y * (0.5 + 0.5 * luma(f)), vec3f(0.0));   // dim generations die back to black, so the recursion never hazes
+  return vec4f(min(max(c, f), vec3f(16.0)), 1.0);   // max, not sum: the recursion keeps the exposure
+}
+`;
+
 // ---------------------------------------------------------------------------------------------
 // The studies. Each draws into g.sceneView at its own resolution scale.
 // ---------------------------------------------------------------------------------------------
@@ -385,7 +442,7 @@ STUDIES.push({
       fn aim() -> vec3f { return vec3f(0.2, 0.0, 0.0); }
       fn eye() -> vec3f {
         let a = 0.6 + u.cam.x * 0.7 + u.time * 0.015;
-        let d = 4.4 * u.cam.z;
+        let d = 4.4 * u.cam.z * (1.0 - 0.25 * u.hit.y);                // the bass pushes the camera in
         return aim() + vec3f(sin(a) * d * cos(u.cam.y), 0.6 + sin(u.cam.y) * d, -cos(a) * d * cos(u.cam.y)) + shake() * 0.4;
       }
       fn basis() -> mat3x3f {
@@ -634,10 +691,10 @@ STUDIES.push({
     this.ng = n;
     g.device.queue.writeBuffer(this.gb, 0, gl, 0, n * 8);
   },
-  frame(g, enc) {
+  frame(g, enc, share = 1) {
     enc.clearBuffer(this.A);
     const c = enc.beginComputePass();
-    c.setPipeline(this.update); c.setBindGroup(0, this.bgU); c.dispatchWorkgroups(this.N / 256);
+    c.setPipeline(this.update); c.setBindGroup(0, this.bgU); c.dispatchWorkgroups(this.N / 256 * share);
     c.end();
     g.draw(enc, this.resolve, this.bgR);
     const pass = enc.beginRenderPass({ colorAttachments: [{ view: g.sceneView, loadOp: 'load', storeOp: 'store' }] });
@@ -649,68 +706,82 @@ STUDIES.push({
   },
 });
 
-// 2 · Grating: one grating per held chord note (and, by genome, its harmonics), spaced by pitch.
-// The genome picks each layer's geometry (lines, rings, spirals, hyperbolas, log-polar), folds the
-// plane into a kaleidoscope, warps it, and can split the layers into colours: colour moiré.
+// 2 · Tunnel: you fly through the score. The walls carry every note (around the tunnel: pitch;
+// along it: time), so notes appear far ahead, rush toward you and pass at the bright now-ring.
+// The genome shapes the cross-section (diamond, circle, square, petals), the twist, the folds, the
+// roll and what else is written on the walls.
 STUDIES.push({
-  id: 'grating', name: 'Grating', scale: 1, exposure: 1.0, bloom: 0.07,
-  about: 'Each held chord note is a grating of light spaced by its pitch; their interference is the harmony. The geometry keeps mutating: lines, rings, spirals, hyperbolas, kaleidoscopes, colour moiré.',
+  id: 'tunnel', name: 'Tunnel', scale: 1, exposure: 1.0, bloom: 0.11,
+  about: 'A flight through the score: notes appear far ahead, rush toward you and pass at the bright ring of now. The tunnel keeps changing shape, twisting, folding and rolling with the music.',
   init(g) {
+    this.TB = 512; this.PB = 128; this.ahead = 10; this.behind = 2;
+    this.img = new Uint8Array(this.TB * this.PB * 4);
+    this.tex = g.device.createTexture({ size: [this.TB, this.PB], format: 'rgba8unorm', usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST });
+    this.smp = g.device.createSampler({ magFilter: 'linear', minFilter: 'linear', addressModeU: 'clamp-to-edge', addressModeV: 'clamp-to-edge' });
     this.pipe = g.fullscreen(COMMON + /* wgsl */`
-      fn grating(d: f32, gamma: f32) -> f32 {
-        let aa = clamp(1.5 - fwidth(d) * 2.5, 0.0, 1.0);  // above Nyquist a grating fades to its mean
-        return pow(max(0.5 + 0.5 * cos(6.2831853 * d) * aa, 0.0), gamma);  // rounding below 0 makes pow NaN: a white screen
-      }
-      fn layerD(p: vec2f, k: i32, f: f32, ang: f32) -> f32 {
-        var kind = u32(fract(gene(0) * 7.31 + f32(k) * 0.379) * 5.0);
-        if (gene(6) < 0.35) { kind = 0u; }                       // a third of the genomes stay pure lines
-        let c = (vec2f(gene(7), gene(8)) - 0.5) * 0.6;
-        let q = p - c;
-        let arms = floor(2.0 + gene(10) * 7.0);
-        if (kind == 1u) { return length(q) * f; }
-        if (kind == 2u) { return length(q) * f + atan2(q.y, q.x) / 6.2831853 * arms; }
-        if (kind == 3u) { let r = rot2(ang) * q; return r.x * r.y * f * 3.0; }
-        if (kind == 4u) { return log(length(q) + 1e-3) * f * 0.12 + atan2(q.y, q.x) / 6.2831853 * arms; }
-        return dot(p, vec2f(cos(ang), sin(ang))) * f;
+      @group(0) @binding(1) var score: texture_2d<f32>;   // x: time from now-2 s to now+10 s · y: MIDI pitch · rgba: pad bass seq lead
+      @group(0) @binding(2) var smp: sampler;
+      fn hair(v: f32) -> f32 {
+        let fw = fwidth(v);
+        return clamp(1.0 - abs(fract(v + 0.5) - 0.5) / max(fw, 1e-4), 0.0, 1.0) * (1.0 - smoothstep(0.15, 0.45, fw));
       }
       @fragment fn fs(i: VO) -> @location(0) vec4f {
-        var p = (i.pos.xy - u.res * 0.5) / u.res.y + shake().xy * 0.08;
-        p += vec2f(gnoise(vec3f(p * 2.0, u.time * 0.05)), gnoise(vec3f(p * 2.0 + 9.0, u.time * 0.05))) * gene(2) * 0.09;   // warp
-        p = foldq(rot2(gene(9) * 6.2831853 + u.time * 0.01 * (gene(9) - 0.5)) * p, gene(1));
-        let extra = u32(gene(11) * 3.0);                         // harmonic layers on top of the chord
-        var n = 0.0;
-        for (var k = 0; k < 4; k++) { if (u.chord[k] > 0.0) { n += 1.0; } }
-        n += min(f32(extra), n);
-        let ex = (5.0 + 3.0 * u.energy + 6.0 * u.hit.z) / max(n, 1.0);
-        let spread = 0.004 + (0.01 + 0.08 * gene(3)) * u.energy;
-        let base = 0.62 + 0.35 * sin(u.time * 0.0041) + u.cam.x;
-        let chroma = gene(4) > 0.55;
-        var masks = array<vec3f, 6>(vec3f(1.0, 1.0, 0.1), vec3f(0.1, 1.0, 1.0), vec3f(1.0, 0.1, 1.0), vec3f(1.0, 0.6, 0.1), vec3f(0.1, 0.6, 1.0), vec3f(0.6, 1.0, 0.1));
-        var light = vec3f(1.0);
-        for (var k = 0; k < 6; k++) {
-          var pk = 0.0;
-          if (k < 4) { pk = u.chord[k]; }
-          else if (u32(k - 4) < extra) { pk = u.chord[k - 4] + select(12.0, 19.0, k == 5); }
-          if (pk <= 0.0) { continue; }
-          let f = 70.0 * (0.5 + gene(5)) * (1.0 + 0.35 * u.energy) / u.cam.z * exp2((pk - u.chord.x) / 12.0 * 0.09);
-          let ang = base + (f32(k) - 1.5) * spread + 0.01 * sin(u.time * 0.05 * f32(k + 1));
-          let step = u.count.z - 1.0 + smoothstep(0.0, 0.12, u.since.z);
-          let d = layerD(p, k, f, ang) - u.time * (0.05 + 0.25 * u.energy) * (f32(k) - 1.5) - step * 0.045 * (f32(k) - 1.5);
-          let gk = grating(d, ex * select(1.0, 2.2, chroma));   // each colour sees fewer layers: sharpen them
-          light *= mix(vec3f(1.0), vec3f(gk), select(vec3f(1.0), masks[k], chroma));
+        let vp = vec2f(sin(u.time * 0.13) * 0.12, cos(u.time * 0.11) * 0.08) + vec2f(u.cam.x, u.cam.y) * vec2f(0.02, 0.12);
+        var q = (i.pos.xy - u.res * 0.5) / u.res.y - vp + shake().xy * 0.05;
+        q = rot2(u.time * (gene(3) - 0.5) * 0.6 + u.cam.x * 0.5) * q;                    // roll
+        let p = 1.0 + 7.0 * gene(0) * gene(0);                                           // diamond · circle · square
+        var r = pow(pow(abs(q.x), p) + pow(abs(q.y), p), 1.0 / p);
+        var ang = atan2(q.y, q.x);
+        r *= 1.0 + gene(2) * 0.35 * sin(ang * floor(3.0 + gene(5) * 6.0) + u.time * 0.4);  // petals
+        let z = 0.35 / max(r, 1e-3);                                                     // depth into the tunnel
+        let now = u.beats * 60.0 / u.bpm;
+        let tz = now + (z - 1.2) * 1.2;                                                  // the music time written at this depth
+        ang += z * (gene(4) - 0.5) * 1.6;                                                // twist
+        var nf = array<f32, 5>(1.0, 2.0, 3.0, 4.0, 6.0);
+        let folds = nf[min(u32(gene(1) * 5.0), 4u)];
+        var around = fract(ang / 6.2831853 + 0.5);
+        if (folds > 1.5) { around = abs(fract(around * folds) - 0.5) * 2.0; }            // mirrored sectors
+        let s = textureSampleLevel(score, smp, vec2f((tz - now + 2.0) / 12.0, (24.0 + around * 72.0) / 128.0), 0.0);
+        let nowRing = exp(-pow((z - 1.2) * 4.0, 2.0));
+        let flare = 1.0 + 2.5 * nowRing;
+        var c = (tint(u.energy) * s.r * 0.6 + vec3f(1.0, 0.35, 0.15) * s.g * 1.2 + vec3f(1.0) * s.b * 1.4 + mix(vec3f(1.0, 0.85, 0.6), u.col.rgb, u.col.w) * s.a * 1.3) * flare;
+        let beats = tz * u.bpm / 60.0;
+        c += tint(u.energy) * (0.10 * hair(beats) + 0.35 * hair(beats / 4.0));          // beat and bar rings rushing past
+        c += tint(u.energy) * nowRing * (0.25 + 1.5 * u.hit.y);
+        let mode = u32(gene(6) * 3.0);
+        if (mode == 1u) {                                                                // Ikeda bars along the walls
+          let cell = floor(z * 24.0 - u.time * (2.0 + 10.0 * u.energy));
+          let code = rnd(u32(abs(cell)) * 2654435761u + u32(around * 16.0) * 97u + u32(u.count.z) * 13u);
+          c += vec3f(step(0.9 - 0.25 * u.level.z, code)) * 0.5 * (0.3 + u.hit.z);
+        } else if (mode == 2u) {                                                         // the chord's grating, wound around the walls
+          var g2 = 1.0;
+          for (var k = 0; k < 4; k++) {
+            if (u.chord[k] <= 0.0) { continue; }
+            let f = 24.0 * exp2((u.chord[k] - u.chord.x) / 12.0 * 0.09);
+            g2 *= pow(max(0.5 + 0.5 * cos(6.2831853 * (around * f + z * 0.5 * f32(k))), 0.0), 1.5);
+          }
+          c += tint(u.energy) * g2 * 0.8 * u.level.x;
         }
-        if (n == 0.0) { light = vec3f(0.0); }
-        let fb = 10.0 * exp2(u.pitch.y * 1.5);
-        let rc = length(p - vec2f(0.0, 0.08)) * fb - (u.count.y - 1.0 + smoothstep(0.0, 0.25, u.since.y)) * 0.5;
-        light *= mix(1.0, grating(rc, 1.0) * 2.0, u.level.y * 0.6);
-        let c = vec2f(sin(u.time * 0.09) * 0.35, (0.5 - u.pitch.w) * 0.5);
-        let ap = exp(-dot(p - c, p - c) / 0.05);
-        light *= 1.0 + u.level.w * (1.6 * ap - 0.4) + 0.8 * u.hit.w * ap;
-        let gain = 3.2 * (0.2 + 1.0 * u.level.x + 0.3 * u.bus.z) * (1.0 + 1.3 * u.hit.y + 0.7 * u.hit.x);
-        return vec4f(select(tint(u.energy), vec3f(1.0), chroma) * light * gain, 1.0);
+        let streak = pow(max(0.5 + 0.5 * cos(6.2831853 * (z * 6.0 - u.time * (1.0 + 6.0 * u.energy))), 0.0), 12.0);
+        c += tint(u.energy) * streak * 0.12 * (0.3 + u.energy);                            // speed lines: the feeling of motion
+        c *= smoothstep(16.0, 2.5, z) * smoothstep(0.0, 0.08, r) * 0.6;                        // far fog, and the eye of the tunnel
+        return vec4f(c, 1.0);
       }`);
   },
-  resize(g) { this.bg = g.bind(this.pipe, [g.U]); },
+  resize(g) { this.bg = g.bind(this.pipe, [g.U, this.tex.createView(), this.smp]); },
+  cpu(g, F, t) {
+    const img = this.img, TB = this.TB, span = this.ahead + this.behind, t0 = t - this.behind;
+    img.fill(0);
+    for (let i = lowerBound(F.notes, t0 - 17); i < F.notes.length && F.notes[i][0] <= t + this.ahead; i++) {
+      const [s, d, tr, p, v] = F.notes[i];
+      if (s + d < t0) continue;
+      const a = Math.max(0, Math.floor((s - t0) / span * TB)), b = Math.min(TB - 1, Math.ceil((s + d - t0) / span * TB));
+      const val = Math.min(255, 120 + v * 135) | 0;
+      const row = p * TB * 4 + tr;
+      for (let x = a; x <= b; x++) { const k = row + x * 4; if (img[k] < val) img[k] = val; }
+    }
+    g.device.queue.writeTexture({ texture: this.tex }, img, { bytesPerRow: TB * 4 }, [TB, this.PB]);
+  },
   frame(g, enc) { g.draw(enc, this.pipe, this.bg); },
 });
 
@@ -718,7 +789,8 @@ STUDIES.push({
 // note. The genome picks the layout (full strips, recursive cells, rings), the orientation, the code
 // (random, the note counter in binary, the pitch in binary, Gray code), and can XOR two systems.
 STUDIES.push({
-  id: 'pattern', name: 'Test Pattern', scale: 1, exposure: 1.0, bloom: 0.006,   // hard edges: glow would lift the black
+  id: 'pattern', name: 'Test Pattern', scale: 1, exposure: 1.0, feedback: 0.82,   // mostly white: a lighter recursion
+  bloom: 0.006,   // hard edges: glow would lift the black
   about: 'After Ryoji Ikeda: binary barcode strips, each driven by one part and re-coded on every note. The layout keeps mutating: recursive cells, rings, crossed systems, codes made from the notes themselves.',
   init(g) {
     this.pipe = g.fullscreen(COMMON + /* wgsl */`
@@ -792,8 +864,9 @@ STUDIES.push({
 const FIELD = binding => /* wgsl */`
       @group(0) @binding(${binding}) var<uniform> S: array<vec4f, 32>;
       fn zoom() -> f32 { return (0.7 + 0.9 * gene(15)) * max(u.cam.z, 0.6); }
-      fn toWorld(px: vec2f) -> vec2f { return rot2(u.cam.x * 0.15) * ((px - u.res * 0.5) / u.res.y * 2.0 * zoom()) + shake().xy * 0.1; }
-      fn toScreen(q: vec2f) -> vec2f { return rot2(-u.cam.x * 0.15) * (q - shake().xy * 0.1) / (2.0 * zoom()) * u.res.y + u.res * 0.5; }
+      fn turn() -> f32 { return u.cam.x * 0.4 + u.time * 0.06 * (gene(13) - 0.5); }
+      fn toWorld(px: vec2f) -> vec2f { return rot2(turn()) * ((px - u.res * 0.5) / u.res.y * 2.0 * zoom()) + shake().xy * 0.1; }
+      fn toScreen(q: vec2f) -> vec2f { return rot2(-turn()) * (q - shake().xy * 0.1) / (2.0 * zoom()) * u.res.y + u.res * 0.5; }
       fn field(q0: vec2f) -> f32 {
         var q = q0;
         q += vec2f(gnoise(vec3f(q * 1.3, u.time * 0.05)), gnoise(vec3f(q * 1.3 + 17.0, u.time * 0.05))) * gene(5) * 0.35;
@@ -901,10 +974,10 @@ STUDIES.push({
     sounding(F, t, this.S);
     g.device.queue.writeBuffer(this.sb, 0, this.S);
   },
-  frame(g, enc) {
+  frame(g, enc, share = 1) {
     enc.clearBuffer(this.A);
     const c = enc.beginComputePass();
-    c.setPipeline(this.update); c.setBindGroup(0, this.bgU); c.dispatchWorkgroups(this.N / 256);
+    c.setPipeline(this.update); c.setBindGroup(0, this.bgU); c.dispatchWorkgroups(this.N / 256 * share);
     c.end();
     g.draw(enc, this.resolve, this.bgR);
     g.draw(enc, this.overlay, this.bgO, g.sceneView, 'load');
@@ -990,29 +1063,51 @@ async function boot() {
   const pKaris = g.fullscreen(COMMON + POST, 'downKaris');
   const pUp = g.fullscreen(COMMON + POST, 'up', 'rgba16float', add);
   const pComp = g.fullscreen(COMMON + POST, 'composite', format);
+  const pMix = g.fullscreen(MIX, 'mixf');
   const postU = device.createBuffer({ size: 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
-  for (const s of STUDIES) await s.init(g, F);
+  const mixU = device.createBuffer({ size: 80, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+  const postIn = device.createBuffer({ size: Udata.byteLength, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });   // the composite's view of U
+  // Every study has its own uniforms and its own target, so two can run at once during a transition.
+  const use = s => { g.U = s.U; g.W = s.W; g.H = s.H; g.sceneView = s.view; };
+  for (const s of STUDIES) {
+    s.U = device.createBuffer({ size: Udata.byteLength, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+    g.U = s.U;
+    await s.init(g, F);
+  }
 
-  let study = STUDIES[0], mips = [], downBG = [], upBG = [], compBG, scene;
+  let study = STUDIES[0], next = null, tw = 0, mips = [], downBG = [], upBG = [], compBG = [], mixBG = [], fb = [], fbi = 0;
+  const tex = (w, h) => device.createTexture({ size: [w, h], format: 'rgba16float', usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING });
   function targets() {
     const pr = Math.min(devicePixelRatio || 1, 2, Math.sqrt(2.2e6 / (innerWidth * innerHeight)));
     canvas.width = Math.max(1, Math.floor(innerWidth * pr));
     canvas.height = Math.max(1, Math.floor(innerHeight * pr));
-    g.W = Math.max(8, Math.round(canvas.width * study.scale));
-    g.H = Math.max(8, Math.round(canvas.height * study.scale));
-    const tex = (w, h) => device.createTexture({ size: [w, h], format: 'rgba16float', usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING });
-    scene?.destroy(); mips.forEach(m => m.destroy());
-    scene = tex(g.W, g.H);
-    g.sceneView = scene.createView();
+    for (const s of STUDIES) {
+      s.rt?.destroy();   // the study's render target (not s.tex: the Tunnel keeps its score there)
+      s.W = Math.max(8, Math.round(canvas.width * s.scale));
+      s.H = Math.max(8, Math.round(canvas.height * s.scale));
+      s.rt = tex(s.W, s.H);
+      s.view = s.rt.createView();
+      use(s);
+      s.resize(g);
+    }
+    fb.forEach(t => t.destroy()); mips.forEach(m => m.destroy());
+    fb = [tex(canvas.width, canvas.height), tex(canvas.width, canvas.height)];
+    const fbv = fb.map(t => t.createView());
     mips = [];
-    for (let k = 1, w = g.W, h = g.H; k <= 6; k++) { w = Math.max(1, w >> 1); h = Math.max(1, h >> 1); mips.push(tex(w, h)); }
+    for (let k = 1, w = canvas.width, h = canvas.height; k <= 6; k++) { w = Math.max(1, w >> 1); h = Math.max(1, h >> 1); mips.push(tex(w, h)); }
     const views = mips.map(m => m.createView());
-    downBG = views.map((v, k) => g.bind(k ? pDown : pKaris, [k ? views[k - 1] : g.sceneView, smp], [1, 2]));
-    upBG = views.slice(1).map((v, k) => g.bind(pUp, [v, smp], [1, 2]));
-    compBG = g.bind(pComp, [g.U, g.sceneView, smp, views[0], postU], [0, 1, 2, 3, 4]);
+    downBG = [0, 1].map(j => views.map((v, k) => g.bind(k ? pDown : pKaris, [k ? views[k - 1] : fbv[j], smp], [1, 2])));
+    upBG = views.slice(1).map(v => g.bind(pUp, [v, smp], [1, 2]));
+    compBG = [0, 1].map(j => g.bind(pComp, [postIn, fbv[j], smp, views[0], postU], [0, 1, 2, 3, 4]));
+    g.fbViews = fbv;
     g.mipViews = views;
-    study.resize(g);
+    mixBG = {};
   }
+  // The mix pass's bind group depends on which two studies are on and which feedback buffer is read.
+  const mixGroup = (a, b, j) => {
+    const key = a.id + b.id + j;
+    return mixBG[key] ??= g.bind(pMix, [mixU, a.view, b.view, g.fbViews[1 - j], smp], [0, 1, 2, 3, 4]);
+  };
 
   // The clock is the audio: the position of what is coming out of the speakers right now.
   const sec = F.show.sections;
@@ -1038,9 +1133,13 @@ async function boot() {
     if (playing) { stop(); start(musicT); }
   };
 
-  // Switching studies passes through black, like a lighting desk's crossfade through a blackout.
-  let fade = 1, want = null;
-  const choose = s => { if (s !== study) want = s; };
+  // Switching studies blends over ten seconds; halfway, the two interfere with each other, and the
+  // feedback carries both. A key pressed mid-blend lands the current one and starts the next.
+  const BLEND = 10;
+  const choose = s => {
+    if (next) { if (s === next) return; study = next; next = null; }
+    if (s !== study) { next = s; tw = 0; }
+  };
 
   // HUD
   const nav = $('studies');
@@ -1051,7 +1150,7 @@ async function boot() {
     nav.append(b);
   });
   const form = $('form');
-  sec.forEach((s, k) => {
+  sec.forEach(s => {
     const d = document.createElement('div');
     d.style.flexGrow = s.bars; d.style.height = Math.round(18 + 82 * s.energy) + '%'; d.title = s.name;
     form.insertBefore(d, $('head'));
@@ -1074,6 +1173,7 @@ async function boot() {
       seek(sec[Math.max(0, Math.min(sec.length - 1, k))].t);
     }
     else if (e.key === 's' || e.key === 'S') { D.strobe = !D.strobe; }
+    else if (e.key === 'b' || e.key === 'B') { D.feedback = !D.feedback; }
     else if (e.key === 'g' || e.key === 'G') { roll(); }
     else if (e.key === 'h' || e.key === 'H') { hudHidden = !hudHidden; hud.classList.toggle('gone', hudHidden); }
     else if (e.key === 'f' || e.key === 'F') { document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen?.().catch(() => {}); }
@@ -1092,15 +1192,20 @@ async function boot() {
   targets();
   addEventListener('resize', targets);
 
-  // The director: camera cuts, strobe and colour, from the music's events. Calm sections glide;
-  // loud ones cut hard on every chord (and every bar at the top) and flash on the bass.
+  // The director: camera moves, strobe, colour and the feedback network, from the music's events.
+  // Calm sections drift; loud ones whip to a new angle on every chord (and every bar at the top),
+  // keep spinning between cuts, and flash on the bass.
   const PALETTE = [[1, 0.2, 0.06], [0.45, 0.62, 1], [1, 1, 1], [0.85, 0.3, 1], [1, 0.62, 0.2], [0.25, 1, 0.85]];
-  const D = { cam: [0, 0, 1, 0], fx: [0, 0, 0, 0], col: [1, 1, 1, 0], target: [0, 0, 1], cut: 0, chord: -1, bar: -1, si: -1, strobe: true, invertUntil: 0,
-    gene: new Float32Array(16), gen: 0, salt: Math.random() * 1000 };   // a fresh lineage every time the page opens
+  const D = { cam: [0, 0, 1, 0], fx: [0, 0, 0, 0], col: [1, 1, 1, 0], target: [0, 0, 1], spin: 0, cut: 0, chord: -1, bar: -1, si: -1, strobe: true, invertUntil: 0,
+    feedback: true, gene: new Float32Array(16), fbg: new Float32Array(8), gen: 0, salt: Math.random() * 1000 };   // a fresh lineage every time the page opens
   const hash01 = k => { const x = Math.sin(k * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); };
   window.__D = D;
   // The genome: every section gets a new one, every cut mutates two of its numbers. G rolls by hand.
-  const roll = () => { D.gen++; for (let k = 0; k < 16; k++) D.gene[k] = hash01(D.salt + D.gen * 97.13 + k * 13.7); };
+  const roll = () => {
+    D.gen++;
+    for (let k = 0; k < 16; k++) D.gene[k] = hash01(D.salt + D.gen * 97.13 + k * 13.7);
+    for (let k = 0; k < 8; k++) D.fbg[k] = hash01(D.salt + D.gen * 61.7 + k * 29.3 + 500);
+  };
   roll();
   function direct(t, dt) {
     const e = F.energy, bar = Math.floor(t * show.bpm / 240);
@@ -1108,13 +1213,15 @@ async function boot() {
     if (F.count[0] !== D.chord || (e > 0.75 && bar !== D.bar) || sectionStart) {
       D.cut++;
       const r = k => hash01(D.cut * 7 + k);
-      D.target = [(r(1) - 0.5) * 6.0 * (0.3 + e), (r(2) - 0.4) * 0.9 * e, 0.55 + r(3) * 0.9];
+      D.target = [D.cam[0] + (r(1) - 0.5) * 6.0 * (0.3 + e), (r(2) - 0.4) * 0.9 * e, 0.55 + r(3) * 0.9];
+      D.spin = (r(8) - 0.5) * 2.4 * e;
       D.col = [...PALETTE[Math.floor(r(4) * PALETTE.length)], Math.max(0, Math.min(1, (e - 0.35) * 2.2))];
       if (sectionStart) roll();
       else for (let k = 5; k < 7; k++) D.gene[Math.floor(r(k) * 16)] = r(k + 10);
     }
     D.chord = F.count[0]; D.bar = bar;
-    const glide = e > 0.6 ? 1 : 1 - Math.exp(-dt / (0.4 + 2.0 * (1 - e)));   // hard cuts when loud
+    D.target[0] += D.spin * dt;                                                   // keeps turning between cuts
+    const glide = 1 - Math.exp(-dt / (0.12 + 1.6 * (1 - e)));                     // a whip when loud, a drift when calm
     for (let k = 0; k < 3; k++) D.cam[k] += (D.target[k] - D.cam[k]) * glide;
     D.cam[3] = F.hit[1] * (0.05 + 0.35 * e);
     let flash = D.fx[0] * Math.exp(-dt / 0.07);
@@ -1129,44 +1236,93 @@ async function boot() {
     D.si = F.si;
   }
 
+  // The feedback network: the previous frame comes back through one to three transforms. One
+  // zooming tap is a tunnel, a turning one a spiral, three shrunken copies an iterated-function
+  // fractal of whatever is on screen. Each pass shifts the hue a little, and can flow along its own
+  // edges. The genome picks the network; the bass punches into it.
+  const M = new Float32Array(20);
+  const FB_MODES = ['TUNNEL IN', 'TUNNEL OUT', 'SPIRAL', 'FRACTAL 3', 'FRACTAL 2', 'ECHO'];
+  function network(dt, visT, aspect) {
+    const f = D.fbg, e = F.energy, hit = F.hit[1];
+    const mode = Math.min(5, Math.floor(f[0] * 6));
+    const taps = [];
+    if (mode === 0) taps.push([0.985 - 0.03 * f[7] - 0.05 * hit, (f[6] - 0.5) * 0.03 + D.spin * 0.01, Math.sin(visT * 0.3) * 0.006, Math.cos(visT * 0.23) * 0.006]);
+    else if (mode === 1) taps.push([1.012 + 0.03 * f[7] + 0.04 * hit, (f[6] - 0.5) * 0.03, 0, 0]);
+    else if (mode === 2) taps.push([0.975 - 0.02 * hit, (f[6] > 0.5 ? 1 : -1) * (0.02 + 0.07 * f[7]) * (0.5 + e), 0, 0]);
+    else if (mode === 5) taps.push([1.0, 0, 0, 0]);
+    else {
+      const n = mode === 3 ? 3 : 2, s = 0.5 + 0.12 * f[7];
+      for (let k = 0; k < n; k++) {
+        const a = visT * 0.1 + k * Math.PI * 2 / n, c = [Math.cos(a) * 0.3 * aspect * 0.6, Math.sin(a) * 0.3];
+        const r = (k - (n - 1) / 2) * (0.3 + f[6]) + visT * 0.05, z = 1 / s;
+        const cr = Math.cos(r), sr = Math.sin(r);
+        taps.push([z, r, -(cr * c[0] - sr * c[1]) * z, -(sr * c[0] + cr * c[1]) * z]);
+      }
+    }
+    if (mode <= 2) { const k = dt * 60; taps[0][0] = Math.pow(taps[0][0], k); taps[0][1] *= k; }
+    while (taps.length < 3) taps.push([1, 0, 0, 0]);
+    const on = D.feedback ? 1 : 0;
+    const bl = next ? tw * tw * (3 - 2 * tw) : 0, ga = study.feedback ?? 1, gain = ga + (((next ?? study).feedback ?? 1) - ga) * bl;
+    const decay = on * gain * Math.pow(mode === 5 ? 0.86 : 0.84 + 0.12 * f[1], dt * 60);   // how many generations stay visible
+    const folds = f[5] > 0.78 ? [2, 3, 4, 6][Math.floor(f[4] * 4)] : 0;
+    const blend = next ? tw * tw * (3 - 2 * tw) : 0;
+    M.set([blend, 0.04 * dt * 60, decay, mode >= 3 && mode <= 4 ? (mode === 3 ? 3 : 2) : 1,
+      (f[2] - 0.5) * 0.12, f[3] > 0.6 ? 0.004 + 0.012 * f[3] : 0, folds, aspect,
+      ...taps[0], ...taps[1], ...taps[2]]);
+    D.fbMode = FB_MODES[mode];
+    return blend;
+  }
+
   let last = performance.now(), visT = 0, frameNo = 0, fps = 60;
   function frame(now) {
-    const dt = Math.min(0.1, (now - last) / 1000);
+    const raw = (now - last) / 1000;
+    const dt = Math.min(0.1, raw);
     last = now;
     fps += (1 / Math.max(dt, 1e-3) - fps) * 0.05;
     window.__fps = fps;
     visT += dt;
     frameNo++;
-    if (want) { fade -= dt / 0.35; if (fade <= 0) { fade = 0; study = want; want = null; targets(); } }
-    else fade = Math.min(1, fade + dt / 0.5);
+    if (next) { tw += Math.min(raw, 1) / BLEND;   // real time: a slow frame must not stretch the blend
+      if (tw >= 1) { study = next; next = null; tw = 0; } }
 
     const t = clock(now);
     F.update(t);
     direct(t, dt);
-    study.cpu?.(g, F, t, D);
     const bpm = show.bpm, beats = t * bpm / 60;
-    Udata.set([visT, dt, beats % 1, (beats / 4) % 1, g.W, g.H, F.energy, F.progress,
-      ...F.lv.slice(0, 4), F.lv[4], F.lv[5], F.lv[6], F.si, ...F.hit, ...F.pitch, ...F.since, ...F.chord, ...F.count,
-      beats, frameNo, bpm, g.W / g.H, ...D.cam, ...D.fx, ...D.col, ...D.gene]);
-    device.queue.writeBuffer(g.U, 0, Udata);
-    device.queue.writeBuffer(postU, 0, new Float32Array([study.exposure, study.bloom, 0.05, fade]));
-
+    const blend = network(dt, visT, canvas.width / canvas.height);
     const enc = device.createCommandEncoder();
-    study.frame(g, enc);
-    for (let k = 0; k < 6; k++) g.draw(enc, k ? pDown : pKaris, downBG[k], g.mipViews[k]);
+    for (const s of next ? [study, next] : [study]) {
+      use(s);
+      s.cpu?.(g, F, t, D);
+      Udata.set([visT, dt, beats % 1, (beats / 4) % 1, s.W, s.H, F.energy, F.progress,
+        ...F.lv.slice(0, 4), F.lv[4], F.lv[5], F.lv[6], F.si, ...F.hit, ...F.pitch, ...F.since, ...F.chord, ...F.count,
+        beats, frameNo, bpm, s.W / s.H, ...D.cam, ...D.fx, ...D.col, ...D.gene]);
+      device.queue.writeBuffer(s.U, 0, Udata);
+      s.frame(g, enc, next ? 0.5 : 1);   // two studies at once: each simulates half its particles
+    }
+    Udata[4] = canvas.width; Udata[5] = canvas.height;
+    device.queue.writeBuffer(postIn, 0, Udata);
+    device.queue.writeBuffer(mixU, 0, M);
+    const b = next ?? study;
+    device.queue.writeBuffer(postU, 0, new Float32Array([1.0, study.bloom + (b.bloom - study.bloom) * blend, 0.05, 1]));
+    fbi = 1 - fbi;
+    g.draw(enc, pMix, mixGroup(study, b, fbi), g.fbViews[fbi]);
+    for (let k = 0; k < 6; k++) g.draw(enc, k ? pDown : pKaris, downBG[fbi][k], g.mipViews[k]);
     for (let k = 4; k >= 0; k--) g.draw(enc, pUp, upBG[k], g.mipViews[k], 'load');
-    g.draw(enc, pComp, compBG, ctx.getCurrentTexture().createView());
+    g.draw(enc, pComp, compBG[fbi], ctx.getCurrentTexture().createView());
     device.queue.submit([enc.finish()]);
 
-    $('now').innerHTML = '<b>' + (STUDIES.indexOf(study) + 1) + ' ' + study.name + '</b>  <span>' + F.section.name + '</span>  ' + mmss(t) + ' <span>/ ' + mmss(F.duration) + '</span>';
+    const name = next ? study.name + ' → ' + next.name + ' ' + Math.round(blend * 100) + '%' : study.name;
+    $('now').innerHTML = '<b>' + name + '</b>  <span>' + F.section.name + ' · ' + (D.feedback ? D.fbMode : 'NO FEEDBACK') + ' · GEN ' + D.gen + '</span>  ' + mmss(t) + ' <span>/ ' + mmss(F.duration) + '</span>';
     $('head').style.left = (t / F.duration * 100) + '%';
-    [...nav.children].forEach((b, k) => b.setAttribute('aria-pressed', STUDIES[k] === study));
+    [...nav.children].forEach((bt, k) => bt.setAttribute('aria-pressed', STUDIES[k] === study || STUDIES[k] === next));
     requestAnimationFrame(frame);
   }
   requestAnimationFrame(frame);
 
-  // For measuring: render one study at a music time without sound.
-  window.__look = (id, t) => { const s = STUDIES.find(x => x.id === id); if (s) { study = s; want = null; fade = 1; targets(); } if (t != null) seek(t); };
+  // For measuring: show one study at a music time without sound (no blend).
+  window.__look = (id, t) => { const s = STUDIES.find(x => x.id === id); if (s) { study = s; next = null; } if (t != null) seek(t); };
+  window.__choose = id => choose(STUDIES.find(x => x.id === id));
 }
 boot().catch(e => fail('Something went wrong while starting: ' + e.message));
 </script>
