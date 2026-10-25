@@ -62,7 +62,7 @@ nav button[aria-pressed="true"] { color: var(--ember); }
     <p class="meta" id="meta">Loading the concert…</p>
     <p class="lede">Six light studies for projecting onto the drummer. Each one reads the music itself: every note, every chord and the level of each part, so the light lands exactly with the sound.</p>
     <button class="go" id="go" disabled>Loading…</button>
-    <p class="keys"><kbd>1</kbd>–<kbd>6</kbd> study · <kbd>Space</kbd> pause · <kbd>←</kbd><kbd>→</kbd> 10 s · <kbd>↑</kbd><kbd>↓</kbd> section · <kbd>H</kbd> hide controls · <kbd>F</kbd> full screen</p>
+    <p class="keys"><kbd>1</kbd>–<kbd>6</kbd> study · <kbd>Space</kbd> pause · <kbd>←</kbd><kbd>→</kbd> 10 s · <kbd>↑</kbd><kbd>↓</kbd> section · <kbd>S</kbd> strobe on/off · <kbd>H</kbd> hide controls · <kbd>F</kbd> full screen</p>
     <p class="err" id="err" hidden></p>
   </div>
 </div>
@@ -106,6 +106,9 @@ class Features {
     this.ptr = lowerBound(this.notes, t + 1e-6);
     this.last = [-99, -99, -99, -99];
     this.vel = [0, 0, 0, 0];
+    this.count = [0, 0, 0, 0];
+    const seen = [-99, -99, -99, -99];
+    for (let i = 0; i < this.ptr; i++) { const n = this.notes[i]; if (n[0] > seen[n[2]] + 1e-4) { seen[n[2]] = n[0]; this.count[n[2]]++; } }
     for (let i = this.ptr - 1; i >= 0 && t - this.notes[i][0] < 30; i--) {
       const n = this.notes[i];
       if (this.last[n[2]] < -90) { this.last[n[2]] = n[0]; this.vel[n[2]] = n[4]; this.pitch[n[2]] = this.norm(n[2], n[3]); }
@@ -120,7 +123,7 @@ class Features {
     else {
       while (this.ptr < this.notes.length && this.notes[this.ptr][0] <= t) {
         const [s, , tr, p, v] = this.notes[this.ptr++];
-        if (s > this.last[tr] + 1e-4) { this.last[tr] = s; this.vel[tr] = v; } else this.vel[tr] = Math.max(this.vel[tr], v);
+        if (s > this.last[tr] + 1e-4) { this.last[tr] = s; this.vel[tr] = v; this.count[tr]++; } else this.vel[tr] = Math.max(this.vel[tr], v);
         if (tr !== 0) this.pitch[tr] = this.norm(tr, p);
       }
       const target = this.levelsAt(t);
@@ -178,7 +181,11 @@ struct U {
   pitch: vec4f,   // last pitch of each part, 0..1 in its range
   since: vec4f,   // seconds since each part's last note-on
   chord: vec4f,   // held pad pitches (MIDI), 0 = none
+  count: vec4f,   // note-ons so far per part: lets a study step something forward with each note
   beats: f32, frame: f32, bpm: f32, aspect: f32,
+  cam: vec4f,     // director: yaw, pitch, zoom, shake
+  fx: vec4f,      // director: flash, invert, -, -
+  col: vec4f,     // director: light colour, and how much of it replaces the white
 };
 @group(0) @binding(0) var<uniform> u: U;
 
@@ -231,7 +238,12 @@ fn curl(p: vec3f) -> vec3f {
   return vec3f((y1.z - y0.z) - (z1.y - z0.y), (z1.x - z0.x) - (x1.z - x0.z), (x1.y - x0.y) - (y1.x - y0.x)) / (2.0 * e);
 }
 // Calm sections light cold, the peak warm: the colour temperature of the form.
-fn tint(e: f32) -> vec3f { return mix(vec3f(0.74, 0.84, 1.0), vec3f(1.0, 0.83, 0.64), smoothstep(0.2, 0.9, e)); }
+fn tint(e: f32) -> vec3f {
+  let white = mix(vec3f(0.74, 0.84, 1.0), vec3f(1.0, 0.83, 0.64), smoothstep(0.2, 0.9, e));
+  return mix(white, u.col.rgb, u.col.w);   // the director recolours the light at each cut in loud sections
+}
+// Camera shake: a fresh random offset every frame, scaled by the director.
+fn shake() -> vec3f { let f = u32(u.frame); return (vec3f(rnd(f * 3u + 11u), rnd(f * 3u + 12u), rnd(f * 3u + 13u)) - 0.5) * u.cam.w; }
 `;
 
 const POST = /* wgsl */`
@@ -277,6 +289,8 @@ fn oetf(c: vec3f) -> vec3f { return select(1.055 * pow(c, vec3f(1.0 / 2.4)) - 0.
   let q = i.uv - 0.5;
   c *= 1.0 - dot(q, q) * 0.55;
   c = oetf(c);
+  c = mix(c, 1.0 - c, u.fx.y);                                               // inverted frames
+  c = mix(c, mix(vec3f(1.0), u.col.rgb, 0.25), clamp(u.fx.x, 0.0, 1.0));   // strobe
   let px = vec2u(i.pos.xy);
   let n0 = rnd(px.x + px.y * 7919u + u32(u.frame) * 104729u);
   let n1 = rnd(px.x * 3u + px.y * 6151u + u32(u.frame) * 15731u + 77u);
@@ -309,7 +323,11 @@ STUDIES.push({
       @group(0) @binding(1) var<storage, read_write> P: array<vec4f>;
       @group(0) @binding(2) var<storage, read_write> V: array<vec4f>;
       @group(0) @binding(3) var<storage, read_write> A: array<atomic<u32>>;
-      fn eye() -> vec3f { let a = u.time * 0.025; return vec3f(sin(a) * 3.4, 0.35 + 0.25 * sin(u.time * 0.031), cos(a) * 3.4); }
+      fn eye() -> vec3f {
+        let a = u.time * 0.025 + u.cam.x;
+        let d = 3.4 * u.cam.z;
+        return vec3f(sin(a) * d * cos(u.cam.y), 0.35 + 0.25 * sin(u.time * 0.031) + sin(u.cam.y) * d, cos(a) * d * cos(u.cam.y)) + shake() * 0.6;
+      }
       fn project(p: vec3f) -> vec3f {
         let e = eye();
         let fw = normalize(-e);
@@ -359,17 +377,20 @@ STUDIES.push({
         let rr = length(p.xyz);
         goal -= p.xyz * 0.6 * max(0.0, rr - 1.25);
         v = mix(v, goal, 1.0 - exp(-u.dt * 3.0));
+        if (u.since.y < u.dt) { v += normalize(p.xyz + vec3f(1e-4)) * (0.5 + 0.7 * u.hit.y) * (1.0 + 2.0 * u.energy); }
+        if (u.fx.x > 0.95) { v += normalize(p.xyz + vec3f(1e-4)) * 2.5; }                 // section change: it explodes   // each bass note: a breath outward
         p = vec4f(p.xyz + v * u.dt, p.w);
         P[i] = p;
         V[i] = vec4f(v, 0.0);
 
         let s = project(p.xyz);
         if (s.z < 0.3) { return; }
-        let coc = abs(s.z - 3.4) * 3.0 * u.res.y / 1080.0;               // depth of field, in pixels
+        let coc = abs(s.z - 3.4 * u.cam.z) * 3.0 * u.res.y / 1080.0;               // depth of field, in pixels
         let j = vec2f(rnd(i ^ (fr * 9781u)), rnd((i * 7u) ^ (fr * 6271u))) - 0.5;
-        let shellR = u.since.z * 1.7;
-        let shell = exp(-pow((rr - shellR) / 0.06, 2.0)) * u.hit.z;
-        var w = smoothstep(0.0, 0.15, p.w) * (1.0 - smoothstep(0.85, 1.0, p.w)) * (1.0 + 5.0 * shell);
+        let shellR = u.since.z * 2.6;
+        let shell = exp(-pow((rr - shellR) / 0.1, 2.0)) * u.hit.z;
+        let near = exp(-6.0 * dot(dl, dl)) * u.level.w;
+        var w = smoothstep(0.0, 0.15, p.w) * (1.0 - smoothstep(0.85, 1.0, p.w)) * (1.0 + 10.0 * shell + 3.0 * near);
         splat(s.xy + j * coc, w / (1.0 + 0.02 * coc * coc));
       }`;
     this.update = g.compute(code, 'update');
@@ -378,7 +399,7 @@ STUDIES.push({
       @fragment fn fs(i: VO) -> @location(0) vec4f {
         let p = vec2u(i.pos.xy);
         let n = f32(A[p.y * u32(u.res.x) + p.x]) / 64.0;
-        let gain = 0.03 * (0.25 + 1.3 * u.level.x + 0.6 * u.bus.z);
+        let gain = 0.03 * (0.2 + 0.9 * u.level.x + 0.4 * u.bus.z) * (1.0 + 1.8 * u.hit.y + 0.8 * u.hit.x);
         return vec4f(tint(u.energy) * n * gain, 1.0);
       }`);
   },
@@ -409,7 +430,7 @@ STUDIES.push({
         return pow(max(0.5 + 0.5 * cos(6.2831853 * d) * aa, 0.0), gamma);  // rounding below 0 makes pow NaN: a white screen
       }
       @fragment fn fs(i: VO) -> @location(0) vec4f {
-        let p = (i.pos.xy - u.res * 0.5) / u.res.y;
+        let p = (i.pos.xy - u.res * 0.5) / u.res.y + shake().xy * 0.08;
         var n = 0.0;
         for (var k = 0; k < 4; k++) { if (u.chord[k] > 0.0) { n += 1.0; } }
         // Thin lines on black: one exponent shared across the gratings, so light gathers only
@@ -417,24 +438,26 @@ STUDIES.push({
         // coincidences form slow bands, and their spacing follows the chord's intervals.
         let ex = (5.0 + 3.0 * u.energy + 6.0 * u.hit.z) / max(n, 1.0);
         let spread = 0.004 + 0.03 * u.energy;
-        let base = 0.62 + 0.35 * sin(u.time * 0.0041);
+        let base = 0.62 + 0.35 * sin(u.time * 0.0041) + u.cam.x;
         var light = 1.0;
         for (var k = 0; k < 4; k++) {
           let pk = u.chord[k];
           if (pk <= 0.0) { continue; }
-          let f = 70.0 * (1.0 + 0.35 * u.energy) * exp2((pk - u.chord.x) / 12.0 * 0.09);
+          let f = 70.0 * (1.0 + 0.35 * u.energy) / u.cam.z * exp2((pk - u.chord.x) / 12.0 * 0.09);
           let ang = base + (f32(k) - 1.5) * spread + 0.01 * sin(u.time * 0.05 * f32(k + 1));
-          let d = dot(p, vec2f(cos(ang), sin(ang))) * f - u.time * (0.05 + 0.25 * u.energy) * (f32(k) - 1.5);
+          let step = u.count.z - 1.0 + smoothstep(0.0, 0.12, u.since.z);    // eased: one step per sequence note
+          let d = dot(p, vec2f(cos(ang), sin(ang))) * f - u.time * (0.05 + 0.25 * u.energy) * (f32(k) - 1.5)
+                - step * 0.045 * (f32(k) - 1.5);
           light *= grating(d, ex);
         }
         if (n == 0.0) { light = 0.0; }
         let fb = 10.0 * exp2(u.pitch.y * 1.5);
-        let rc = length(p - vec2f(0.0, 0.08)) * fb - u.since.y * 2.0;
+        let rc = length(p - vec2f(0.0, 0.08)) * fb - (u.count.y - 1.0 + smoothstep(0.0, 0.25, u.since.y)) * 0.5;
         light *= mix(1.0, grating(rc, 1.0) * 2.0, u.level.y * 0.6);
         let c = vec2f(sin(u.time * 0.09) * 0.35, (0.5 - u.pitch.w) * 0.5);
         let ap = exp(-dot(p - c, p - c) / 0.05);
         light *= 1.0 + u.level.w * (1.6 * ap - 0.4) + 0.8 * u.hit.w * ap;
-        let gain = 3.2 * (0.2 + 1.3 * u.level.x + 0.4 * u.bus.z);
+        let gain = 3.2 * (0.2 + 1.0 * u.level.x + 0.3 * u.bus.z) * (1.0 + 1.3 * u.hit.y + 0.7 * u.hit.x);
         return vec4f(tint(u.energy) * light * gain, 1.0);
       }`);
   },
@@ -456,7 +479,9 @@ STUDIES.push({
       fn hg(c: f32) -> f32 { let g = 0.45; let g2 = g * g; return (1.0 - g2) / pow(1.0 + g2 - 2.0 * g * c, 1.5); }
       @fragment fn fs(i: VO) -> @location(0) vec4f {
         let uv = (i.pos.xy - u.res * 0.5) / u.res.y * vec2f(1.0, -1.0);
-        let ro = vec3f(0.35 * sin(u.time * 0.017), 1.4, -8.5);
+        let ya = u.cam.x * 0.35;
+        let dist = 8.5 * (0.6 + 0.4 * u.cam.z);
+        let ro = vec3f(sin(ya) * dist + 0.35 * sin(u.time * 0.017), 1.4 + u.cam.y * 3.0, -cos(ya) * dist) + shake();
         let fw = normalize(vec3f(0.0, 2.0, 0.0) - ro);
         let rt = normalize(cross(fw, vec3f(0, 1, 0)));
         let up = cross(rt, fw);
@@ -468,10 +493,10 @@ STUDIES.push({
         let sqP = vec3f(mix(-2.6, 2.6, u.pitch.z), 7.0, 1.2);  let sqD = vec3f(0.0, -1.0, 0.0);
         let ldT = vec3f(sin(u.time * 0.23) * 1.3, 0.4 + u.pitch.w * 2.2, 0.0);
         let ldP = vec3f(0.0, 6.0, -3.5);  let ldD = normalize(ldT - ldP);
-        let Ipad = tint(u.energy) * u.level.x * 1.3;
+        let Ipad = tint(u.energy) * u.level.x * 1.3 * (1.0 + 1.5 * u.hit.x);
         let Ibass = vec3f(1.0, 0.30, 0.11) * u.level.y * (0.6 + 3.0 * u.hit.y) * 3.0;
-        let Iseq = vec3f(0.85, 0.92, 1.0) * u.hit.z * 3.5;
-        let Ilead = vec3f(1.0, 0.86, 0.62) * u.level.w * (1.0 + u.hit.w) * 2.2;
+        let Iseq = vec3f(0.85, 0.92, 1.0) * u.hit.z * 6.0;
+        let Ilead = mix(vec3f(1.0, 0.86, 0.62), u.col.rgb, u.col.w) * u.level.w * (1.0 + u.hit.w) * 2.2;
 
         let far = 15.0;
         var tmax = far;
@@ -487,14 +512,14 @@ STUDIES.push({
           let dens = 0.015 + 0.35 * h * h;
           var L = Ipad * spot(x, padP, padD, 0.965, 0.988) * hg(dot(rd, padD));
           L += Ibass * (spot(x, bA, bAD, 0.9965, 0.9993) * hg(dot(rd, bAD)) + spot(x, bB, bBD, 0.9965, 0.9993) * hg(dot(rd, bBD)));
-          L += Iseq * spot(x, sqP, sqD, 0.9990, 0.9998) * hg(dot(rd, sqD));
+          L += Iseq * spot(x, sqP, sqD, 0.9975, 0.9993) * hg(dot(rd, sqD));
           L += Ilead * spot(x, ldP, ldD, 0.9945, 0.9985) * hg(dot(rd, ldD));
           acc += T * dens * L * dt;
           T *= exp(-dens * dt * 0.3);
         }
         if (tmax < far) {    // the floor catches the pools of light
           let x = ro + rd * tmax;
-          var L = Ipad * spot(x, padP, padD, 0.965, 0.988) + Iseq * spot(x, sqP, sqD, 0.9990, 0.9998);
+          var L = Ipad * spot(x, padP, padD, 0.965, 0.988) + Iseq * spot(x, sqP, sqD, 0.9975, 0.9993);
           L += Ibass * (spot(x, bA, bAD, 0.9965, 0.9993) + spot(x, bB, bBD, 0.9965, 0.9993)) + Ilead * spot(x, ldP, ldD, 0.9945, 0.9985);
           acc += T * L * 0.18;
         }
@@ -621,16 +646,16 @@ STUDIES.push({
         let B = hp.z;
         let x = (f32(b) / (B - 1.0) - 0.5) * 9.0;
         let z = f32(r) * 0.11;
-        return vec3f(x, val(b, r) * 1.5, z);
+        return vec3f(x, val(b, r) * 1.5 * (1.0 + 0.9 * u.hit.y), z);
       }
       fn clip(w: vec3f) -> vec4f {
-        let e = vec3f(0.6 * sin(u.time * 0.02), 1.55, -2.4);
+        let e = vec3f(0.6 * sin(u.time * 0.02) + sin(u.cam.x) * 2.5, 1.55 + u.cam.y * 2.0, -2.4) + shake() * 0.5;
         let fw = normalize(vec3f(0.0, 0.0, 7.0) - e);
         let rt = normalize(cross(fw, vec3f(0, 1, 0)));
         let up = cross(rt, fw);
         let d = w - e;
         let z = dot(d, fw);
-        let f = 1.9;
+        let f = 1.9 * u.cam.z;
         let n = 0.1; let fa = 40.0;
         return vec4f(dot(d, rt) * f / u.aspect, dot(d, up) * f, z * fa / (fa - n) - fa * n / (fa - n), z);
       }
@@ -660,7 +685,7 @@ STUDIES.push({
         o.pos = vec4f(sp / (u.res * 0.5) * P.w, P.z - 0.0008 * P.w, P.w);
         let v = max(val(b, r), val(b + 1u, r));
         let fog = exp(-f32(r) * 0.02) * (1.0 - smoothstep(hp.y - 30.0, hp.y, f32(r)));
-        o.c = tint(u.energy) * fog * (0.12 + 1.8 * v) * (0.3 + 1.2 * u.bus.z);
+        o.c = tint(u.energy) * fog * (0.12 + 1.8 * v) * (0.3 + 1.2 * u.bus.z) * (1.0 + 1.6 * u.hit.y * exp(-f32(r) * 0.08));
         o.e = k.y * pad / hw;
         return o;
       }
@@ -716,11 +741,14 @@ STUDIES.push({
   init(g) {
     this.pipe = g.fullscreen(COMMON + /* wgsl */`
       fn sdf(p0: vec3f) -> f32 {
-        let a = u.time * 0.07;
+        let a = u.time * 0.07 + (u.count.x - 1.0 + smoothstep(0.0, 1.2, u.since.x)) * 0.5;   // a turn per chord
         let xz = mat2x2f(cos(a), sin(a), -sin(a), cos(a)) * p0.xz;
-        let p = vec3f(xz.x, p0.y, xz.y);
-        let R = 1.15 + 0.07 * u.hit.y + 0.04 * u.level.y;
-        let f = 4.0 + 6.0 * u.energy;
+        var p = vec3f(xz.x, p0.y, xz.y);
+        let tw = p.y * u.hit.y * 2.2;                                   // each bass note twists it
+        let txz = mat2x2f(cos(tw), sin(tw), -sin(tw), cos(tw)) * p.xz;
+        p = vec3f(txz.x, p.y, txz.y);
+        let R = 1.15 + 0.16 * u.hit.y + 0.04 * u.level.y;
+        let f = 4.0 + 6.0 * u.energy + 3.0 * u.hit.y;
         let gy = abs(dot(sin(p * f), cos(p.zxy * f))) / f - (0.010 + 0.022 * u.level.x);
         return max(length(p) - R, gy * 0.7);
       }
@@ -730,13 +758,14 @@ STUDIES.push({
       }
       @fragment fn fs(i: VO) -> @location(0) vec4f {
         let uv = (i.pos.xy - u.res * 0.5) / u.res.y * vec2f(1.0, -1.0);
-        let a = u.time * 0.031;
-        let ro = vec3f(sin(a) * 5.4, 0.6 * sin(u.time * 0.019), cos(a) * 5.4);
+        let a = u.time * 0.031 + u.cam.x;
+        let dist = 5.4 * u.cam.z;
+        let ro = vec3f(sin(a) * dist * cos(u.cam.y), 0.6 * sin(u.time * 0.019) + sin(u.cam.y) * dist, cos(a) * dist * cos(u.cam.y)) + shake() * 0.4;
         let fw = normalize(-ro);
         let rt = normalize(cross(fw, vec3f(0, 1, 0)));
         let up = cross(rt, fw);
         let rd = normalize(fw * 1.9 + rt * uv.x + up * uv.y);
-        var t = 3.6;
+        var t = max(0.5, dist - 1.8);
         var hit = false;
         var glow = 0.0;
         for (var s = 0; s < 110; s++) {
@@ -744,7 +773,7 @@ STUDIES.push({
           glow += 0.006 / (1.0 + d * d * 900.0);
           if (d < 0.0008 * t) { hit = true; break; }
           t += d;
-          if (t > 7.6) { break; }
+          if (t > dist + 2.2) { break; }
         }
         var c = vec3f(0.0);
         if (hit) {
@@ -757,7 +786,7 @@ STUDIES.push({
           let inner = exp(-length(p) * 2.2) * u.level.w * (5.0 + 6.0 * u.hit.w) * max(0.0, dot(n, -normalize(p)) * 0.7 + 0.3);
           let yb = -1.2 + u.since.z * 3.4;
           let band = exp(-pow((p.y - yb) / 0.02, 2.0)) * u.hit.z * 5.0;
-          c = tint(u.energy) * (dif * 0.22 + rim * 1.1) * ao * (0.25 + 1.3 * u.level.x)
+          c = tint(u.energy) * (dif * 0.22 + rim * 1.1) * ao * (0.25 + 1.1 * u.level.x) * (1.0 + 1.4 * u.hit.y)
             + vec3f(1.0, 0.8, 0.58) * inner + vec3f(0.88, 0.94, 1.0) * band * ao;
         }
         c += tint(u.energy) * glow * (0.3 + u.level.x);
@@ -772,7 +801,7 @@ STUDIES.push({
 // Boot.
 // ---------------------------------------------------------------------------------------------
 const $ = id => document.getElementById(id);
-const fail = msg => { $('err').hidden = false; $('err').textContent = msg; $('go').textContent = 'Unavailable'; };
+const fail = msg => { $('veil').hidden = false; $('err').hidden = false; $('err').textContent = msg; $('go').textContent = 'Unavailable'; };
 window.__errors = [];
 
 async function boot() {
@@ -783,21 +812,33 @@ async function boot() {
   device.addEventListener('uncapturederror', e => { window.__errors.push(e.error.message); console.error(e.error.message); });
   device.lost.then(info => fail('The graphics device was lost: ' + info.message + '. Reload the page.'));
 
-  const [show, audioBlob] = await Promise.all([
+  const [show, audioData] = await Promise.all([
     fetch(MEDIA + '.show.json').then(r => { if (!r.ok) throw new Error('show data ' + r.status); return r.json(); }),
-    fetch(MEDIA + '.mp3').then(r => { if (!r.ok) throw new Error('audio ' + r.status); return r.blob(); }),
+    fetch(MEDIA + '.mp3').then(r => { if (!r.ok) throw new Error('audio ' + r.status); return r.arrayBuffer(); }),
   ]).catch(e => { fail('Could not load the concert (' + e.message + ').'); return []; });
   if (!show) return;
   const F = window.__F = new Features(show);
-  const audio = new Audio(URL.createObjectURL(audioBlob));
-  audio.preload = 'auto';
+  // Web Audio rather than an <audio> element: the artifact sandbox refused the element's blob URL,
+  // so the clock never started. The context's output timestamp is also the time actually heard.
+  const actx = new AudioContext();
+  const pcm = await actx.decodeAudioData(audioData).catch(e => { fail('Could not decode the recording (' + e.message + ').'); });
+  if (!pcm) return;
+  const out = actx.createGain();
+  out.gain.value = location.hash === '#silent' ? 0 : 1;   // #silent: for checking the page without sound
+  out.connect(actx.destination);
+  let src = null, startAt = 0, startT = 0;
+  const heard = now => {
+    const ts = actx.getOutputTimestamp?.();
+    if (ts && ts.performanceTime > 0) return ts.contextTime + (now - ts.performanceTime) / 1000;
+    return actx.currentTime - (actx.outputLatency || actx.baseLatency || 0);
+  };
 
   const canvas = $('view');
   const ctx = canvas.getContext('webgpu');
   const format = navigator.gpu.getPreferredCanvasFormat();
   ctx.configure({ device, format, alphaMode: 'opaque' });
   const smp = device.createSampler({ magFilter: 'linear', minFilter: 'linear', addressModeU: 'clamp-to-edge', addressModeV: 'clamp-to-edge' });
-  const Udata = new Float32Array(36);
+  const Udata = new Float32Array(52);
   const g = {
     device,
     U: device.createBuffer({ size: Udata.byteLength, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST }),
@@ -859,16 +900,29 @@ async function boot() {
     study.resize(g);
   }
 
-  // The clock is the audio: the element's time, smoothed between its coarse updates.
+  // The clock is the audio: the position of what is coming out of the speakers right now.
   const sec = F.show.sections;
-  let playing = false, musicT = (sec.find(s => s.name === 'Summit') ?? sec[0]).t + 14, base = { t: musicT, at: 0 };
+  let playing = false, musicT = (sec.find(s => s.name === 'Summit') ?? sec[0]).t + 14;
   const clock = now => {
     if (!playing) return musicT;
-    let t = base.t + (now - base.at) / 1000;
-    if (Math.abs(t - audio.currentTime) > 0.06) { base = { t: audio.currentTime, at: now }; t = audio.currentTime; }
-    return musicT = t;
+    musicT = Math.max(startT, startT + heard(now) - startAt);
+    if (musicT >= F.duration) { stop(); musicT = F.duration - 0.01; }
+    return musicT;
   };
-  const seek = t => { musicT = Math.max(0, Math.min(F.duration - 0.1, t)); audio.currentTime = musicT; base = { t: musicT, at: performance.now() }; };
+  const start = from => {
+    src = actx.createBufferSource();
+    src.buffer = pcm;
+    src.connect(out);
+    startAt = actx.currentTime + 0.05;
+    startT = from;
+    src.start(startAt, from);
+    playing = true;
+  };
+  const stop = () => { if (src) { src.onended = null; try { src.stop(); } catch {} src = null; } playing = false; };
+  const seek = t => {
+    musicT = Math.max(0, Math.min(F.duration - 0.1, t));
+    if (playing) { stop(); start(musicT); }
+  };
 
   // Switching studies passes through black, like a lighting desk's crossfade through a blackout.
   let fade = 1, want = null;
@@ -905,23 +959,53 @@ async function boot() {
       const k = F.sectionIndex(musicT) + (e.key === 'ArrowUp' ? 1 : (musicT - sec[F.sectionIndex(musicT)].t < 2 ? -1 : 0));
       seek(sec[Math.max(0, Math.min(sec.length - 1, k))].t);
     }
+    else if (e.key === 's' || e.key === 'S') { D.strobe = !D.strobe; }
     else if (e.key === 'h' || e.key === 'H') { hudHidden = !hudHidden; hud.classList.toggle('gone', hudHidden); }
     else if (e.key === 'f' || e.key === 'F') { document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen?.().catch(() => {}); }
     else return;
     poke();
   });
   const toggle = () => {
-    if (playing) { audio.pause(); playing = false; }
-    else { audio.currentTime = musicT; audio.play().then(() => { playing = true; base = { t: audio.currentTime, at: performance.now() }; }).catch(e => fail('The audio would not start: ' + e.message)); }
+    if (playing) { stop(); return; }
+    actx.resume().then(() => start(musicT)).catch(e => fail('The audio would not start: ' + e.message));
   };
-  audio.onended = () => { playing = false; };
   $('go').disabled = false; $('go').textContent = 'Play from the start';
-  $('go').onclick = () => { $('veil').hidden = true; seek(0); toggle(); poke(); };
+  $('go').onclick = () => { $('veil').hidden = true; stop(); musicT = 0; toggle(); poke(); };
 
   const hash = location.hash.slice(1);
   study = STUDIES.find(s => s.id === hash) ?? study;
   targets();
   addEventListener('resize', targets);
+
+  // The director: camera cuts, strobe and colour, from the music's events. Calm sections glide;
+  // loud ones cut hard on every chord (and every bar at the top) and flash on the bass.
+  const PALETTE = [[1, 0.2, 0.06], [0.45, 0.62, 1], [1, 1, 1], [0.85, 0.3, 1], [1, 0.62, 0.2], [0.25, 1, 0.85]];
+  const D = { cam: [0, 0, 1, 0], fx: [0, 0, 0, 0], col: [1, 1, 1, 0], target: [0, 0, 1], cut: 0, chord: -1, bar: -1, si: -1, strobe: true, invertUntil: 0 };
+  const hash01 = k => { const x = Math.sin(k * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); };
+  window.__D = D;
+  function direct(t, dt) {
+    const e = F.energy, bar = Math.floor(t * show.bpm / 240);
+    const sectionStart = F.si !== D.si && D.si >= 0;
+    if (F.count[0] !== D.chord || (e > 0.75 && bar !== D.bar) || sectionStart) {
+      D.cut++;
+      const r = k => hash01(D.cut * 7 + k);
+      D.target = [(r(1) - 0.5) * 6.0 * (0.3 + e), (r(2) - 0.4) * 0.9 * e, 0.55 + r(3) * 0.9];
+      D.col = [...PALETTE[Math.floor(r(4) * PALETTE.length)], Math.max(0, Math.min(1, (e - 0.35) * 2.2))];
+    }
+    D.chord = F.count[0]; D.bar = bar;
+    const glide = e > 0.6 ? 1 : 1 - Math.exp(-dt / (0.4 + 2.0 * (1 - e)));   // hard cuts when loud
+    for (let k = 0; k < 3; k++) D.cam[k] += (D.target[k] - D.cam[k]) * glide;
+    D.cam[3] = F.hit[1] * (0.05 + 0.35 * e);
+    let flash = D.fx[0] * Math.exp(-dt / 0.07);
+    if (D.strobe && playing) {
+      if (F.since[1] < dt && e > 0.4) flash = Math.max(flash, F.vel[1] * (e - 0.2) * 1.2);
+      if (F.since[2] < dt && e > 0.85) flash = Math.max(flash, 0.35);
+      if (sectionStart) { flash = 1; if (e > 0.5) D.invertUntil = t + 0.4; }
+    }
+    D.fx[0] = flash;
+    D.fx[1] = D.strobe && t < D.invertUntil ? Math.floor(t * 14) % 2 : 0;   // inverted flicker at a section change
+    D.si = F.si;
+  }
 
   let last = performance.now(), visT = 0, frameNo = 0, fps = 60;
   function frame(now) {
@@ -936,11 +1020,12 @@ async function boot() {
 
     const t = clock(now);
     F.update(t);
+    direct(t, dt);
     study.cpu?.(g, F, t);
     const bpm = show.bpm, beats = t * bpm / 60;
     Udata.set([visT, dt, beats % 1, (beats / 4) % 1, g.W, g.H, F.energy, F.progress,
-      ...F.lv.slice(0, 4), F.lv[4], F.lv[5], F.lv[6], F.si, ...F.hit, ...F.pitch, ...F.since, ...F.chord,
-      beats, frameNo, bpm, g.W / g.H]);
+      ...F.lv.slice(0, 4), F.lv[4], F.lv[5], F.lv[6], F.si, ...F.hit, ...F.pitch, ...F.since, ...F.chord, ...F.count,
+      beats, frameNo, bpm, g.W / g.H, ...D.cam, ...D.fx, ...D.col]);
     device.queue.writeBuffer(g.U, 0, Udata);
     device.queue.writeBuffer(postU, 0, new Float32Array([study.exposure, study.bloom, 0.05, fade]));
 
