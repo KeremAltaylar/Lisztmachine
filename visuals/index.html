@@ -60,9 +60,9 @@ nav button[aria-pressed="true"] { color: var(--ember); }
   <div class="card">
     <h1>Lisztmachine</h1>
     <p class="meta" id="meta">Loading the concert…</p>
-    <p class="lede">Six light studies for projecting onto the drummer. Each one reads the music itself: every note, every chord and the level of each part, so the light lands exactly with the sound.</p>
+    <p class="lede">Four generative light studies for projecting onto the drummer. Each one reads the music itself: every note, every chord and the level of each part, so the light lands exactly with the sound.</p>
     <button class="go" id="go" disabled>Loading…</button>
-    <p class="keys"><kbd>1</kbd>–<kbd>6</kbd> study · <kbd>Space</kbd> pause · <kbd>←</kbd><kbd>→</kbd> 10 s · <kbd>↑</kbd><kbd>↓</kbd> section · <kbd>S</kbd> strobe on/off · <kbd>H</kbd> hide controls · <kbd>F</kbd> full screen</p>
+    <p class="keys"><kbd>1</kbd>–<kbd>4</kbd> study · <kbd>G</kbd> new look · <kbd>Space</kbd> pause · <kbd>←</kbd><kbd>→</kbd> 10 s · <kbd>↑</kbd><kbd>↓</kbd> section · <kbd>S</kbd> strobe on/off · <kbd>H</kbd> hide controls · <kbd>F</kbd> full screen</p>
     <p class="err" id="err" hidden></p>
   </div>
 </div>
@@ -186,8 +186,21 @@ struct U {
   cam: vec4f,     // director: yaw, pitch, zoom, shake
   fx: vec4f,      // director: flash, invert, -, -
   col: vec4f,     // director: light colour, and how much of it replaces the white
+  gene: array<vec4f, 4>,   // the genome: 16 numbers each study reads as its structure; re-rolled every section
 };
 @group(0) @binding(0) var<uniform> u: U;
+fn gene(k: i32) -> f32 { return u.gene[k / 4][k % 4]; }
+fn rot2(a: f32) -> mat2x2f { return mat2x2f(cos(a), sin(a), -sin(a), cos(a)); }
+// Kaleidoscope: fold the plane into 1, 2, 3, 4, 6 or 8 mirrored sectors.
+fn foldq(q: vec2f, g: f32) -> vec2f {
+  var ns = array<f32, 6>(1.0, 2.0, 3.0, 4.0, 6.0, 8.0);
+  let n = ns[min(u32(g * 6.0), 5u)];
+  if (n < 1.5) { return q; }
+  let sector = 6.2831853 / n;
+  var a = atan2(q.y, q.x);
+  a = abs(a - sector * floor(a / sector) - sector * 0.5);
+  return vec2f(cos(a), sin(a)) * length(q);
+}
 
 struct VO { @builtin(position) pos: vec4f, @location(0) uv: vec2f };
 @vertex fn vs(@builtin(vertex_index) i: u32) -> VO {
@@ -304,221 +317,195 @@ fn oetf(c: vec3f) -> vec3f { return select(1.055 * pow(c, vec3f(1.0 / 2.4)) - 0.
 // ---------------------------------------------------------------------------------------------
 // The studies. Each draws into g.sceneView at its own resolution scale.
 // ---------------------------------------------------------------------------------------------
-// Shared by the particle studies: projection through a camera at eye(), bilinear atomic splats,
-// and the pass that turns the splat counts into light.
+// Shared by the particle studies: bilinear atomic splats into two accumulators (layer 0 white,
+// layer 1 coloured), and the pass that turns the counts into light.
 const SPLAT = /* wgsl */`
-      fn project(p: vec3f) -> vec3f {
-        let e = eye();
-        let fw = normalize(-e);
-        let rt = normalize(cross(fw, vec3f(0, 1, 0)));
-        let up = cross(rt, fw);
-        let d = p - e;
-        let z = dot(d, fw);
-        let s = 1.6 / max(z, 1e-3) * u.res.y * 0.5;
-        return vec3f(u.res.x * 0.5 + dot(d, rt) * s, u.res.y * 0.5 - dot(d, up) * s, z);
-      }
-      fn splat(xy: vec2f, w: f32) {
+      fn splat(xy: vec2f, w: f32, layer: u32) {
         let f = xy - 0.5;
         let b = floor(f);
         let t = f - b;
         let W = i32(u.res.x); let H = i32(u.res.y);
+        let off = layer * u32(W * H);
         for (var k = 0; k < 4; k++) {
           let o = vec2i(k & 1, k >> 1);
           let q = vec2i(b) + o;
           if (q.x < 0 || q.y < 0 || q.x >= W || q.y >= H) { continue; }
           let wx = select(1.0 - t.x, t.x, o.x == 1);
           let wy = select(1.0 - t.y, t.y, o.y == 1);
-          atomicAdd(&A[q.y * W + q.x], u32(w * wx * wy * 64.0));
+          atomicAdd(&A[off + u32(q.y * W + q.x)], u32(w * wx * wy * 64.0));
         }
       }`;
-const RESOLVE = /* wgsl */`
+const RESOLVE = (white, colour) => /* wgsl */`
       @group(0) @binding(1) var<storage, read> A: array<u32>;
       @fragment fn fs(i: VO) -> @location(0) vec4f {
         let p = vec2u(i.pos.xy);
-        let n = f32(A[p.y * u32(u.res.x) + p.x]) / 64.0;
+        let n = u32(u.res.x) * u32(u.res.y);
+        let k = p.y * u32(u.res.x) + p.x;
+        let w = f32(A[k]) / 64.0;
+        let c = f32(A[n + k]) / 64.0;
         let gain = 0.03 * (0.2 + 0.9 * u.level.x + 0.4 * u.bus.z) * (1.0 + 1.8 * u.hit.y + 0.8 * u.hit.x);
-        return vec4f(tint(u.energy) * n * gain, 1.0);
+        return vec4f((mix(vec3f(1.0), tint(u.energy), 0.25) * w * ${white} + tint(u.energy) * c * ${colour}) * gain, 1.0);
       }`;
+const ADD = { color: { srcFactor: 'one', dstFactor: 'one' }, alpha: { srcFactor: 'one', dstFactor: 'one' } };
+
+// The sounding notes (and those released in the last 0.3 s), packed from slot 0: pitch, level, part, age.
+function sounding(F, t, out) {
+  out.fill(0);
+  let n = 0;
+  const max = out.length / 4;
+  for (let i = lowerBound(F.notes, t - 17); i < F.notes.length && F.notes[i][0] <= t && n < max; i++) {
+    const [s, d, tr, p, v] = F.notes[i];
+    const rel = t - (s + d);
+    if (rel > 0.3) continue;
+    out.set([p, v * (0.35 + F.lv[tr]) * (rel > 0 ? Math.exp(-rel / 0.06) : 1), tr, t - s], n++ * 4);
+  }
+  return n;
+}
 
 const STUDIES = [];
 
-// 1 · Ash: a million particles in a curl-noise current, splatted with atomics.
+// 1 · Dust Score: the concert as lines in space (time along x, pitch up, a layer per part), flown
+// through as it plays. Dust streams out of every sounding note along its line, then peels off into
+// a strange attractor chosen by the genome: Lorenz, Aizawa, Thomas, Halvorsen, or curl noise.
 STUDIES.push({
-  id: 'ash', name: 'Ash', scale: 1, exposure: 1.0, bloom: 0.10,
-  about: 'A million particles of dust in a slow current. The bass stirs it, sequence notes send shock shells through it, the lead pulls a vortex.',
-  init(g) {
+  id: 'dust', name: 'Dust Score', scale: 1, exposure: 1.0, bloom: 0.09,
+  about: 'The score as lines in space with a million grains of dust streaming out of every sounding note. The dust peels off into a strange attractor (Lorenz, Aizawa, Thomas, Halvorsen) that changes with the music.',
+  async init(g, F) {
     const N = this.N = 1 << 20;
     const P = new Float32Array(N * 4);
     for (let i = 0; i < N; i++) {
-      const a = Math.random() * Math.PI * 2, z = Math.random() * 2 - 1, r = 0.9 * Math.cbrt(Math.random()), q = Math.sqrt(1 - z * z);
-      P.set([Math.cos(a) * q * r, z * r, Math.sin(a) * q * r, Math.random()], i * 4);
+      const a = Math.random() * Math.PI * 2, z = Math.random() * 2 - 1, r = Math.cbrt(Math.random()), q = Math.sqrt(1 - z * z);
+      P.set([-0.9 + Math.cos(a) * q * r, z * r, Math.sin(a) * q * r, Math.random()], i * 4);
     }
     this.P = g.buffer(P, GPUBufferUsage.STORAGE);
     this.V = g.buffer(new Float32Array(N * 4), GPUBufferUsage.STORAGE);
-    const code = COMMON + /* wgsl */`
+    this.S = new Float32Array(32 * 4);
+    this.sb = g.device.createBuffer({ size: this.S.byteLength, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+    const CAM = /* wgsl */`
+      fn aim() -> vec3f { return vec3f(0.2, 0.0, 0.0); }
+      fn eye() -> vec3f {
+        let a = 0.6 + u.cam.x * 0.7 + u.time * 0.015;
+        let d = 4.4 * u.cam.z;
+        return aim() + vec3f(sin(a) * d * cos(u.cam.y), 0.6 + sin(u.cam.y) * d, -cos(a) * d * cos(u.cam.y)) + shake() * 0.4;
+      }
+      fn basis() -> mat3x3f {
+        let fw = normalize(aim() - eye());
+        let rt = normalize(cross(fw, vec3f(0, 1, 0)));
+        return mat3x3f(rt, cross(rt, fw), fw);
+      }
+      fn project(p: vec3f) -> vec3f {           // pixels, and depth
+        let B = basis();
+        let d = p - eye();
+        let z = dot(d, B[2]);
+        let s = 1.7 / max(z, 1e-3) * u.res.y * 0.5;
+        return vec3f(u.res.x * 0.5 + dot(d, B[0]) * s, u.res.y * 0.5 - dot(d, B[1]) * s, z);
+      }
+      fn clip(w: vec3f) -> vec4f {              // the same camera, for the line and text passes
+        let B = basis();
+        let q = w - eye();
+        return vec4f(dot(q, B[0]) * 1.7 / u.aspect, dot(q, B[1]) * 1.7, 0.5, dot(q, B[2]));
+      }`;
+    this.update = g.compute(COMMON + CAM + /* wgsl */`
       @group(0) @binding(1) var<storage, read_write> P: array<vec4f>;
       @group(0) @binding(2) var<storage, read_write> V: array<vec4f>;
       @group(0) @binding(3) var<storage, read_write> A: array<atomic<u32>>;
-      fn eye() -> vec3f {
-        let a = u.time * 0.025 + u.cam.x;
-        let d = 3.4 * u.cam.z;
-        return vec3f(sin(a) * d * cos(u.cam.y), 0.35 + 0.25 * sin(u.time * 0.031) + sin(u.cam.y) * d, cos(a) * d * cos(u.cam.y)) + shake() * 0.6;
-      }
+      @group(0) @binding(4) var<uniform> S: array<vec4f, 32>;
       ${SPLAT}
+      const C0 = vec3f(-0.9, 0.0, 0.0);   // where the attractor lives: behind the now-plane, in the past
+      fn rotY(q: vec3f, a: f32) -> vec3f { return vec3f(q.x * cos(a) - q.z * sin(a), q.y, q.x * sin(a) + q.z * cos(a)); }
+      fn attractor(p: vec3f) -> vec3f {
+        let kind = u32(gene(0) * 5.0);
+        let sc = 0.25 + 0.45 * gene(2);
+        let a = gene(12); let b = gene(13);
+        let ang = gene(9) * 6.2831853;
+        let q = rotY((p - C0) / sc, -ang);
+        var d = vec3f(0.0);
+        if (kind == 1u) {        // Lorenz
+          let x = q * 12.0 + vec3f(0.0, 0.0, 24.0);
+          let r = 22.0 + 12.0 * a; let bb = 2.0 + 1.5 * b;
+          d = vec3f(10.0 * (x.y - x.x), x.x * (r - x.z) - x.y, x.x * x.y - bb * x.z);
+        } else if (kind == 2u) { // Aizawa
+          let x = q * 1.2; let A1 = 0.85 + 0.2 * a; let D1 = 3.0 + b;
+          d = vec3f((x.z - 0.7) * x.x - D1 * x.y, D1 * x.x + (x.z - 0.7) * x.y,
+                    0.6 + A1 * x.z - x.z * x.z * x.z / 3.0 - (x.x * x.x + x.y * x.y) * (1.0 + 0.25 * x.z) + 0.1 * x.z * x.x * x.x * x.x);
+        } else if (kind == 3u) { // Thomas
+          let x = q * 3.0; let bb = 0.12 + 0.12 * a;
+          d = vec3f(sin(x.y) - bb * x.x, sin(x.z) - bb * x.y, sin(x.x) - bb * x.z);
+        } else if (kind == 4u) { // Halvorsen
+          let x = q * 6.0; let aa = 1.4 + 0.8 * a;
+          d = vec3f(-aa * x.x - 4.0 * x.y - 4.0 * x.z - x.y * x.y, -aa * x.y - 4.0 * x.z - 4.0 * x.x - x.z * x.z, -aa * x.z - 4.0 * x.x - 4.0 * x.y - x.x * x.x);
+        } else {
+          d = curl(q * 1.3 + vec3f(u.time * 0.03));
+        }
+        let r = rotY(d, ang);
+        return r / (length(r) + 1e-4);
+      }
       @compute @workgroup_size(256) fn update(@builtin(global_invocation_id) id: vec3u) {
         let i = id.x;
         if (i >= arrayLength(&P)) { return; }
         var p = P[i];
-        var v = V[i].xyz;
+        let vv = V[i];
+        var v = vv.xyz;
+        var born = vv.w;                               // 0: attractor dust · 1..4: streamed from a note of part born-1
         let fr = u32(u.frame);
-        p.w -= u.dt * (0.05 + 0.1 * rnd(i * 3u + 1u));
+        let scroll = vec3f(-0.45 * (0.6 + 1.2 * gene(4)), 0.0, 0.0);   // the score moves 0.45 units a second
+        p.w -= u.dt * (0.05 + 0.12 * rnd(i * 3u + 1u)) * select(1.0, 1.5, born > 0.5);
         if (p.w <= 0.0) {
           let s = fr * 1664525u + i * 2654435761u;
-          let a = rnd(s) * 6.2831853;
-          let z = rnd(s + 1u) * 2.0 - 1.0;
-          let r = 0.95 * pow(rnd(s + 2u), 0.33);
-          let q = sqrt(1.0 - z * z);
-          p = vec4f(vec3f(cos(a) * q, z, sin(a) * q) * r, 1.0);
-          v = vec3f(0.0);
+          var n = 0u;
+          for (var k = 0u; k < 32u; k++) { if (S[k].y <= 0.0) { break; } n = k + 1u; }
+          if (n > 0u && rnd(s + 7u) < 0.1 + 0.8 * gene(3)) {
+            let k = min(u32(rnd(s + 9u) * f32(n)), n - 1u);
+            let sn = S[k];
+            p = vec4f(vec3f(0.0, (sn.x - 60.0) * 0.055, sn.z * 0.55 - 0.8) + (vec3f(rnd(s), rnd(s + 1u), rnd(s + 2u)) - 0.5) * vec3f(0.03, 0.012, 0.012), 1.0);
+            v = scroll;
+            born = 1.0 + sn.z;
+          } else {
+            let a = rnd(s) * 6.2831853; let z = rnd(s + 1u) * 2.0 - 1.0; let r = pow(rnd(s + 2u), 0.33); let q = sqrt(1.0 - z * z);
+            p = vec4f(C0 + vec3f(cos(a) * q, z, sin(a) * q) * r, 1.0);
+            v = vec3f(0.0);
+            born = 0.0;
+          }
         }
         let e = u.energy;
-        let flow = curl(p.xyz * (0.55 + 0.9 * e) + vec3f(0.0, u.time * 0.04, u.time * 0.02));
-        var goal = flow * (0.10 + 0.5 * u.level.y + 0.3 * e + 0.7 * u.hit.y);
-        let lp = vec3f(cos(u.time * 0.21) * 0.7, (u.pitch.w - 0.5) * 1.4, sin(u.time * 0.21) * 0.7);
-        let dl = p.xyz - lp;
-        goal += cross(normalize(dl + vec3f(1e-4)), vec3f(0.0, 1.0, 0.0)) * u.level.w * 0.9 / (1.0 + 6.0 * dot(dl, dl));
-        let rr = length(p.xyz);
-        goal -= p.xyz * 0.6 * max(0.0, rr - 1.25);
+        let age = 1.0 - p.w;
+        let att = attractor(p.xyz) * (0.15 + 0.9 * e + 0.6 * u.hit.y) * (0.2 + gene(1));
+        let fl = curl(p.xyz * (0.3 + 2.2 * gene(5)) + vec3f(0.0, u.time * 0.04, u.time * 0.02)) * (0.05 + 0.4 * gene(6)) * (1.0 + u.hit.y);
+        var goal = att + fl;
+        if (born > 0.5) { goal = mix(scroll + fl * 0.25, att + fl, smoothstep(0.25, 0.95, age)); }   // trails peel off into the attractor
+        let rc = length(p.xyz - C0);
+        goal -= (p.xyz - C0) * 0.5 * max(0.0, rc - 1.8);
         v = mix(v, goal, 1.0 - exp(-u.dt * 3.0));
-        if (u.since.y < u.dt) { v += normalize(p.xyz + vec3f(1e-4)) * (0.5 + 0.7 * u.hit.y) * (1.0 + 2.0 * u.energy); }   // each bass note: a breath outward
-        if (u.fx.x > 0.95) { v += normalize(p.xyz + vec3f(1e-4)) * 2.5; }                 // section change: it explodes
+        if (u.since.y < u.dt) { v += normalize(p.xyz - C0 + vec3f(1e-4)) * (0.4 + 0.7 * u.hit.y) * (1.0 + 2.0 * e); }   // each bass note: a breath outward
+        if (u.fx.x > 0.95) { v += normalize(p.xyz - C0 + vec3f(1e-4)) * 2.5; }                                         // a section change: it explodes
         p = vec4f(p.xyz + v * u.dt, p.w);
         P[i] = p;
-        V[i] = vec4f(v, 0.0);
+        V[i] = vec4f(v, born);
 
-        let s = project(p.xyz);
-        if (s.z < 0.3) { return; }
-        let coc = abs(s.z - 3.4 * u.cam.z) * 3.0 * u.res.y / 1080.0;               // depth of field, in pixels
-        let j = vec2f(rnd(i ^ (fr * 9781u)), rnd((i * 7u) ^ (fr * 6271u))) - 0.5;
-        let shellR = u.since.z * 2.6;
-        let shell = exp(-pow((rr - shellR) / 0.1, 2.0)) * u.hit.z;
-        let near = exp(-6.0 * dot(dl, dl)) * u.level.w;
-        var w = smoothstep(0.0, 0.15, p.w) * (1.0 - smoothstep(0.85, 1.0, p.w)) * (1.0 + 10.0 * shell + 3.0 * near);
-        splat(s.xy + j * coc, w / (1.0 + 0.02 * coc * coc));
-      }`;
-    this.update = g.compute(code, 'update');
-    this.resolve = g.fullscreen(COMMON + RESOLVE);
-  },
-  resize(g) {
-    this.A?.destroy();
-    this.A = g.device.createBuffer({ size: g.W * g.H * 4, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST });
-    this.bgU = g.bind(this.update, [g.U, this.P, this.V, this.A]);
-    this.bgR = g.bind(this.resolve, [g.U, this.A]);
-  },
-  frame(g, enc) {
-    enc.clearBuffer(this.A);
-    const c = enc.beginComputePass();
-    c.setPipeline(this.update); c.setBindGroup(0, this.bgU); c.dispatchWorkgroups(this.N / 256);
-    c.end();
-    g.draw(enc, this.resolve, this.bgR);
-  },
-});
-
-// 2 · Grating: one line grating per held pad note, spaced by the note's frequency. Where they
-// cross, the moiré is the chord: consonant intervals settle into calm bands, dissonant ones shimmer.
-STUDIES.push({
-  id: 'grating', name: 'Grating', scale: 1, exposure: 1.0, bloom: 0.07,
-  about: 'Each held chord note is a grating of light whose spacing follows its pitch. Their interference is the harmony, made visible. The bass adds rings, sequence notes sharpen the lines.',
-  init(g) {
-    this.pipe = g.fullscreen(COMMON + /* wgsl */`
-      fn grating(d: f32, gamma: f32) -> f32 {
-        let aa = clamp(1.5 - fwidth(d) * 2.5, 0.0, 1.0);  // above Nyquist a grating fades to its mean
-        return pow(max(0.5 + 0.5 * cos(6.2831853 * d) * aa, 0.0), gamma);  // rounding below 0 makes pow NaN: a white screen
-      }
-      @fragment fn fs(i: VO) -> @location(0) vec4f {
-        let p = (i.pos.xy - u.res * 0.5) / u.res.y + shake().xy * 0.08;
-        var n = 0.0;
-        for (var k = 0; k < 4; k++) { if (u.chord[k] > 0.0) { n += 1.0; } }
-        // Thin lines on black: one exponent shared across the gratings, so light gathers only
-        // where their lines coincide. Nearly parallel, slightly different spacings: the
-        // coincidences form slow bands, and their spacing follows the chord's intervals.
-        let ex = (5.0 + 3.0 * u.energy + 6.0 * u.hit.z) / max(n, 1.0);
-        let spread = 0.004 + 0.03 * u.energy;
-        let base = 0.62 + 0.35 * sin(u.time * 0.0041) + u.cam.x;
-        var light = 1.0;
-        for (var k = 0; k < 4; k++) {
-          let pk = u.chord[k];
-          if (pk <= 0.0) { continue; }
-          let f = 70.0 * (1.0 + 0.35 * u.energy) / u.cam.z * exp2((pk - u.chord.x) / 12.0 * 0.09);
-          let ang = base + (f32(k) - 1.5) * spread + 0.01 * sin(u.time * 0.05 * f32(k + 1));
-          let step = u.count.z - 1.0 + smoothstep(0.0, 0.12, u.since.z);    // eased: one step per sequence note
-          let d = dot(p, vec2f(cos(ang), sin(ang))) * f - u.time * (0.05 + 0.25 * u.energy) * (f32(k) - 1.5)
-                - step * 0.045 * (f32(k) - 1.5);
-          light *= grating(d, ex);
+        let shell = exp(-pow((rc - u.since.z * 2.6) / 0.1, 2.0)) * u.hit.z;
+        let w = smoothstep(0.0, 0.15, p.w) * (1.0 - smoothstep(0.85, 1.0, p.w)) * select(0.55, 1.5, born > 0.5) * (1.0 + 8.0 * shell);
+        let layer = select(0u, 1u, born > 0.5);
+        let focus = 4.4 * u.cam.z;
+        let mirror = u32(gene(14) * 3.0);
+        for (var m = 0u; m <= mirror; m++) {           // the genome can mirror the dust into symmetry
+          var q = p.xyz;
+          if (m == 1u) { q.y = -q.y; }
+          if (m == 2u) { q.z = -q.z; }
+          let s = project(q);
+          if (s.z < 0.3) { continue; }
+          let coc = abs(s.z - focus) * (1.0 + 4.0 * gene(15)) * u.res.y / 1080.0;
+          let j = vec2f(rnd(i ^ (fr * 9781u + m)), rnd((i * 7u) ^ (fr * 6271u + m))) - 0.5;
+          splat(s.xy + j * coc, w / (1.0 + 0.02 * coc * coc), layer);
         }
-        if (n == 0.0) { light = 0.0; }
-        let fb = 10.0 * exp2(u.pitch.y * 1.5);
-        let rc = length(p - vec2f(0.0, 0.08)) * fb - (u.count.y - 1.0 + smoothstep(0.0, 0.25, u.since.y)) * 0.5;
-        light *= mix(1.0, grating(rc, 1.0) * 2.0, u.level.y * 0.6);
-        let c = vec2f(sin(u.time * 0.09) * 0.35, (0.5 - u.pitch.w) * 0.5);
-        let ap = exp(-dot(p - c, p - c) / 0.05);
-        light *= 1.0 + u.level.w * (1.6 * ap - 0.4) + 0.8 * u.hit.w * ap;
-        let gain = 3.2 * (0.2 + 1.0 * u.level.x + 0.3 * u.bus.z) * (1.0 + 1.3 * u.hit.y + 0.7 * u.hit.x);
-        return vec4f(tint(u.energy) * light * gain, 1.0);
-      }`);
-  },
-  resize(g) { this.bg = g.bind(this.pipe, [g.U]); },
-  frame(g, enc) { g.draw(enc, this.pipe, this.bg); },
-});
+      }`, 'update');
+    this.resolve = g.fullscreen(COMMON + RESOLVE(0.8, 1.6));
 
-// 3 · Test Pattern: after Ryoji Ikeda. The screen is cut into strips of binary barcode; each strip
-// belongs to one part and rolls to a new code on every note of it.
-STUDIES.push({
-  id: 'pattern', name: 'Test Pattern', scale: 1, exposure: 1.0, bloom: 0.006,   // hard edges: glow would lift the black
-  about: 'After Ryoji Ikeda: strips of binary barcode, each driven by one part. Every note rolls its strip to a new code, the bass inverts strips, and louder sections cut finer, faster strips.',
-  init(g) {
-    this.pipe = g.fullscreen(COMMON + /* wgsl */`
-      fn h2(a: f32, b: f32) -> f32 { return rnd((u32(abs(a)) * 2654435761u) ^ (u32(abs(b)) * 2246822519u + 374761393u)); }
-      @fragment fn fs(i: VO) -> @location(0) vec4f {
-        let cut = u.fx.z;
-        let e = u.energy;
-        let rows = exp2(floor(clamp(1.0 + e * 4.5 + h2(cut, 3.0) * 1.5, 1.0, 6.0)));   // 2 to 64 strips
-        let y = i.pos.y / u.res.y;
-        let row = floor(y * rows);
-        let rs = row * 7.0 + cut * 131.0;
-        let part = u32(h2(rs, 1.0) * 4.0) & 3u;
-        let lvl = u.level[part];
-        let hit = u.hit[part];
-        let wpx = exp2(floor(h2(rs, 2.0) * 4.0)) * max(1.0, u.res.y / 1080.0);   // bar width: 1, 2, 4 or 8 px
-        let speed = select(-1.0, 1.0, h2(rs, 4.0) > 0.5) * (30.0 + h2(rs, 5.0) * 900.0 * (0.15 + e));
-        let cell = floor((i.pos.x + u.time * speed) / wpx);
-        let code = floor(u.count[part]) * 977.0 % 65521.0;
-        let bit = select(0.0, 1.0, h2(cell + 70000.0, rs + code) < 0.06 + 0.34 * lvl);
-        let on = smoothstep(0.02, 0.15, lvl + hit);                         // a silent part's strip is dark
-        var v = bit * on;
-        if (u.since.y < 0.09 && h2(rs + floor(u.count.y) * 13.0, 9.0) < 0.35 * u.hit.y) { v = on - v; }   // a bass note inverts strips, briefly
-        let edge = fract(y * rows) * u.res.y / rows;
-        let rule = select(0.0, 0.45, edge < 1.0 && rows < 40.0);              // hairlines between strips
-        return vec4f(mix(vec3f(1.0), tint(e), 0.35) * max(v, rule) * 3.0, 1.0);   // near pure white, as Ikeda's
-      }`);
-  },
-  resize(g) { this.bg = g.bind(this.pipe, [g.U]); },
-  frame(g, enc) { g.draw(enc, this.pipe, this.bg); },
-});
-
-// 4 · Data: after Ikeda's datamatics. The whole concert as a sculpture of lines in space (time
-// along x, pitch up, one layer per part), flown through with the music; the sounding notes are
-// read out as numbers.
-STUDIES.push({
-  id: 'data', name: 'Data', scale: 1, exposure: 1.0, bloom: 0.07,
-  about: 'After Ryoji Ikeda: the whole concert as a sculpture of lines (time, pitch, part), flown through as it plays. The sounding notes are read out in hertz, with a running log of every note.',
-  async init(g, F) {
+    // The score's lines, and the read-out of notes, through the same camera.
     const notes = F.notes;
     const data = new Float32Array(notes.length * 4);
     notes.forEach(([s, d, tr, p, v], k) => data.set([s, d, p, tr + Math.min(v, 0.999)], k * 4));
     this.n = notes.length;
     this.nb = g.buffer(data, GPUBufferUsage.VERTEX);
-    // Glyph atlas: one monospace face drawn into a canvas, 16 x 4 cells.
     this.chars = ' 0123456789.:-+/ABCDEFGHIJKLMNOPQRSTUVWXYZ%#=_<>';
     const cw = 32, ch = 56, cv = document.createElement('canvas');
     cv.width = cw * 16; cv.height = ch * 4;
@@ -531,26 +518,15 @@ STUDIES.push({
     this.maxG = 6000;
     this.gl = new Float32Array(this.maxG * 8);
     this.gb = g.device.createBuffer({ size: this.gl.byteLength, usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST });
-
-    const code = COMMON + /* wgsl */`
+    const mod = g.device.createShaderModule({ code: COMMON + CAM + /* wgsl */`
       fn now() -> f32 { return u.beats * 60.0 / u.bpm; }
       fn wpos(t: f32, pitch: f32, tr: f32) -> vec3f { return vec3f((t - now()) * 0.45, (pitch - 60.0) * 0.055, tr * 0.55 - 0.8); }
-      fn clip(w: vec3f) -> vec4f {
-        let a = 0.6 + u.cam.x * 0.7 + u.time * 0.015;
-        let d = 4.4 * u.cam.z;
-        let e = vec3f(sin(a) * d * cos(u.cam.y), 0.9 + sin(u.cam.y) * d, -cos(a) * d * cos(u.cam.y)) + shake() * 0.4;
-        let fw = normalize(vec3f(0.8, 0.0, 0.0) - e);
-        let rt = normalize(cross(fw, vec3f(0, 1, 0)));
-        let up = cross(rt, fw);
-        let q = w - e;
-        let z = dot(q, fw);
-        return vec4f(dot(q, rt) * 1.7 / u.aspect, dot(q, up) * 1.7, 0.5, z);
-      }
+      fn lineGain() -> f32 { var lg = array<f32, 4>(1.0, 1.0, 0.3, 0.0); return lg[min(u32(gene(7) * 4.0), 3u)]; }
       struct LV { @builtin(position) pos: vec4f, @location(0) c: vec3f, @location(1) e: f32 };
       fn segment(vi: u32, a: vec4f, b: vec4f, hwPx: f32, c: vec3f) -> LV {
         var o: LV;
         o.c = c;
-        if (a.w < 0.15 || b.w < 0.15) { o.pos = vec4f(2.0, 2.0, 0.0, 1.0); o.e = 2.0; return o; }   // behind the camera
+        if (a.w < 0.15 || b.w < 0.15) { o.pos = vec4f(2.0, 2.0, 0.0, 1.0); o.e = 2.0; return o; }
         let sa = a.xy / a.w * u.res * 0.5;
         let sb = b.xy / b.w * u.res * 0.5;
         let dir = normalize(sb - sa + vec2f(1e-4, 0.0));
@@ -570,20 +546,16 @@ STUDIES.push({
         if (n.x > t) { b = 0.14; }
         else if (n.x + n.y < t) { b = 0.5 * exp(-(t - n.x - n.y) * 0.05); }
         else { b = 1.6 + 3.0 * exp(-(t - n.x) * 8.0); hw = 1.4 * s; }
-        var tone = array<vec3f, 4>(vec3f(0.6), vec3f(0.85), vec3f(1.0), vec3f(1.0));
-        return segment(vi, clip(wpos(n.x, n.z, tr)), clip(wpos(n.x + n.y, n.z, tr)), hw, tint(u.energy) * tone[u32(tr)] * b * (0.5 + vel));
+        return segment(vi, clip(wpos(n.x, n.z, tr)), clip(wpos(n.x + n.y, n.z, tr)), hw, tint(u.energy) * b * (0.5 + vel) * lineGain());
       }
       @vertex fn vsDrop(@builtin(vertex_index) vi: u32, @location(0) n: vec4f) -> LV {
         let tr = floor(n.w); let t = now();
-        let sounding = n.x <= t && n.x + n.y > t;
         let top = wpos(t, n.z, tr);
-        var o = segment(vi, clip(top), clip(vec3f(0.0, -1.9, top.z)), 0.5, tint(u.energy) * 0.35);
-        if (!sounding) { o.pos = vec4f(2.0, 2.0, 0.0, 1.0); }
+        var o = segment(vi, clip(top), clip(vec3f(0.0, -1.9, top.z)), 0.5, tint(u.energy) * 0.35 * lineGain());
+        if (!(n.x <= t && n.x + n.y > t)) { o.pos = vec4f(2.0, 2.0, 0.0, 1.0); }
         return o;
       }
-      @fragment fn fsLine(i: LV) -> @location(0) vec4f {
-        return vec4f(i.c * clamp((1.0 - abs(i.e)) * 2.0, 0.0, 1.0), 1.0);
-      }
+      @fragment fn fsLine(i: LV) -> @location(0) vec4f { return vec4f(i.c * clamp((1.0 - abs(i.e)) * 2.0, 0.0, 1.0), 1.0); }
 
       @group(0) @binding(1) var atlas: texture_2d<f32>;
       @group(0) @binding(2) var smp: sampler;
@@ -608,14 +580,11 @@ STUDIES.push({
         return o;
       }
       @fragment fn fsGlyph(i: GV) -> @location(0) vec4f {
-        let a = textureSampleLevel(atlas, smp, i.uv, 0.0).a;
-        return vec4f(tint(u.energy) * a * i.b, 1.0);
-      }`;
-    const mod = g.device.createShaderModule({ code });
-    const add = { color: { srcFactor: 'one', dstFactor: 'one' }, alpha: { srcFactor: 'one', dstFactor: 'one' } };
+        return vec4f(tint(u.energy) * textureSampleLevel(atlas, smp, i.uv, 0.0).a * i.b, 1.0);
+      }` });
     const lineBuf = [{ arrayStride: 16, stepMode: 'instance', attributes: [{ shaderLocation: 0, offset: 0, format: 'float32x4' }] }];
     const mk = (vs, fs, buffers) => g.device.createRenderPipeline({ layout: 'auto', vertex: { module: mod, entryPoint: vs, buffers },
-      fragment: { module: mod, entryPoint: fs, targets: [{ format: 'rgba16float', blend: add }] } });
+      fragment: { module: mod, entryPoint: fs, targets: [{ format: 'rgba16float', blend: ADD }] } });
     this.notePipe = mk('vsNote', 'fsLine', lineBuf);
     this.dropPipe = mk('vsDrop', 'fsLine', lineBuf);
     this.glyphPipe = mk('vsGlyph', 'fsGlyph', [{ arrayStride: 32, stepMode: 'instance', attributes: [
@@ -623,177 +592,47 @@ STUDIES.push({
     this.smp = g.device.createSampler({ magFilter: 'linear', minFilter: 'linear' });
   },
   resize(g) {
+    this.A?.destroy();
+    this.A = g.device.createBuffer({ size: g.W * g.H * 8, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST });
+    this.bgU = g.bind(this.update, [g.U, this.P, this.V, this.A, this.sb]);
+    this.bgR = g.bind(this.resolve, [g.U, this.A]);
     this.bgN = g.bind(this.notePipe, [g.U]);
     this.bgD = g.bind(this.dropPipe, [g.U]);
     this.bgG = g.bind(this.glyphPipe, [g.U, this.atlas.createView(), this.smp]);
   },
-  cpu(g, F, t) {
+  cpu(g, F, t, D) {
+    sounding(F, t, this.S);
+    g.device.queue.writeBuffer(this.sb, 0, this.S);
+    const mode = Math.min(3, Math.floor(D.gene[7] * 4));   // 0 lines, labels and log · 1 lines and labels · 2 faint lines · 3 dust only
     const gl = this.gl, idx = c => Math.max(0, this.chars.indexOf(c));
     let n = 0;
-    const text = (str, x, y, z, b, ox, oy, mode) => {
-      for (let k = 0; k < str.length && n < this.maxG; k++, n++)
-        gl.set([x, y, z, b, ox + k * 11, oy, idx(str[k]), mode], n * 8);
+    const text = (str, x, y, z, b, ox, oy, m) => {
+      for (let k = 0; k < str.length && n < this.maxG; k++, n++) gl.set([x, y, z, b, ox + k * 11, oy, idx(str[k]), m], n * 8);
     };
     const hz = p => (440 * Math.pow(2, (p - 69) / 12)).toFixed(2);
-    const PART = ['PAD ', 'BASS', 'SEQ ', 'LEAD'];
-    const lo = lowerBound(F.notes, t - 17);
-    let shown = 0;
-    for (let i = lo; i < F.notes.length && F.notes[i][0] <= t && shown < 28; i++) {
-      const [s, d, tr, p] = F.notes[i];
-      if (s + d <= t) continue;
-      shown++;
-      text(hz(p) + ' HZ', 0, (p - 60) * 0.055, tr * 0.55 - 0.8, 0.9, 10, -9, 0);
+    if (mode <= 1) {
+      for (let k = 0; k < 32 && this.S[k * 4 + 1] > 0; k++) {
+        const p = this.S[k * 4], tr = this.S[k * 4 + 2];
+        text(hz(p) + ' HZ', 0, (p - 60) * 0.055, tr * 0.55 - 0.8, 0.9, 10, -9, 0);
+      }
     }
-    // the running log: the last notes, newest at the bottom
-    const end = lowerBound(F.notes, t + 1e-6);
-    for (let k = 0; k < 30; k++) {
-      const i = end - 30 + k;
-      if (i < 0) continue;
-      const [s, , tr, p, v] = F.notes[i];
-      const mm = Math.floor(s / 60), ss = (s % 60).toFixed(3).padStart(6, '0');
-      text(`${mm}:${ss}  ${PART[tr]}  ${String(p).padStart(3)}  ${hz(p).padStart(7)}  ${v.toFixed(2)}`, 28, 40 + k * 22, 0, 0.18 + 0.7 * (k / 29) ** 3, 0, 0, 1);
+    if (mode === 0) {
+      const PART = ['PAD ', 'BASS', 'SEQ ', 'LEAD'];
+      const end = lowerBound(F.notes, t + 1e-6);
+      for (let k = 0; k < 30; k++) {
+        const i = end - 30 + k;
+        if (i < 0) continue;
+        const [s, , tr, p, v] = F.notes[i];
+        const mm = Math.floor(s / 60), ss = (s % 60).toFixed(3).padStart(6, '0');
+        text(`${mm}:${ss}  ${PART[tr]}  ${String(p).padStart(3)}  ${hz(p).padStart(7)}  ${v.toFixed(2)}`, 28, 40 + k * 22, 0, 0.18 + 0.7 * (k / 29) ** 3, 0, 0, 1);
+      }
+      const beat = t * F.show.bpm / 60;
+      const kinds = ['CURL', 'LORENZ', 'AIZAWA', 'THOMAS', 'HALVORSEN'];
+      text(`${F.section.name.toUpperCase()}   BAR ${Math.floor(beat / 4) + 1}.${Math.floor(beat % 4) + 1}   ${F.show.bpm} BPM   ${kinds[Math.min(4, Math.floor(D.gene[0] * 5))]}   GEN ${D.gen}`,
+        28, 1040, 0, 0.8, 0, 0, 1);
     }
-    const beat = t * F.show.bpm / 60;
-    text(`${F.section.name.toUpperCase()}   BAR ${Math.floor(beat / 4) + 1}.${Math.floor(beat % 4) + 1}   ${F.show.bpm} BPM   E ${(F.energy * 100).toFixed(0)}%`,
-      28, 1040, 0, 0.8, 0, 0, 1);
     this.ng = n;
     g.device.queue.writeBuffer(this.gb, 0, gl, 0, n * 8);
-  },
-  frame(g, enc) {
-    const pass = g.pass(enc);
-    pass.setVertexBuffer(0, this.nb);
-    pass.setPipeline(this.dropPipe); pass.setBindGroup(0, this.bgD); pass.draw(6, this.n);
-    pass.setPipeline(this.notePipe); pass.setBindGroup(0, this.bgN); pass.draw(6, this.n);
-    pass.setVertexBuffer(0, this.gb);
-    pass.setPipeline(this.glyphPipe); pass.setBindGroup(0, this.bgG); pass.draw(6, this.ng);
-    pass.end();
-  },
-});
-
-// 5 · Spectra: after Ikeda's spectra. Every sounding note is a blade of white light across the
-// whole height, placed by pitch; sequence notes strobe, the bass is a wide slab.
-STUDIES.push({
-  id: 'spectra', name: 'Spectra', scale: 1, exposure: 1.0, bloom: 0.16,
-  about: 'After Ryoji Ikeda: every sounding note is a blade of light the full height of the screen, placed by pitch. Sequence notes strobe, bass notes are wide slabs, chords stand as soft columns.',
-  init(g) {
-    this.S = new Float32Array(64 * 4);
-    this.sb = g.device.createBuffer({ size: this.S.byteLength, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
-    this.pipe = g.fullscreen(COMMON + /* wgsl */`
-      @group(0) @binding(1) var<uniform> S: array<vec4f, 64>;   // pitch, level, part, age
-      @fragment fn fs(i: VO) -> @location(0) vec4f {
-        let y = i.pos.y / u.res.y;
-        var c = 0.0;
-        var widths = array<f32, 4>(0.012, 0.03, 0.0018, 0.004);
-        for (var k = 0; k < 64; k++) {
-          let s = S[k];
-          if (s.y <= 0.0) { continue; }
-          let tr = u32(s.z);
-          let xc = (0.04 + (s.x - 24.0) / 72.0 * 0.92) * u.res.x;
-          let hw = widths[tr] * u.res.x * 0.5 * (0.6 + 0.8 * s.y);
-          let slab = clamp(hw + 0.5 - abs(i.pos.x - xc), 0.0, 1.0);
-          var env = 0.0;
-          if (tr == 0u) { env = 0.3 + 0.7 * exp(-s.w * 1.5); }
-          else if (tr == 1u) { env = 0.3 + 1.6 * exp(-s.w * 5.0); }
-          else if (tr == 2u) { env = 2.0 * exp(-s.w * 9.0) * select(1.0, f32((u32(u.frame) + u32(k)) % 2u), s.w < 0.12); }
-          else { env = 0.9 + 1.2 * exp(-s.w * 6.0); }
-          c += slab * env * s.y;
-        }
-        c += exp(-pow((y - (1.0 - u.pitch.y)) * u.res.y / 1.5, 2.0)) * u.hit.y * 2.5;   // a horizontal cut on each bass note
-        return vec4f(tint(u.energy) * c, 1.0);
-      }`);
-  },
-  resize(g) { this.bg = g.bind(this.pipe, [g.U, this.sb]); },
-  cpu(g, F, t) {
-    this.S.fill(0);
-    let n = 0;
-    for (let i = lowerBound(F.notes, t - 17); i < F.notes.length && F.notes[i][0] <= t && n < 64; i++) {
-      const [s, d, tr, p, v] = F.notes[i];
-      const rel = t - (s + d);
-      if (rel > 0.3) continue;
-      const lv = v * (0.35 + F.lv[tr]) * (rel > 0 ? Math.exp(-rel / 0.06) : 1);
-      this.S.set([p, lv, tr, t - s], n++ * 4);
-    }
-    g.device.queue.writeBuffer(this.sb, 0, this.S);
-  },
-  frame(g, enc) { g.draw(enc, this.pipe, this.bg); },
-});
-
-// 6 · Superposition: Ash's particles living on Grating's moiré. A million grains drift along the
-// interference bands of the chord, so the dust draws the harmony.
-STUDIES.push({
-  id: 'superposition', name: 'Superposition', scale: 1, exposure: 1.0, bloom: 0.10,
-  about: 'Your two favourites crossed: a million particles that gather on the moiré bands of the held chord and stream along them. The bass scatters them, every chord change redraws the field.',
-  init(g) {
-    const N = this.N = 1 << 20;
-    const P = new Float32Array(N * 4);
-    for (let i = 0; i < N; i++) P.set([(Math.random() * 2 - 1) * 4.0, (Math.random() * 2 - 1) * 1.6, (Math.random() * 2 - 1) * 0.04, Math.random()], i * 4);
-    this.P = g.buffer(P, GPUBufferUsage.STORAGE);
-    this.V = g.buffer(new Float32Array(N * 4), GPUBufferUsage.STORAGE);
-    this.update = g.compute(COMMON + /* wgsl */`
-      @group(0) @binding(1) var<storage, read_write> P: array<vec4f>;
-      @group(0) @binding(2) var<storage, read_write> V: array<vec4f>;
-      @group(0) @binding(3) var<storage, read_write> A: array<atomic<u32>>;
-      fn eye() -> vec3f {
-        let a = u.cam.x * 0.15; let pt = u.cam.y * 0.5; let d = 2.6 * max(u.cam.z, 0.8);
-        return vec3f(sin(a) * d * cos(pt), sin(pt) * d, cos(a) * d * cos(pt)) + shake() * 0.3;
-      }
-      ${SPLAT}
-      fn field(q: vec2f) -> f32 {
-        var n = 0.0;
-        for (var k = 0; k < 4; k++) { if (u.chord[k] > 0.0) { n += 1.0; } }
-        let ex = (4.0 + 3.0 * u.energy) / max(n, 1.0);
-        let base = 0.62 + u.cam.x * 0.5;
-        var light = 1.0;
-        for (var k = 0; k < 4; k++) {
-          let pk = u.chord[k];
-          if (pk <= 0.0) { continue; }
-          let f = 9.0 * exp2((pk - u.chord.x) / 12.0 * 0.09);
-          let ang = base + (f32(k) - 1.5) * (0.01 + 0.04 * u.energy);
-          let d = dot(q, vec2f(cos(ang), sin(ang))) * f - u.time * 0.05 * (f32(k) - 1.5);
-          light *= pow(max(0.5 + 0.5 * cos(6.2831853 * d), 0.0), ex);
-        }
-        return select(light, 0.0, n == 0.0);
-      }
-      @compute @workgroup_size(256) fn update(@builtin(global_invocation_id) id: vec3u) {
-        let i = id.x;
-        if (i >= arrayLength(&P)) { return; }
-        var p = P[i];
-        var v = V[i].xyz;
-        let fr = u32(u.frame);
-        p.w -= u.dt * (0.06 + 0.12 * rnd(i * 3u + 1u));
-        if (p.w <= 0.0 || abs(p.x) > 4.1 || abs(p.y) > 1.7) {
-          let s = fr * 1664525u + i * 2654435761u;
-          p = vec4f((rnd(s) * 2.0 - 1.0) * 4.0, (rnd(s + 1u) * 2.0 - 1.0) * 1.6, (rnd(s + 2u) * 2.0 - 1.0) * 0.04, 1.0);
-          v = vec3f(0.0);
-        }
-        let e = u.energy;
-        let h = 0.004;
-        let L = field(p.xy);
-        let gr = vec2f(field(p.xy + vec2f(h, 0.0)) - field(p.xy - vec2f(h, 0.0)), field(p.xy + vec2f(0.0, h)) - field(p.xy - vec2f(0.0, h))) / (2.0 * h);
-        let tang = vec2f(-gr.y, gr.x) / (length(gr) + 1e-3);
-        var goal = vec3f(tang * (0.04 + 0.35 * e + 0.5 * u.hit.z) + gr * 0.012, 0.0);
-        goal += curl(p.xyz * 1.4 + vec3f(0.0, u.time * 0.05, 0.0)) * (0.03 + 0.25 * u.hit.y);
-        goal.z -= p.z * 2.0;
-        v = mix(v, goal, 1.0 - exp(-u.dt * 4.0));
-        if (u.since.y < u.dt) { v += vec3f(normalize(p.xy + vec2f(1e-4)), 0.0) * (0.3 + 0.8 * u.hit.y) * (0.5 + e); }
-        if (u.fx.x > 0.95) { v += vec3f(normalize(p.xy + vec2f(1e-4)), (rnd(i) - 0.5)) * 1.8; }
-        p = vec4f(p.xyz + v * u.dt, p.w);
-        P[i] = p;
-        V[i] = vec4f(v, 0.0);
-        let s = project(p.xyz);
-        if (s.z < 0.2) { return; }
-        let coc = abs(s.z - 2.6 * max(u.cam.z, 0.8)) * 2.0 * u.res.y / 1080.0;
-        let j = vec2f(rnd(i ^ (fr * 9781u)), rnd((i * 7u) ^ (fr * 6271u))) - 0.5;
-        let w = smoothstep(0.0, 0.15, p.w) * (1.0 - smoothstep(0.85, 1.0, p.w)) * (0.7 + 16.0 * L);
-        splat(s.xy + j * coc, w);
-      }`, 'update');
-    this.resolve = g.fullscreen(COMMON + RESOLVE);
-  },
-  resize(g) {
-    this.A?.destroy();
-    this.A = g.device.createBuffer({ size: g.W * g.H * 4, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST });
-    this.bgU = g.bind(this.update, [g.U, this.P, this.V, this.A]);
-    this.bgR = g.bind(this.resolve, [g.U, this.A]);
   },
   frame(g, enc) {
     enc.clearBuffer(this.A);
@@ -801,6 +640,274 @@ STUDIES.push({
     c.setPipeline(this.update); c.setBindGroup(0, this.bgU); c.dispatchWorkgroups(this.N / 256);
     c.end();
     g.draw(enc, this.resolve, this.bgR);
+    const pass = enc.beginRenderPass({ colorAttachments: [{ view: g.sceneView, loadOp: 'load', storeOp: 'store' }] });
+    pass.setVertexBuffer(0, this.nb);
+    pass.setPipeline(this.dropPipe); pass.setBindGroup(0, this.bgD); pass.draw(6, this.n);
+    pass.setPipeline(this.notePipe); pass.setBindGroup(0, this.bgN); pass.draw(6, this.n);
+    if (this.ng) { pass.setVertexBuffer(0, this.gb); pass.setPipeline(this.glyphPipe); pass.setBindGroup(0, this.bgG); pass.draw(6, this.ng); }
+    pass.end();
+  },
+});
+
+// 2 · Grating: one grating per held chord note (and, by genome, its harmonics), spaced by pitch.
+// The genome picks each layer's geometry (lines, rings, spirals, hyperbolas, log-polar), folds the
+// plane into a kaleidoscope, warps it, and can split the layers into colours: colour moiré.
+STUDIES.push({
+  id: 'grating', name: 'Grating', scale: 1, exposure: 1.0, bloom: 0.07,
+  about: 'Each held chord note is a grating of light spaced by its pitch; their interference is the harmony. The geometry keeps mutating: lines, rings, spirals, hyperbolas, kaleidoscopes, colour moiré.',
+  init(g) {
+    this.pipe = g.fullscreen(COMMON + /* wgsl */`
+      fn grating(d: f32, gamma: f32) -> f32 {
+        let aa = clamp(1.5 - fwidth(d) * 2.5, 0.0, 1.0);  // above Nyquist a grating fades to its mean
+        return pow(max(0.5 + 0.5 * cos(6.2831853 * d) * aa, 0.0), gamma);  // rounding below 0 makes pow NaN: a white screen
+      }
+      fn layerD(p: vec2f, k: i32, f: f32, ang: f32) -> f32 {
+        var kind = u32(fract(gene(0) * 7.31 + f32(k) * 0.379) * 5.0);
+        if (gene(6) < 0.35) { kind = 0u; }                       // a third of the genomes stay pure lines
+        let c = (vec2f(gene(7), gene(8)) - 0.5) * 0.6;
+        let q = p - c;
+        let arms = floor(2.0 + gene(10) * 7.0);
+        if (kind == 1u) { return length(q) * f; }
+        if (kind == 2u) { return length(q) * f + atan2(q.y, q.x) / 6.2831853 * arms; }
+        if (kind == 3u) { let r = rot2(ang) * q; return r.x * r.y * f * 3.0; }
+        if (kind == 4u) { return log(length(q) + 1e-3) * f * 0.12 + atan2(q.y, q.x) / 6.2831853 * arms; }
+        return dot(p, vec2f(cos(ang), sin(ang))) * f;
+      }
+      @fragment fn fs(i: VO) -> @location(0) vec4f {
+        var p = (i.pos.xy - u.res * 0.5) / u.res.y + shake().xy * 0.08;
+        p += vec2f(gnoise(vec3f(p * 2.0, u.time * 0.05)), gnoise(vec3f(p * 2.0 + 9.0, u.time * 0.05))) * gene(2) * 0.09;   // warp
+        p = foldq(rot2(gene(9) * 6.2831853 + u.time * 0.01 * (gene(9) - 0.5)) * p, gene(1));
+        let extra = u32(gene(11) * 3.0);                         // harmonic layers on top of the chord
+        var n = 0.0;
+        for (var k = 0; k < 4; k++) { if (u.chord[k] > 0.0) { n += 1.0; } }
+        n += min(f32(extra), n);
+        let ex = (5.0 + 3.0 * u.energy + 6.0 * u.hit.z) / max(n, 1.0);
+        let spread = 0.004 + (0.01 + 0.08 * gene(3)) * u.energy;
+        let base = 0.62 + 0.35 * sin(u.time * 0.0041) + u.cam.x;
+        let chroma = gene(4) > 0.55;
+        var masks = array<vec3f, 6>(vec3f(1.0, 1.0, 0.1), vec3f(0.1, 1.0, 1.0), vec3f(1.0, 0.1, 1.0), vec3f(1.0, 0.6, 0.1), vec3f(0.1, 0.6, 1.0), vec3f(0.6, 1.0, 0.1));
+        var light = vec3f(1.0);
+        for (var k = 0; k < 6; k++) {
+          var pk = 0.0;
+          if (k < 4) { pk = u.chord[k]; }
+          else if (u32(k - 4) < extra) { pk = u.chord[k - 4] + select(12.0, 19.0, k == 5); }
+          if (pk <= 0.0) { continue; }
+          let f = 70.0 * (0.5 + gene(5)) * (1.0 + 0.35 * u.energy) / u.cam.z * exp2((pk - u.chord.x) / 12.0 * 0.09);
+          let ang = base + (f32(k) - 1.5) * spread + 0.01 * sin(u.time * 0.05 * f32(k + 1));
+          let step = u.count.z - 1.0 + smoothstep(0.0, 0.12, u.since.z);
+          let d = layerD(p, k, f, ang) - u.time * (0.05 + 0.25 * u.energy) * (f32(k) - 1.5) - step * 0.045 * (f32(k) - 1.5);
+          let gk = grating(d, ex * select(1.0, 2.2, chroma));   // each colour sees fewer layers: sharpen them
+          light *= mix(vec3f(1.0), vec3f(gk), select(vec3f(1.0), masks[k], chroma));
+        }
+        if (n == 0.0) { light = vec3f(0.0); }
+        let fb = 10.0 * exp2(u.pitch.y * 1.5);
+        let rc = length(p - vec2f(0.0, 0.08)) * fb - (u.count.y - 1.0 + smoothstep(0.0, 0.25, u.since.y)) * 0.5;
+        light *= mix(1.0, grating(rc, 1.0) * 2.0, u.level.y * 0.6);
+        let c = vec2f(sin(u.time * 0.09) * 0.35, (0.5 - u.pitch.w) * 0.5);
+        let ap = exp(-dot(p - c, p - c) / 0.05);
+        light *= 1.0 + u.level.w * (1.6 * ap - 0.4) + 0.8 * u.hit.w * ap;
+        let gain = 3.2 * (0.2 + 1.0 * u.level.x + 0.3 * u.bus.z) * (1.0 + 1.3 * u.hit.y + 0.7 * u.hit.x);
+        return vec4f(select(tint(u.energy), vec3f(1.0), chroma) * light * gain, 1.0);
+      }`);
+  },
+  resize(g) { this.bg = g.bind(this.pipe, [g.U]); },
+  frame(g, enc) { g.draw(enc, this.pipe, this.bg); },
+});
+
+// 3 · Test Pattern: after Ryoji Ikeda. Binary barcode strips, one part each, re-coded on every
+// note. The genome picks the layout (full strips, recursive cells, rings), the orientation, the code
+// (random, the note counter in binary, the pitch in binary, Gray code), and can XOR two systems.
+STUDIES.push({
+  id: 'pattern', name: 'Test Pattern', scale: 1, exposure: 1.0, bloom: 0.006,   // hard edges: glow would lift the black
+  about: 'After Ryoji Ikeda: binary barcode strips, each driven by one part and re-coded on every note. The layout keeps mutating: recursive cells, rings, crossed systems, codes made from the notes themselves.',
+  init(g) {
+    this.pipe = g.fullscreen(COMMON + /* wgsl */`
+      fn h2(a: f32, b: f32) -> f32 { return rnd((u32(abs(a)) * 2654435761u) ^ (u32(abs(b)) * 2246822519u + 374761393u)); }
+      fn bitOf(part: u32, cell: f32, rs: f32) -> f32 {
+        let kind = u32(gene(3) * 4.0);
+        let ci = u32(abs(cell));
+        let n = u32(u.count[part]);
+        if (kind == 1u) { return f32((n >> (ci % 12u)) & 1u); }                                  // the note counter, in binary
+        if (kind == 2u) { return f32((u32(u.pitch[part] * 127.0) >> (ci % 7u)) & 1u); }          // the pitch, in binary
+        if (kind == 3u) { return f32(((n ^ (n >> 1u)) >> (ci % 10u)) & 1u); }                    // Gray code of the counter
+        let code = f32(n * 977u % 65521u);
+        return select(0.0, 1.0, h2(cell + 70000.0, rs + code) < 0.06 + 0.34 * u.level[part] + 0.3 * (gene(4) - 0.5));
+      }
+      fn pattern(uv: vec2f, salt: f32) -> f32 {
+        let shape = u32(gene(0) * 3.0);                         // 0 strips · 1 recursive cells · 2 rings
+        var lo = vec2f(0.0);
+        var size = vec2f(1.0);
+        var id = 1.0 + salt;
+        let depth = select(0u, 1u + u32(gene(1) * 5.0), shape == 1u);
+        for (var d = 0u; d < depth; d++) {
+          if (h2(id * 3.0 + u.fx.z * 7.0, f32(d)) > 0.75) { break; }
+          let hf = size * 0.5;
+          let q = step(lo + hf, uv);
+          lo += q * hf;
+          size = hf;
+          id = id * 4.0 + q.x + 2.0 * q.y + 1.0;
+        }
+        let rs0 = id * 7.0 + u.fx.z * 131.0 + salt * 53.0;
+        let om = u32(gene(2) * 3.0);
+        let vertical = select(om == 1u, h2(rs0, 21.0) > 0.5, om == 2u);
+        let local = (uv - lo) / size;
+        var along = local.y;
+        var across = uv.x * u.res.x;
+        var alongPx = size.y * u.res.y;
+        if (shape == 2u) {
+          let c = (uv - 0.5) * vec2f(u.aspect, 1.0);
+          along = length(c) * 1.6; across = (atan2(c.y, c.x) + 3.14159) * length(c) * u.res.y; alongPx = u.res.y / 1.6;
+        } else if (vertical) { along = local.x; across = uv.y * u.res.y; alongPx = size.x * u.res.x; }
+        let rows = exp2(floor(clamp(1.0 + u.energy * 4.0 + h2(rs0, 3.0) * 2.0 - f32(depth) * 0.6, 0.0, 6.0)));
+        let row = floor(along * rows);
+        let rs = rs0 + row * 7.0;
+        let part = u32(h2(rs, 1.0) * 4.0) & 3u;
+        let lvl = u.level[part];
+        let hit = u.hit[part];
+        let wpx = exp2(floor(h2(rs, 2.0) * 4.0)) * max(1.0, u.res.y / 1080.0) * (0.5 + 1.5 * gene(7));
+        let speed = select(-1.0, 1.0, h2(rs, 4.0) > 0.5) * (30.0 + h2(rs, 5.0) * 900.0 * (0.15 + u.energy)) * (0.3 + 1.4 * gene(5));
+        let cell = floor((across + u.time * speed) / wpx);
+        let on = smoothstep(0.02, 0.15, lvl + hit);              // a silent part's strip is dark
+        var v = bitOf(part, cell, rs) * on;
+        if (u.since.y < 0.09 && h2(rs + floor(u.count.y) * 13.0, 9.0) < 0.35 * u.hit.y) { v = on - v; }   // a bass note inverts strips, briefly
+        let fr = fract(along * rows) * alongPx / rows;
+        let edge = min(min(local.x * size.x * u.res.x, local.y * size.y * u.res.y), fr);
+        return max(v, select(0.0, 0.45, edge < 1.0 && rows < 40.0 && shape != 2u));
+      }
+      @fragment fn fs(i: VO) -> @location(0) vec4f {
+        let uv = i.pos.xy / u.res;
+        var v = pattern(uv, 0.0);
+        if (gene(6) > 0.6) { v = abs(v - pattern(vec2f(1.0) - uv.yx, 5.0)); }   // XOR with a second, crossed system
+        if (gene(8) > 0.88) { v = 1.0 - v; }                                   // a negative section
+        return vec4f(mix(vec3f(1.0), tint(u.energy), 0.35) * v * 3.0, 1.0);    // near pure white, as Ikeda's
+      }`);
+  },
+  resize(g) { this.bg = g.bind(this.pipe, [g.U]); },
+  frame(g, enc) { g.draw(enc, this.pipe, this.bg); },
+});
+
+// 4 · Interference: one field made of everything sounding (a blade of light per note, the moiré of
+// the chord, rings on the bass), folded into a kaleidoscope, warped, sometimes mapped to log-polar
+// space; drawn sharp, with half a million grains of dust gathering on it.
+const FIELD = binding => /* wgsl */`
+      @group(0) @binding(${binding}) var<uniform> S: array<vec4f, 32>;
+      fn zoom() -> f32 { return (0.7 + 0.9 * gene(15)) * max(u.cam.z, 0.6); }
+      fn toWorld(px: vec2f) -> vec2f { return rot2(u.cam.x * 0.15) * ((px - u.res * 0.5) / u.res.y * 2.0 * zoom()) + shake().xy * 0.1; }
+      fn toScreen(q: vec2f) -> vec2f { return rot2(-u.cam.x * 0.15) * (q - shake().xy * 0.1) / (2.0 * zoom()) * u.res.y + u.res * 0.5; }
+      fn field(q0: vec2f) -> f32 {
+        var q = q0;
+        q += vec2f(gnoise(vec3f(q * 1.3, u.time * 0.05)), gnoise(vec3f(q * 1.3 + 17.0, u.time * 0.05))) * gene(5) * 0.35;
+        if (gene(12) > 0.62) { q = vec2f(atan2(q.y, q.x) * 0.6366, log(length(q) + 1e-3) * 0.8); }
+        q = foldq(q, gene(0));
+        let ba = gene(1) * 3.14159;
+        let x = dot(q, vec2f(cos(ba), sin(ba)));
+        var widths = array<f32, 4>(0.03, 0.06, 0.006, 0.012);
+        var blades = 0.0;
+        for (var k = 0; k < 32; k++) {
+          let s = S[k];
+          if (s.y <= 0.0) { break; }
+          let tr = u32(s.z);
+          let xc = ((s.x - 24.0) / 72.0 - 0.5) * 3.2;
+          let w = widths[tr] * (0.5 + 1.5 * gene(8));
+          var env = 0.9 + 1.2 * exp(-s.w * 6.0);
+          if (tr == 0u) { env = 0.3 + 0.7 * exp(-s.w * 1.5); }
+          if (tr == 1u) { env = 0.3 + 1.6 * exp(-s.w * 5.0); }
+          if (tr == 2u) { env = 2.0 * exp(-s.w * 9.0); }
+          blades += exp(-pow((x - xc) / w, 2.0)) * env * s.y;
+        }
+        var n = 0.0;
+        for (var k = 0; k < 4; k++) { if (u.chord[k] > 0.0) { n += 1.0; } }
+        let ex = (4.0 + 3.0 * u.energy) / max(n, 1.0);
+        var moire = select(1.0, 0.0, n == 0.0);
+        for (var k = 0; k < 4; k++) {
+          let pk = u.chord[k];
+          if (pk <= 0.0) { continue; }
+          let f = (6.0 + 10.0 * gene(9)) * exp2((pk - u.chord.x) / 12.0 * 0.09);
+          let ang = ba + 1.5708 + (f32(k) - 1.5) * (0.005 + 0.06 * gene(7));
+          let d = dot(q, vec2f(cos(ang), sin(ang))) * f - u.time * 0.05 * (f32(k) - 1.5) - (u.count.z + smoothstep(0.0, 0.12, u.since.z)) * 0.03 * (f32(k) - 1.5);
+          moire *= pow(max(0.5 + 0.5 * cos(6.2831853 * d), 0.0), ex);
+        }
+        let ringPhase = length(q) * (4.0 + 6.0 * u.pitch.y) - (u.count.y + smoothstep(0.0, 0.25, u.since.y)) * 0.5;
+        let rings = pow(max(0.5 + 0.5 * cos(6.2831853 * ringPhase), 0.0), 3.0) * u.level.y;
+        return blades * (0.3 + 1.2 * gene(2)) + moire * (0.3 + 1.5 * gene(3)) + rings * gene(4);
+      }`;
+STUDIES.push({
+  id: 'interference', name: 'Interference', scale: 1, exposure: 1.0, bloom: 0.13,
+  about: 'Everything sounding as one field: a blade of light per note, the moiré of the chord, rings on the bass. Folded into kaleidoscopes, warped, mapped to log-polar space, with half a million grains of dust gathering on it.',
+  init(g) {
+    const N = this.N = 1 << 19;
+    const P = new Float32Array(N * 4);
+    for (let i = 0; i < N; i++) P.set([(Math.random() * 2 - 1) * 3, (Math.random() * 2 - 1) * 1.7, 0, Math.random()], i * 4);
+    this.P = g.buffer(P, GPUBufferUsage.STORAGE);
+    this.V = g.buffer(new Float32Array(N * 4), GPUBufferUsage.STORAGE);
+    this.S = new Float32Array(32 * 4);
+    this.sb = g.device.createBuffer({ size: this.S.byteLength, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+    this.update = g.compute(COMMON + /* wgsl */`
+      @group(0) @binding(1) var<storage, read_write> P: array<vec4f>;
+      @group(0) @binding(2) var<storage, read_write> V: array<vec4f>;
+      @group(0) @binding(3) var<storage, read_write> A: array<atomic<u32>>;
+      ${FIELD(4)}
+      ${SPLAT}
+      @compute @workgroup_size(256) fn update(@builtin(global_invocation_id) id: vec3u) {
+        let i = id.x;
+        if (i >= arrayLength(&P)) { return; }
+        var p = P[i];
+        var v = V[i].xy;
+        let fr = u32(u.frame);
+        let ext = vec2f(u.aspect, 1.0) * zoom() * 1.05;
+        p.w -= u.dt * (0.08 + 0.15 * rnd(i * 3u + 1u));
+        if (p.w <= 0.0 || abs(p.x) > ext.x * 1.2 || abs(p.y) > ext.y * 1.2) {
+          let s = fr * 1664525u + i * 2654435761u;
+          p = vec4f((vec2f(rnd(s), rnd(s + 1u)) * 2.0 - 1.0) * ext, 0.0, 1.0);
+          v = vec2f(0.0);
+        }
+        let e = u.energy;
+        let h = 0.006;
+        let L = field(p.xy);
+        let gr = vec2f(field(p.xy + vec2f(h, 0.0)) - L, field(p.xy + vec2f(0.0, h)) - L) / h;
+        let gn = gr / (length(gr) + 1e-3);
+        let tang = vec2f(-gn.y, gn.x);
+        let speed = (0.05 + 0.4 * gene(13)) * (0.4 + e) + 0.5 * u.hit.z;
+        let mode = u32(gene(6) * 3.0);
+        var goal = tang * speed;                                             // 0: stream along the structures
+        if (mode == 1u) { goal = gn * speed + tang * speed * 0.3; }          // 1: condense onto them
+        if (mode == 2u) { goal = vec2f(-p.y, p.x) * speed * 0.8 + gn * speed * 0.5; }   // 2: swirl and gather
+        v = mix(v, goal, 1.0 - exp(-u.dt * 4.0));
+        if (u.since.y < u.dt) { v += normalize(p.xy + vec2f(1e-4)) * (0.3 + 0.8 * u.hit.y) * (0.5 + e); }
+        if (u.fx.x > 0.95) { v += normalize(p.xy + vec2f(1e-4)) * 1.8; }
+        p = vec4f(p.xy + v * u.dt, 0.0, p.w);
+        P[i] = p;
+        V[i] = vec4f(v, 0.0, 0.0);
+        let w = smoothstep(0.0, 0.15, p.w) * (1.0 - smoothstep(0.85, 1.0, p.w)) * (0.4 + 10.0 * L) * (0.5 + gene(11));
+        let j = vec2f(rnd(i ^ (fr * 9781u)), rnd((i * 7u) ^ (fr * 6271u))) - 0.5;
+        splat(toScreen(p.xy) + j * (0.5 + 2.0 * u.hit.y), w, select(0u, 1u, gene(14) > 0.5));
+      }`, 'update');
+    this.resolve = g.fullscreen(COMMON + RESOLVE(1.0, 1.6));
+    this.overlay = g.fullscreen(COMMON + FIELD(1) + /* wgsl */`
+      @fragment fn fs(i: VO) -> @location(0) vec4f {
+        let L = field(toWorld(i.pos.xy));
+        let col = select(tint(u.energy), mix(vec3f(1.0), tint(u.energy), 0.2), gene(14) > 0.5);
+        return vec4f(col * L * (0.12 + 0.8 * gene(10)), 1.0);
+      }`, 'fs', 'rgba16float', ADD);
+  },
+  resize(g) {
+    this.A?.destroy();
+    this.A = g.device.createBuffer({ size: g.W * g.H * 8, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST });
+    this.bgU = g.bind(this.update, [g.U, this.P, this.V, this.A, this.sb]);
+    this.bgR = g.bind(this.resolve, [g.U, this.A]);
+    this.bgO = g.bind(this.overlay, [g.U, this.sb]);
+  },
+  cpu(g, F, t) {
+    sounding(F, t, this.S);
+    g.device.queue.writeBuffer(this.sb, 0, this.S);
+  },
+  frame(g, enc) {
+    enc.clearBuffer(this.A);
+    const c = enc.beginComputePass();
+    c.setPipeline(this.update); c.setBindGroup(0, this.bgU); c.dispatchWorkgroups(this.N / 256);
+    c.end();
+    g.draw(enc, this.resolve, this.bgR);
+    g.draw(enc, this.overlay, this.bgO, g.sceneView, 'load');
   },
 });
 
@@ -845,7 +952,7 @@ async function boot() {
   const format = navigator.gpu.getPreferredCanvasFormat();
   ctx.configure({ device, format, alphaMode: 'opaque' });
   const smp = device.createSampler({ magFilter: 'linear', minFilter: 'linear', addressModeU: 'clamp-to-edge', addressModeV: 'clamp-to-edge' });
-  const Udata = new Float32Array(52);
+  const Udata = new Float32Array(68);
   const g = {
     device,
     U: device.createBuffer({ size: Udata.byteLength, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST }),
@@ -967,6 +1074,7 @@ async function boot() {
       seek(sec[Math.max(0, Math.min(sec.length - 1, k))].t);
     }
     else if (e.key === 's' || e.key === 'S') { D.strobe = !D.strobe; }
+    else if (e.key === 'g' || e.key === 'G') { roll(); }
     else if (e.key === 'h' || e.key === 'H') { hudHidden = !hudHidden; hud.classList.toggle('gone', hudHidden); }
     else if (e.key === 'f' || e.key === 'F') { document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen?.().catch(() => {}); }
     else return;
@@ -987,9 +1095,13 @@ async function boot() {
   // The director: camera cuts, strobe and colour, from the music's events. Calm sections glide;
   // loud ones cut hard on every chord (and every bar at the top) and flash on the bass.
   const PALETTE = [[1, 0.2, 0.06], [0.45, 0.62, 1], [1, 1, 1], [0.85, 0.3, 1], [1, 0.62, 0.2], [0.25, 1, 0.85]];
-  const D = { cam: [0, 0, 1, 0], fx: [0, 0, 0, 0], col: [1, 1, 1, 0], target: [0, 0, 1], cut: 0, chord: -1, bar: -1, si: -1, strobe: true, invertUntil: 0 };
+  const D = { cam: [0, 0, 1, 0], fx: [0, 0, 0, 0], col: [1, 1, 1, 0], target: [0, 0, 1], cut: 0, chord: -1, bar: -1, si: -1, strobe: true, invertUntil: 0,
+    gene: new Float32Array(16), gen: 0, salt: Math.random() * 1000 };   // a fresh lineage every time the page opens
   const hash01 = k => { const x = Math.sin(k * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); };
   window.__D = D;
+  // The genome: every section gets a new one, every cut mutates two of its numbers. G rolls by hand.
+  const roll = () => { D.gen++; for (let k = 0; k < 16; k++) D.gene[k] = hash01(D.salt + D.gen * 97.13 + k * 13.7); };
+  roll();
   function direct(t, dt) {
     const e = F.energy, bar = Math.floor(t * show.bpm / 240);
     const sectionStart = F.si !== D.si && D.si >= 0;
@@ -998,6 +1110,8 @@ async function boot() {
       const r = k => hash01(D.cut * 7 + k);
       D.target = [(r(1) - 0.5) * 6.0 * (0.3 + e), (r(2) - 0.4) * 0.9 * e, 0.55 + r(3) * 0.9];
       D.col = [...PALETTE[Math.floor(r(4) * PALETTE.length)], Math.max(0, Math.min(1, (e - 0.35) * 2.2))];
+      if (sectionStart) roll();
+      else for (let k = 5; k < 7; k++) D.gene[Math.floor(r(k) * 16)] = r(k + 10);
     }
     D.chord = F.count[0]; D.bar = bar;
     const glide = e > 0.6 ? 1 : 1 - Math.exp(-dt / (0.4 + 2.0 * (1 - e)));   // hard cuts when loud
@@ -1029,11 +1143,11 @@ async function boot() {
     const t = clock(now);
     F.update(t);
     direct(t, dt);
-    study.cpu?.(g, F, t);
+    study.cpu?.(g, F, t, D);
     const bpm = show.bpm, beats = t * bpm / 60;
     Udata.set([visT, dt, beats % 1, (beats / 4) % 1, g.W, g.H, F.energy, F.progress,
       ...F.lv.slice(0, 4), F.lv[4], F.lv[5], F.lv[6], F.si, ...F.hit, ...F.pitch, ...F.since, ...F.chord, ...F.count,
-      beats, frameNo, bpm, g.W / g.H, ...D.cam, ...D.fx, ...D.col]);
+      beats, frameNo, bpm, g.W / g.H, ...D.cam, ...D.fx, ...D.col, ...D.gene]);
     device.queue.writeBuffer(g.U, 0, Udata);
     device.queue.writeBuffer(postU, 0, new Float32Array([study.exposure, study.bloom, 0.05, fade]));
 
