@@ -55,6 +55,8 @@ nav button[aria-pressed="true"] { color: var(--ember); }
 .pad button { padding: 4px 10px; border: 1px solid var(--rule); color: var(--ink); }
 .pad button:hover { border-color: var(--ember); color: var(--ember); }
 .pad select { font: inherit; color: var(--ink); background: var(--void); border: 1px solid var(--rule); padding: 3px 6px; max-width: 46vw; }
+.amt { display: inline-flex; align-items: center; gap: 8px; color: var(--ink); font-variant-numeric: tabular-nums; }
+.amt input { width: 140px; accent-color: var(--ember); }
 .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
 @media (prefers-reduced-motion: reduce) { #hud { transition: none; } }
 </style>
@@ -65,9 +67,9 @@ nav button[aria-pressed="true"] { color: var(--ember); }
   <div class="card">
     <h1>Lisztmachine</h1>
     <p class="meta" id="meta">Loading the concert…</p>
-    <p class="lede">Four generative light studies for projecting onto the drummer, blending into each other. Each one reads the music itself: every note, every chord and the level of each part, so the light lands exactly with the sound.</p>
+    <p class="lede">Eight generative light studies for projecting onto the drummer, blending into each other. Each one reads the music itself: every note, every chord and the level of each part, so the light lands exactly with the sound.</p>
     <button class="go" id="go" disabled>Loading…</button>
-    <p class="keys"><kbd>1</kbd>–<kbd>4</kbd> study · <kbd>G</kbd> new look · <kbd>Space</kbd> pause · <kbd>←</kbd><kbd>→</kbd> 10 s · <kbd>↑</kbd><kbd>↓</kbd> section · <kbd>S</kbd> strobe on/off · <kbd>B</kbd> feedback on/off · <kbd>K</kbd> test drum hit · <kbd>[</kbd><kbd>]</kbd> pad sensitivity · <kbd>H</kbd> hide controls · <kbd>F</kbd> full screen</p>
+    <p class="keys"><kbd>1</kbd>–<kbd>8</kbd> study · <kbd>G</kbd> new look · <kbd>Space</kbd> pause · <kbd>←</kbd><kbd>→</kbd> 10 s · <kbd>↑</kbd><kbd>↓</kbd> section · <kbd>S</kbd> strobe on/off · <kbd>B</kbd> feedback on/off · <kbd>K</kbd> test drum hit · <kbd>[</kbd><kbd>]</kbd> pad sensitivity · <kbd>,</kbd><kbd>.</kbd> pad effect · <kbd>H</kbd> hide controls · <kbd>F</kbd> full screen</p>
     <p class="err" id="err" hidden></p>
   </div>
 </div>
@@ -82,6 +84,7 @@ nav button[aria-pressed="true"] { color: var(--ember); }
     <button id="pad-go">Drum pad</button>
     <label for="pad-device" class="sr">Input device</label><select id="pad-device"><option value="">Default input</option></select>
     <label for="pad-ch" class="sr">Channel</label><select id="pad-ch"><option value="0">Input 1</option><option value="1">Input 2</option></select>
+    <label class="amt" for="pad-amt">Pad effect <input id="pad-amt" type="range" min="0" max="100" step="1" value="50"> <span id="pad-amt-v">50</span></label>
     <span id="pad-state">Off</span>
   </div>
 </div>
@@ -262,6 +265,17 @@ fn curl(p: vec3f) -> vec3f {
   let y0 = pot(p - vec3f(0, e, 0)); let y1 = pot(p + vec3f(0, e, 0));
   let z0 = pot(p - vec3f(0, 0, e)); let z1 = pot(p + vec3f(0, 0, e));
   return vec3f((y1.z - y0.z) - (z1.y - z0.y), (z1.x - z0.x) - (x1.z - x0.z), (x1.y - x0.y) - (y1.x - y0.x)) / (2.0 * e);
+}
+// A long camera journey: slow sines with periods of 40 to 110 s on every axis, offset per study, so each
+// study travels its own path that does not repeat for many minutes. Its clock (u.padx.z) runs faster
+// when the music is loud. Returns yaw, pitch, a distance factor and roll.
+fn traj(s: f32) -> vec4f {
+  let t = u.padx.z;
+  return vec4f(
+    sin(t * 0.131 + s) * 1.6 + sin(t * 0.083 + s * 2.3) * 1.1 + sin(t * 0.057 + s * 0.7) * 0.8,
+    sin(t * 0.097 + s * 1.7) * 0.35 + sin(t * 0.061 + s * 3.1) * 0.25,
+    1.0 + 0.3 * sin(t * 0.071 + s * 0.4) + 0.18 * sin(t * 0.113 + s * 1.9),
+    sin(t * 0.049 + s * 2.7) * 0.35 + sin(t * 0.089 + s) * 0.2);
 }
 // Calm sections light cold, the peak warm: the colour temperature of the form.
 fn tint(e: f32) -> vec3f {
@@ -454,13 +468,17 @@ STUDIES.push({
     const CAM = /* wgsl */`
       fn aim() -> vec3f { return vec3f(0.2, 0.0, 0.0); }
       fn eye() -> vec3f {
-        let a = 0.6 + u.cam.x * 0.7 + u.time * 0.015;
-        let d = 4.4 * u.cam.z * (1.0 - 0.25 * u.hit.y);                // the bass pushes the camera in
-        return aim() + vec3f(sin(a) * d * cos(u.cam.y), 0.6 + sin(u.cam.y) * d, -cos(a) * d * cos(u.cam.y)) + shake() * 0.4;
+        let j = traj(1.0);
+        let a = 0.6 + u.cam.x * 0.7 + u.time * 0.015 + j.x;
+        let el = u.cam.y + j.y;
+        let d = 4.4 * u.cam.z * j.z * (1.0 - 0.25 * u.hit.y);          // the bass pushes the camera in
+        return aim() + vec3f(sin(a) * d * cos(el), 0.6 + sin(el) * d, -cos(a) * d * cos(el)) + shake() * 0.4;
       }
       fn basis() -> mat3x3f {
         let fw = normalize(aim() - eye());
-        let rt = normalize(cross(fw, vec3f(0, 1, 0)));
+        let rt0 = normalize(cross(fw, vec3f(0, 1, 0)));
+        let r = traj(1.0).w;
+        let rt = rt0 * cos(r) + cross(rt0, fw) * sin(r);                   // roll
         return mat3x3f(rt, cross(rt, fw), fw);
       }
       fn project(p: vec3f) -> vec3f {           // pixels, and depth
@@ -574,7 +592,7 @@ STUDIES.push({
         let shell = exp(-pow((rc - u.since.z * 2.6) / 0.1, 2.0)) * u.hit.z;
         let w = smoothstep(0.0, 0.15, p.w) * (1.0 - smoothstep(0.85, 1.0, p.w)) * select(0.55, 1.5, born > 0.5) * (1.0 + 8.0 * shell + 5.0 * shock);
         let layer = select(0u, 1u, born > 0.5);
-        let focus = 4.4 * u.cam.z;
+        let focus = 4.4 * u.cam.z * traj(1.0).z;
         let mirror = u32(gene(14) * 3.0);
         for (var m = 0u; m <= mirror; m++) {           // the genome can mirror the dust into symmetry
           var q = p.xyz;
@@ -759,8 +777,9 @@ STUDIES.push({
       }
       @fragment fn fs(i: VO) -> @location(0) vec4f {
         let vp = vec2f(sin(u.time * 0.13) * 0.12, cos(u.time * 0.11) * 0.08) + vec2f(u.cam.x, u.cam.y) * vec2f(0.02, 0.12);
-        var q = (i.pos.xy - u.res * 0.5) / u.res.y - vp + shake().xy * 0.05;
-        q = rot2(u.time * (gene(3) - 0.5) * 0.6 + u.cam.x * 0.5) * q;                    // roll
+        let j = traj(2.0);
+        var q = ((i.pos.xy - u.res * 0.5) / u.res.y - vp - vec2f(sin(j.x) * 0.18, j.y * 0.3) + shake().xy * 0.05) * j.z;
+        q = rot2(u.time * (gene(3) - 0.5) * 0.6 + u.cam.x * 0.5 + j.w * 2.0) * q;       // roll
         let p = 1.0 + 7.0 * gene(0) * gene(0);                                           // diamond · circle · square
         var r = pow(pow(abs(q.x), p) + pow(abs(q.y), p), 1.0 / p);
         var ang = atan2(q.y, q.x);
@@ -889,7 +908,9 @@ STUDIES.push({
         return max(v, select(0.0, 0.45, edge < 1.0 && rows < 40.0 && shape != 2u));
       }
       @fragment fn fs(i: VO) -> @location(0) vec4f {
-        let uv = i.pos.xy / u.res;
+        let j = traj(3.0);                             // the camera's journey turns, zooms and drifts the whole pattern
+        let cuv = rot2(j.w * 0.7 + sin(j.x) * 0.2) * ((i.pos.xy / u.res - 0.5) * vec2f(u.aspect, 1.0)) / j.z + vec2f(sin(j.x) * 0.08, j.y * 0.25);
+        let uv = cuv / vec2f(u.aspect, 1.0) + 0.5;
         var v = pattern(uv, 0.0);
         if (gene(6) > 0.6) { v = abs(v - pattern(vec2f(1.0) - uv.yx, 5.0)); }   // XOR with a second, crossed system
         for (var k = 0; k < 8; k++) {                  // drum hits: a ragged front of inversion spreads from the impact, re-coding what it passes
@@ -914,10 +935,11 @@ STUDIES.push({
 // space; drawn sharp, with half a million grains of dust gathering on it.
 const FIELD = binding => /* wgsl */`
       @group(0) @binding(${binding}) var<uniform> S: array<vec4f, 32>;
-      fn zoom() -> f32 { return (0.7 + 0.9 * gene(15)) * max(u.cam.z, 0.6); }
-      fn turn() -> f32 { return u.cam.x * 0.4 + u.time * 0.06 * (gene(13) - 0.5); }
-      fn toWorld(px: vec2f) -> vec2f { return rot2(turn()) * ((px - u.res * 0.5) / u.res.y * 2.0 * zoom()) + shake().xy * 0.1; }
-      fn toScreen(q: vec2f) -> vec2f { return rot2(-turn()) * (q - shake().xy * 0.1) / (2.0 * zoom()) * u.res.y + u.res * 0.5; }
+      fn zoom() -> f32 { return (0.7 + 0.9 * gene(15)) * max(u.cam.z, 0.6) * traj(4.0).z; }
+      fn pan() -> vec2f { let j = traj(4.0); return vec2f(sin(j.x) * 0.35, j.y * 0.5); }
+      fn turn() -> f32 { return u.cam.x * 0.4 + u.time * 0.06 * (gene(13) - 0.5) + traj(4.0).w + traj(4.0).x * 0.25; }
+      fn toWorld(px: vec2f) -> vec2f { return rot2(turn()) * ((px - u.res * 0.5) / u.res.y * 2.0 * zoom()) + shake().xy * 0.1 + pan(); }
+      fn toScreen(q: vec2f) -> vec2f { return rot2(-turn()) * (q - shake().xy * 0.1 - pan()) / (2.0 * zoom()) * u.res.y + u.res * 0.5; }
       fn field(q0: vec2f) -> f32 {
         var q = q0;
         q += vec2f(gnoise(vec3f(q * 1.3, u.time * 0.05)), gnoise(vec3f(q * 1.3 + 17.0, u.time * 0.05))) * gene(5) * 0.35;
@@ -1039,6 +1061,486 @@ STUDIES.push({
     c.end();
     g.draw(enc, this.resolve, this.bgR);
     g.draw(enc, this.overlay, this.bgO, g.sceneView, 'load');
+  },
+});
+
+// 5 · Lumen: stage light in haze, aimed at where the drummer sits. The genome picks the rig: the
+// classic four lamps, a ring of beams closing in, searchlights sweeping up from the floor, or a curtain
+// of light walls; drum hits burst as shells of light that push the haze.
+STUDIES.push({
+  id: 'lumen', name: 'Lumen', scale: 0.5, exposure: 1.0, bloom: 0.12,
+  about: 'Haze and lamps aimed at the drummer: a classic rig, a ring of beams, searchlights or a curtain of light walls, chosen by the genome. Every part drives its lamps; drum hits burst as shells of light.',
+  init(g) {
+    this.pipe = g.fullscreen(COMMON + /* wgsl */`
+      fn spot(x: vec3f, pos: vec3f, dir: vec3f, cosOut: f32, cosIn: f32) -> f32 {
+        let L = x - pos;
+        let d2 = dot(L, L);
+        return smoothstep(cosOut, cosIn, dot(L * inverseSqrt(d2), dir)) / (1.0 + 0.05 * d2);
+      }
+      fn hg(c: f32) -> f32 { let g = 0.45; let g2 = g * g; return (1.0 - g2) / pow(1.0 + g2 - 2.0 * g * c, 1.5); }
+      fn partColour(k: u32) -> vec3f {
+        var c = array<vec3f, 4>(vec3f(1.0), vec3f(1.0, 0.3, 0.11), vec3f(0.85, 0.92, 1.0), vec3f(1.0, 0.86, 0.62));
+        return select(c[k], u.col.rgb, u.col.w > 0.5 && k != 2u);
+      }
+      fn partPower(k: u32) -> f32 {
+        var w = array<f32, 4>(1.3, 2.4, 0.0, 2.0);
+        return u.level[k] * (0.5 + 2.6 * u.hit[k]) * w[k] + select(0.0, u.hit.z * 6.0, k == 2u);
+      }
+      @fragment fn fs(i: VO) -> @location(0) vec4f {
+        let uv = (i.pos.xy - u.res * 0.5) / u.res.y * vec2f(1.0, -1.0);
+        let j = traj(5.0);
+        let ya = u.cam.x * 0.35 + j.x * 0.6;
+        let dist = 8.5 * (0.6 + 0.4 * u.cam.z) * j.z;
+        let aim = vec3f(0.0, 2.0, 0.0);
+        let ro = aim + vec3f(sin(ya) * dist, -0.6 + (u.cam.y + j.y) * 4.0, -cos(ya) * dist) + shake();
+        let fw = normalize(aim - ro);
+        var rt = normalize(cross(fw, vec3f(0, 1, 0)));
+        var up = cross(rt, fw);
+        let rr = rt * cos(j.w) + up * sin(j.w);
+        up = cross(rr, fw); rt = rr;                                             // roll
+        let rd = normalize(fw * 1.5 + rt * uv.x + up * uv.y);
+
+        // the rig: up to 12 lamps, positions and aims chosen by the genome
+        var lp: array<vec3f, 12>; var ld: array<vec3f, 12>; var lc: array<vec3f, 12>; var lw: array<f32, 12>;
+        let rig = u32(gene(0) * 4.0);
+        let wide = 0.5 + gene(3);
+        var n = 0u;
+        if (rig == 0u) {
+          lp[0] = vec3f(0.0, 7.0, 0.5); ld[0] = normalize(vec3f(0.0, -1.0, -0.05)); lc[0] = tint(u.energy) * partPower(0u); lw[0] = 0.965;
+          lp[1] = vec3f(-3.8, 0.05, 1.0); ld[1] = normalize(vec3f(3.8, 2.65, -0.7)); lc[1] = partColour(1u) * partPower(1u); lw[1] = 0.9965;
+          lp[2] = vec3f(3.8, 0.05, 1.0); ld[2] = normalize(vec3f(-3.8, 2.65, -0.7)); lc[2] = lc[1]; lw[2] = 0.9965;
+          lp[3] = vec3f(mix(-2.6, 2.6, u.pitch.z), 7.0, 1.2); ld[3] = vec3f(0.0, -1.0, 0.0); lc[3] = partColour(2u) * partPower(2u); lw[3] = 0.9975;
+          let t = vec3f(sin(u.time * 0.23) * 1.3, 0.4 + u.pitch.w * 2.2, 0.0);
+          lp[4] = vec3f(0.0, 6.0, -3.5); ld[4] = normalize(t - lp[4]); lc[4] = partColour(3u) * partPower(3u); lw[4] = 0.9945;
+          n = 5u;
+        } else if (rig == 1u) {                                                   // a ring of beams closing in on the drummer
+          n = 4u + u32(gene(1) * 9.0);
+          for (var k = 0u; k < n; k++) {
+            let a = f32(k) / f32(n) * 6.2831853 + u.time * 0.08 * (gene(5) - 0.5);
+            lp[k] = vec3f(cos(a) * 4.5, 0.1, sin(a) * 4.5 + 0.5);
+            ld[k] = normalize(vec3f(0.0, 2.8 + sin(u.time * 0.3 + f32(k)) * 1.2, 0.5) - lp[k]);
+            lc[k] = partColour(k % 4u) * partPower(k % 4u) * 2.2;
+            lw[k] = 1.0 - 0.006 * wide;
+          }
+        } else if (rig == 2u) {                                                   // searchlights sweeping up from the floor
+          n = 3u + u32(gene(1) * 5.0);
+          for (var k = 0u; k < n; k++) {
+            let x = (f32(k) / f32(n - 1u) - 0.5) * 8.0;
+            let sweep = sin(u.time * (0.2 + 0.07 * f32(k)) + f32(k) * 1.7) * 0.7 + (u.pitch[k % 4u] - 0.5) * 0.6;
+            lp[k] = vec3f(x, 0.0, 2.5);
+            ld[k] = normalize(vec3f(sin(sweep), 1.0, -0.35 + 0.3 * cos(u.time * 0.13 * f32(k + 1u))));
+            lc[k] = partColour(k % 4u) * partPower(k % 4u) * 2.2;
+            lw[k] = 1.0 - 0.004 * wide;
+          }
+        } else {                                                                  // a curtain of light walls, one per part and its mirror
+          n = 8u;
+          for (var k = 0u; k < 8u; k++) {
+            let part = k % 4u;
+            let x = (u.pitch[part] - 0.5) * 6.0 * select(1.0, -1.0, k >= 4u);
+            lp[k] = vec3f(x, 8.0, 0.8);
+            ld[k] = vec3f(0.0, -1.0, 0.0);
+            lc[k] = partColour(part) * partPower(part) * 2.0;
+            lw[k] = 1.0 - 0.003 * wide;
+          }
+        }
+
+        let far = 16.0;
+        var tmax = far;
+        if (rd.y < 0.0) { tmax = min(far, -ro.y / rd.y); }
+        let N = 44;
+        let dt = tmax / f32(N);
+        let jit = rnd(u32(i.pos.x) * 1973u + u32(i.pos.y) * 9277u + u32(u.frame) * 26699u);
+        let hazeScale = 0.3 + 0.6 * gene(2);
+        var T = 1.0;
+        var acc = vec3f(0.0);
+        for (var s = 0; s < N; s++) {
+          let x = ro + rd * ((f32(s) + jit) * dt);
+          let h = clamp(fbm(x * hazeScale + vec3f(0.0, -u.time * (0.02 + 0.08 * gene(5)), u.time * 0.03)) + 0.3, 0.0, 1.5);
+          var dens = 0.012 + 0.35 * h * h;
+          var L = vec3f(0.0);
+          for (var k = 0u; k < n; k++) {
+            L += lc[k] * spot(x, lp[k], ld[k], lw[k], 1.0 - (1.0 - lw[k]) * 0.3) * hg(dot(rd, ld[k]));
+          }
+          for (var k = 0; k < 8; k++) {                                           // drum hits: shells of light pushing the haze
+            let hh = u.pad[k];
+            if (hh.z > 2.0) { continue; }
+            let c = vec3f(hh.x * 3.0, 1.2 + (hh.y + 1.0) * 1.4, 0.5);
+            let prof = exp(-pow((length(x - c) - hh.z * 3.5) / (0.25 + hh.z * 0.4), 2.0)) * hh.w * exp(-hh.z * 1.5);
+            L += mix(tint(u.energy), u.col.rgb, 0.5) * prof * 5.0;
+            dens += prof * 0.4;
+          }
+          acc += T * dens * L * dt;
+          T *= exp(-dens * dt * 0.3);
+        }
+        if (tmax < far) {
+          let x = ro + rd * tmax;
+          var L = vec3f(0.0);
+          for (var k = 0u; k < n; k++) { L += lc[k] * spot(x, lp[k], ld[k], lw[k], 1.0 - (1.0 - lw[k]) * 0.3); }
+          acc += T * L * 0.18;
+        }
+        return vec4f(acc * 0.45, 1.0);
+      }`);
+  },
+  resize(g) { this.bg = g.bind(this.pipe, [g.U]); },
+  frame(g, enc) { g.draw(enc, this.pipe, this.bg); },
+});
+
+// 6 · Horizon: the pitch spectrum of the last seconds as a landscape that rolls toward the horizon.
+// The genome draws it as ridges, as furrows or as a grid, can mirror it into a canyon or wrap it into a
+// tube around you; drum hits send ripples across the land.
+STUDIES.push({
+  id: 'horizon', name: 'Horizon', scale: 1, exposure: 1.0, bloom: 0.09,
+  about: 'Everything that sounds, laid out by pitch, rolling toward the horizon as ridges, furrows or a grid; sometimes mirrored into a canyon or wrapped into a tube. Drum hits ripple across the land.',
+  init(g) {
+    this.B = 128; this.R = 160; this.head = 0; this.acc = 0; this.lastT = -1;
+    this.row = new Float32Array(this.B);
+    this.rows = g.device.createBuffer({ size: this.B * this.R * 4, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST });
+    this.hp = [0, 1].map(() => g.device.createBuffer({ size: 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST }));
+    const code = COMMON + /* wgsl */`
+      @group(0) @binding(1) var<storage, read> rows: array<f32>;
+      @group(0) @binding(2) var<uniform> hp: vec4f;   // head row, rows, bands, mirrored copy
+      fn val(b: u32, r: u32) -> f32 {
+        let R = u32(hp.y); let B = u32(hp.z);
+        return rows[((u32(hp.x) + R - r) % R) * B + b];
+      }
+      fn world(b: u32, r: u32) -> vec3f {
+        let xn = f32(b) / (hp.z - 1.0) - 0.5;
+        let z = f32(r) * 0.11;
+        var h = val(b, r) * (0.7 + 1.8 * gene(2)) * (1.0 + 0.9 * u.hit.y);
+        for (var k = 0; k < 8; k++) {                                     // drum hits: ripples across the land
+          let hh = u.pad[k];
+          if (hh.z > 2.5) { continue; }
+          let d = length(vec2f(xn * 9.0 - hh.x * 4.0, z - 3.0 - (hh.y + 1.0) * 3.0)) - hh.z * 4.0;
+          h += hh.w * exp(-hh.z * 1.4) * cos(d * 5.0) * exp(-d * d * 0.8) * 0.7;
+        }
+        if (gene(3) > 0.72) {                                             // wrapped into a tube around the camera
+          let th = xn * 6.2831853 * 0.96;
+          let rad = 3.2 - h * 0.5;
+          return vec3f(sin(th) * rad, 1.6 - cos(th) * rad, z);
+        }
+        return vec3f(xn * 9.0, select(h, 3.4 - h, hp.w > 0.5), z);
+      }
+      fn clip(w: vec3f) -> vec4f {
+        let j = traj(6.0);
+        let e = vec3f(sin(j.x) * 2.5 + sin(u.cam.x) * 2.0, 1.55 + (u.cam.y + j.y) * 2.0, -2.4 - (j.z - 1.0) * 3.0) + shake() * 0.5;
+        let fw = normalize(vec3f(sin(j.x) * 1.5, 0.3, 7.0) - e);
+        var rt = normalize(cross(fw, vec3f(0, 1, 0)));
+        var up = cross(rt, fw);
+        let rr = rt * cos(j.w) + up * sin(j.w);
+        up = cross(rr, fw); rt = rr;
+        let d = w - e;
+        let z = dot(d, fw);
+        let f = 1.9 * u.cam.z;
+        let n = 0.1; let fa = 40.0;
+        return vec4f(dot(d, rt) * f / u.aspect, dot(d, up) * f, z * fa / (fa - n) - fa * n / (fa - n), z);
+      }
+      struct SV { @builtin(position) pos: vec4f, @location(0) c: vec3f, @location(1) e: f32 };
+      @vertex fn vsFace(@builtin(vertex_index) vi: u32) -> @builtin(position) vec4f {
+        let B = u32(hp.z);
+        let cell = vi / 6u;
+        var cr = array<vec2u, 6>(vec2u(0, 0), vec2u(1, 0), vec2u(0, 1), vec2u(0, 1), vec2u(1, 0), vec2u(1, 1));
+        let k = cr[vi % 6u];
+        return clip(world(cell % (B - 1u) + k.x, cell / (B - 1u) + k.y));
+      }
+      @fragment fn fsFace() -> @location(0) vec4f { return vec4f(0.0, 0.0, 0.0, 1.0); }
+      fn segment(vi: u32, b0: u32, r0: u32, b1: u32, r1: u32) -> SV {
+        let a = clip(world(b0, r0)); let c = clip(world(b1, r1));
+        var o: SV;
+        if (a.w < 0.12 || c.w < 0.12) { o.pos = vec4f(2.0, 2.0, 0.0, 1.0); return o; }
+        let sa = a.xy / a.w * u.res * 0.5; let sc = c.xy / c.w * u.res * 0.5;
+        let dir = normalize(sc - sa + vec2f(1e-5, 0.0));
+        let nrm = vec2f(-dir.y, dir.x);
+        var cr = array<vec2f, 6>(vec2f(0, -1), vec2f(1, -1), vec2f(0, 1), vec2f(0, 1), vec2f(1, -1), vec2f(1, 1));
+        let k = cr[vi];
+        let hw = 0.75 * u.res.y / 1080.0 + 0.25;
+        let pad = hw + 1.0;
+        let P = select(a, c, k.x > 0.5);
+        let sp = select(sa, sc, k.x > 0.5) + nrm * k.y * pad;
+        o.pos = vec4f(sp / (u.res * 0.5) * P.w, P.z - 0.0008 * P.w, P.w);
+        let v = max(val(b0, r0), val(b1, r1));
+        let r = f32(max(r0, r1));
+        let fog = exp(-r * 0.02) * (1.0 - smoothstep(hp.y - 30.0, hp.y, r));
+        o.c = tint(u.energy) * fog * (0.12 + 1.8 * v) * (0.3 + 1.2 * u.bus.z) * (1.0 + 1.6 * u.hit.y * exp(-r * 0.08));
+        o.e = k.y * pad / hw;
+        return o;
+      }
+      @vertex fn vsRow(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> SV {
+        let B = u32(hp.z);
+        return segment(vi, ii % (B - 1u), ii / (B - 1u), ii % (B - 1u) + 1u, ii / (B - 1u));
+      }
+      @vertex fn vsCol(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> SV {
+        let B = u32(hp.z);
+        let b = (ii % (B / 4u)) * 4u;                                      // every fourth band, along the depth
+        let r = ii / (B / 4u);
+        return segment(vi, b, r, b, r + 1u);
+      }
+      @fragment fn fsLine(i: SV) -> @location(0) vec4f {
+        return vec4f(i.c * clamp((1.0 - abs(i.e)) * 2.0, 0.0, 1.0), 1.0);
+      }`;
+    const mod = g.device.createShaderModule({ code });
+    const depth = { format: 'depth24plus', depthWriteEnabled: true, depthCompare: 'less' };
+    const lineDepth = { format: 'depth24plus', depthWriteEnabled: false, depthCompare: 'less-equal' };
+    this.face = g.device.createRenderPipeline({ layout: 'auto', vertex: { module: mod, entryPoint: 'vsFace' },
+      fragment: { module: mod, entryPoint: 'fsFace', targets: [{ format: 'rgba16float' }] }, depthStencil: depth, primitive: { cullMode: 'none' } });
+    const mkLine = vs => g.device.createRenderPipeline({ layout: 'auto', vertex: { module: mod, entryPoint: vs },
+      fragment: { module: mod, entryPoint: 'fsLine', targets: [{ format: 'rgba16float', blend: ADD }] }, depthStencil: lineDepth });
+    this.rowPipe = mkLine('vsRow');
+    this.colPipe = mkLine('vsCol');
+  },
+  resize(g) {
+    this.depth?.destroy();
+    this.depth = g.device.createTexture({ size: [g.W, g.H], format: 'depth24plus', usage: GPUTextureUsage.RENDER_ATTACHMENT });
+    this.bg = this.hp.map(h => ({ face: g.bind(this.face, [g.U, this.rows, h]), row: g.bind(this.rowPipe, [g.U, this.rows, h]), col: g.bind(this.colPipe, [g.U, this.rows, h]) }));
+  },
+  cpu(g, F, t, D) {
+    const step = 1 / (24 + 40 * D.gene[4]);
+    if (this.lastT < 0 || t < this.lastT || t - this.lastT > 1) {   // a seek: rebuild the whole landscape
+      const all = new Float32Array(this.B * this.R);
+      for (let r = 0; r < this.R; r++) { F.bands(t - r * step, this.row); all.set(this.row, ((this.R - r) % this.R) * this.B); }
+      this.head = 0; this.acc = 0;
+      g.device.queue.writeBuffer(this.rows, 0, all);
+    } else {
+      this.acc += t - this.lastT;
+      while (this.acc >= step) {
+        this.acc -= step;
+        this.head = (this.head + 1) % this.R;
+        F.bands(t - this.acc, this.row);
+        g.device.queue.writeBuffer(this.rows, this.head * this.B * 4, this.row);
+      }
+    }
+    this.lastT = t;
+    this.mode = Math.min(2, Math.floor(D.gene[0] * 3));             // 0 ridges · 1 furrows · 2 grid
+    this.mirror = D.gene[1] > 0.6 && D.gene[3] <= 0.72;
+    this.hp.forEach((h, k) => g.device.queue.writeBuffer(h, 0, new Float32Array([this.head, this.R, this.B, k])));
+  },
+  frame(g, enc) {
+    const pass = g.pass(enc, this.depth.createView());
+    for (const k of this.mirror ? [0, 1] : [0]) {
+      const bg = this.bg[k];
+      pass.setPipeline(this.face); pass.setBindGroup(0, bg.face); pass.draw((this.B - 1) * (this.R - 1) * 6);
+      if (this.mode !== 1) { pass.setPipeline(this.rowPipe); pass.setBindGroup(0, bg.row); pass.draw(6, (this.B - 1) * this.R); }
+      if (this.mode !== 0) { pass.setPipeline(this.colPipe); pass.setBindGroup(0, bg.col); pass.draw(6, (this.B / 4) * (this.R - 1)); }
+    }
+    pass.end();
+  },
+});
+
+// 7 · Form: one object, carved into a minimal-surface lattice (gyroid, Schwarz P, Schwarz D,
+// Neovius) inside a sphere, torus, box or octahedron, sometimes repeated into a crown. Drum hits send
+// a ripple running over its skin and flash its core.
+STUDIES.push({
+  id: 'form', name: 'Form', scale: 0.75, exposure: 1.0, bloom: 0.10,
+  about: 'One object carved into a lattice (gyroid, Schwarz, Neovius) inside a sphere, torus, box or octahedron. It twists and breathes with the bass; drum hits send ripples running over its skin.',
+  init(g) {
+    this.pipe = g.fullscreen(COMMON + /* wgsl */`
+      fn lattice(p: vec3f, f: f32) -> f32 {
+        let q = p * f;
+        let kind = u32(gene(0) * 4.0);
+        if (kind == 1u) { return (cos(q.x) + cos(q.y) + cos(q.z)) / f * 0.6; }                                    // Schwarz P
+        if (kind == 2u) {                                                                                          // Schwarz D
+          return (sin(q.x) * sin(q.y) * sin(q.z) + sin(q.x) * cos(q.y) * cos(q.z) + cos(q.x) * sin(q.y) * cos(q.z) + cos(q.x) * cos(q.y) * sin(q.z)) / f * 0.7;
+        }
+        if (kind == 3u) { return (3.0 * (cos(q.x) + cos(q.y) + cos(q.z)) + 4.0 * cos(q.x) * cos(q.y) * cos(q.z)) / f * 0.15; }   // Neovius
+        return dot(sin(q), cos(q.zxy)) / f;                                                                        // gyroid
+      }
+      fn shell(p: vec3f, R: f32) -> f32 {
+        let kind = u32(gene(1) * 4.0);
+        if (kind == 1u) { let q = vec2f(length(p.xz) - R * 0.8, p.y); return length(q) - R * 0.42; }              // torus
+        if (kind == 2u) { let d = abs(p) - vec3f(R * 0.78); return length(max(d, vec3f(0.0))) + min(max(d.x, max(d.y, d.z)), 0.0) - 0.05; }   // box
+        if (kind == 3u) { return (abs(p.x) + abs(p.y) + abs(p.z) - R * 1.3) * 0.577; }                            // octahedron
+        return length(p) - R;                                                                                      // sphere
+      }
+      fn sdf(p0: vec3f) -> f32 {
+        let a = u.time * 0.07 + (u.count.x - 1.0 + smoothstep(0.0, 1.2, u.since.x)) * 0.5;   // a turn per chord
+        var p = vec3f((mat2x2f(cos(a), sin(a), -sin(a), cos(a)) * p0.xz).x, p0.y, (mat2x2f(cos(a), sin(a), -sin(a), cos(a)) * p0.xz).y);
+        if (gene(4) > 0.7) {                                                                 // a crown: the plane folded into copies
+          let q = foldq(p.xz, 0.4 + gene(5) * 0.6);
+          p = vec3f(q.x - 1.1, p.y, q.y);
+        }
+        let tw = p.y * (u.hit.y * 2.2 + (gene(3) - 0.5) * 1.5);                              // twist: the bass, and the genome
+        let txz = mat2x2f(cos(tw), sin(tw), -sin(tw), cos(tw)) * p.xz;
+        p = vec3f(txz.x, p.y, txz.y);
+        var R = 1.15 + 0.16 * u.hit.y + 0.04 * u.level.y;
+        for (var k = 0; k < 8; k++) {                                                        // drum hits: a ripple running over the skin
+          let h = u.pad[k];
+          if (h.z > 2.0) { continue; }
+          let arc = acos(clamp(dot(normalize(p + vec3f(1e-4)), normalize(vec3f(h.x, h.y, 0.7))), -1.0, 1.0));
+          R += h.w * exp(-h.z * 1.6) * 0.09 * exp(-pow((arc - h.z * 2.2) / 0.25, 2.0));
+        }
+        let f = (3.0 + 4.0 * gene(5)) + 5.0 * u.energy + 3.0 * u.hit.y;
+        let lat = abs(lattice(p, f)) - (0.008 + 0.03 * gene(2) + 0.02 * u.level.x);
+        return max(shell(p, R), lat * 0.7);
+      }
+      fn normal(p: vec3f) -> vec3f {
+        let e = vec2f(0.0015, -0.0015);
+        return normalize(e.xyy * sdf(p + e.xyy) + e.yyx * sdf(p + e.yyx) + e.yxy * sdf(p + e.yxy) + e.xxx * sdf(p + e.xxx));
+      }
+      @fragment fn fs(i: VO) -> @location(0) vec4f {
+        let uv = (i.pos.xy - u.res * 0.5) / u.res.y * vec2f(1.0, -1.0);
+        let j = traj(7.0);
+        let a = u.time * 0.031 + u.cam.x + j.x;
+        let el = u.cam.y + j.y * 1.5;
+        let dist = select(5.4, 7.5, gene(4) > 0.7) * u.cam.z * j.z;
+        let ro = vec3f(sin(a) * dist * cos(el), sin(el) * dist, cos(a) * dist * cos(el)) + shake() * 0.4;
+        let fw = normalize(-ro);
+        var rt = normalize(cross(fw, vec3f(0, 1, 0)));
+        var up = cross(rt, fw);
+        let rr = rt * cos(j.w) + up * sin(j.w);
+        up = cross(rr, fw); rt = rr;
+        let rd = normalize(fw * 1.9 + rt * uv.x + up * uv.y);
+        var t = max(0.5, dist - 3.2);
+        var hit = false;
+        var glow = 0.0;
+        for (var s = 0; s < 120; s++) {
+          let d = sdf(ro + rd * t);
+          glow += 0.006 / (1.0 + d * d * 900.0);
+          if (d < 0.0008 * t) { hit = true; break; }
+          t += d;
+          if (t > dist + 3.5) { break; }
+        }
+        var flash = 0.0;
+        for (var k = 0; k < 8; k++) { flash += u.pad[k].w * exp(-u.pad[k].z * 5.0); }
+        var c = vec3f(0.0);
+        if (hit) {
+          let p = ro + rd * t;
+          let n = normal(p);
+          let dif = max(0.0, dot(n, normalize(vec3f(-0.6, 0.8, -0.4))));
+          let rim = pow(1.0 - max(0.0, dot(n, -rd)), 3.0);
+          let ao = clamp(sdf(p + n * 0.12) / 0.12, 0.0, 1.0);
+          let inner = exp(-length(p) * 2.2) * (u.level.w * (5.0 + 6.0 * u.hit.w) + flash * 12.0) * max(0.0, dot(n, -normalize(p)) * 0.7 + 0.3);
+          let band = exp(-pow((p.y - (-1.2 + u.since.z * 3.4)) / 0.02, 2.0)) * u.hit.z * 5.0;
+          c = tint(u.energy) * (dif * 0.22 + rim * 1.1) * ao * (0.25 + 1.1 * u.level.x) * (1.0 + 1.4 * u.hit.y)
+            + mix(vec3f(1.0, 0.8, 0.58), u.col.rgb, u.col.w) * inner + vec3f(0.88, 0.94, 1.0) * band * ao;
+        }
+        c += tint(u.energy) * glow * (0.3 + u.level.x + flash);
+        return vec4f(c, 1.0);
+      }`);
+  },
+  resize(g) { this.bg = g.bind(this.pipe, [g.U]); },
+  frame(g, enc) { g.draw(enc, this.pipe, this.bg); },
+});
+
+// 8 · Score: the notes as lines of light past a now-line, with what is coming shown faintly. The
+// genome lays the score out flowing sideways, falling, rising, or lying on a floor that runs to the
+// horizon; the camera turns and zooms through it; drum hits split the now-line into two shock lines.
+STUDIES.push({
+  id: 'score', name: 'Score', scale: 1, exposure: 1.0, bloom: 0.06,
+  about: 'The score as light, after Ryoji Ikeda: every note a line, the sequence a barcode, beats and bars as a grid. It flows sideways, falls, rises or lies on a floor to the horizon; drum hits split the now-line.',
+  init(g) {
+    this.max = 6400;
+    this.inst = new Float32Array(this.max * 4);
+    this.ib = g.device.createBuffer({ size: this.inst.byteLength, usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST });
+    const code = COMMON + /* wgsl */`
+      const SPAN = 10.0;  const NOWX = 0.78;
+      struct NV { @builtin(position) pos: vec4f, @location(0) c: vec3f, @location(1) e: f32, @location(2) hw: f32, @location(3) ahead: f32, @location(4) lx: f32 };
+      fn xOf(trel: f32) -> f32 { return NOWX + trel / SPAN * NOWX; }
+      fn yOf(p: f32) -> f32 { return 0.07 + (p - 24.0) / 72.0 * 0.86; }
+      fn place(p: vec2f) -> vec2f {                    // layout (time x, pitch y, 0..1) to clip space, through the layout and the camera
+        let lay = u32(gene(0) * 4.0);
+        var q = p;
+        if (lay == 1u) { q = vec2f(p.y, p.x); }                                       // falling: the future at the top
+        if (lay == 2u) { q = vec2f(p.y, 1.0 - p.x); }                                 // rising
+        if (lay == 3u) {                                                              // a floor running to the horizon
+          let s = 1.0 / (1.0 + 3.0 * p.x);
+          q = vec2f(0.5 + (p.y - 0.5) * s * 1.7, 0.08 + 0.75 * (1.0 - s));
+        }
+        let j = traj(8.0);
+        var c = (q * 2.0 - 1.0) * vec2f(u.aspect, 1.0);
+        c = rot2(j.w * 0.8 + u.cam.x * 0.15) * c / (0.75 + 0.45 * j.z * u.cam.z) + vec2f(sin(j.x) * 0.25, j.y * 0.35) + shake().xy * 0.05;
+        return c / vec2f(u.aspect, 1.0);
+      }
+      fn bright(n: vec4f) -> f32 {
+        if (n.x > 0.0) { return 0.13; }
+        if (n.y < 0.0) { return 0.75 * exp(n.y * 0.14); }
+        return 1.0 + 2.5 * exp(n.x * 9.0);
+      }
+      fn quadH(vi: u32, x0: f32, x1: f32, yc: f32, hwPx: f32, c: vec3f) -> NV {     // a horizontal line in layout space
+        var cr = array<vec2f, 6>(vec2f(0, -1), vec2f(1, -1), vec2f(0, 1), vec2f(0, 1), vec2f(1, -1), vec2f(1, 1));
+        let k = cr[vi];
+        let pad = hwPx + 1.0;
+        var o: NV;
+        let x = mix(x0, x1, k.x);
+        o.pos = vec4f(place(vec2f(x, yc + k.y * pad / u.res.y)), 0.0, 1.0);
+        o.c = c; o.e = k.y * pad; o.hw = hwPx; o.ahead = 1.0; o.lx = x;
+        return o;
+      }
+      fn quadV(vi: u32, x: f32, y0: f32, y1: f32, hwPx: f32, c: vec3f) -> NV {     // a vertical line in layout space
+        var cr = array<vec2f, 6>(vec2f(-1, 0), vec2f(1, 0), vec2f(-1, 1), vec2f(-1, 1), vec2f(1, 0), vec2f(1, 1));
+        let k = cr[vi];
+        let pad = hwPx + 1.0;
+        var o: NV;
+        o.pos = vec4f(place(vec2f(x + k.x * pad / u.res.x, mix(y0, y1, k.y))), 0.0, 1.0);
+        o.c = c; o.e = k.x * pad; o.hw = hwPx; o.ahead = 1.0; o.lx = x;
+        return o;
+      }
+      @vertex fn vsNote(@builtin(vertex_index) vi: u32, @location(0) n: vec4f) -> NV {
+        let tr = i32(floor(n.w));
+        var o: NV;
+        if (tr > 3) { o.pos = vec4f(2.0, 2.0, 0.0, 1.0); return o; }
+        let vel = fract(n.w);
+        var hw = array<f32, 4>(1.6, 2.2, 0.8, 1.3);
+        var tone = array<vec3f, 4>(vec3f(0.55), vec3f(0.8), vec3f(1.0), vec3f(1.0, 0.86, 0.66));
+        var kick = 0.0;
+        for (var k = 0; k < 8; k++) { kick += u.pad[k].w * exp(-u.pad[k].z * 6.0); }
+        let b = bright(n) * (0.4 + 0.8 * vel);
+        o = quadH(vi, xOf(n.x), max(xOf(n.y), xOf(n.x) + 2.0 / u.res.x), yOf(n.z), hw[tr] * (0.6 + 0.8 * gene(1)) * (1.0 + 1.5 * kick * step(n.x, 0.0) * step(0.0, n.y)), tint(u.energy) * tone[tr] * b);
+        o.ahead = 0.13 / bright(n);
+        return o;
+      }
+      @vertex fn vsLine(@builtin(vertex_index) vi: u32, @location(0) n: vec4f) -> NV {
+        let tr = i32(floor(n.w));
+        let x = xOf(n.x);
+        var o: NV;
+        if (tr == 2) { o = quadV(vi, x, 0.04, 0.96, 0.5, vec3f(0.07 * min(bright(n), 1.6) * (0.5 + fract(n.w)) * (0.3 + 1.4 * gene(2)))); }   // the sequence's barcode
+        else if (tr == 4) { o = quadV(vi, x, 0.04, 0.96, 0.5, vec3f(0.035 + 0.06 * fract(n.w)) * (0.4 + gene(3))); }                           // beats and bars
+        else if (tr == 5) { o = quadV(vi, NOWX, 0.02, 0.98, 0.6, vec3f(0.25)); }                                                               // now
+        else if (tr == 6) { o = quadV(vi, x, 0.0, 1.0, 1.2, mix(tint(u.energy), u.col.rgb, 0.5) * fract(n.w) * 3.0); }                          // drum hits: two shock lines
+        else { o.pos = vec4f(2.0, 2.0, 0.0, 1.0); return o; }
+        return o;
+      }
+      @fragment fn fsNote(i: NV) -> @location(0) vec4f {
+        let a = clamp(i.hw + 0.5 - abs(i.e), 0.0, 1.0);
+        return vec4f(i.c * a * select(1.0, min(i.ahead, 1.0), i.lx > NOWX), 1.0);
+      }`;
+    const mod = g.device.createShaderModule({ code });
+    const mk = vs => g.device.createRenderPipeline({
+      layout: 'auto',
+      vertex: { module: mod, entryPoint: vs, buffers: [{ arrayStride: 16, stepMode: 'instance', attributes: [{ shaderLocation: 0, offset: 0, format: 'float32x4' }] }] },
+      fragment: { module: mod, entryPoint: 'fsNote', targets: [{ format: 'rgba16float', blend: ADD }] },
+    });
+    this.notePipe = mk('vsNote');
+    this.linePipe = mk('vsLine');
+  },
+  resize(g) {
+    this.bgN = g.bind(this.notePipe, [g.U]);
+    this.bgL = g.bind(this.linePipe, [g.U]);
+  },
+  cpu(g, F, t, D, pad, padAge) {
+    let n = 0;
+    const put = (a, b, c, d) => { if (n < this.max) this.inst.set([a, b, c, d], n++ * 4); };
+    for (let i = lowerBound(F.notes, t - 27); i < F.notes.length && F.notes[i][0] <= t + 2.9; i++) {
+      const [s, d, tr, p, v] = F.notes[i];
+      if (s + d < t - 10.5) continue;
+      put(s - t, s + d - t, p, tr + Math.min(v, 0.999));
+    }
+    const spb = 60 / F.show.bpm;
+    for (let b = Math.ceil((t - 10.5) / spb); b * spb < t + 2.9; b++) put(b * spb - t, 0, 0, 4 + (b % 4 === 0 ? 0.9 : 0.2));
+    put(0, 0, 0, 5);
+    for (let k = 0; k < pad.hits.length; k++) {
+      const h = pad.hits[k], age = padAge(h);
+      if (age > 2) continue;
+      const amp = Math.min(0.999, h.vel * Math.exp(-age * 1.8));
+      for (const dir of [-1, 1]) put(dir * age * 4, 0, 0, 6 + amp);
+    }
+    this.count = n;
+    g.device.queue.writeBuffer(this.ib, 0, this.inst, 0, n * 4);
+  },
+  frame(g, enc) {
+    const pass = g.pass(enc);
+    pass.setVertexBuffer(0, this.ib);
+    pass.setPipeline(this.linePipe); pass.setBindGroup(0, this.bgL); pass.draw(6, this.count);
+    pass.setPipeline(this.notePipe); pass.setBindGroup(0, this.bgN); pass.draw(6, this.count);
+    pass.end();
   },
 });
 
@@ -1233,6 +1735,8 @@ async function boot() {
     else if (e.key === 's' || e.key === 'S') { D.strobe = !D.strobe; }
     else if (e.key === 'b' || e.key === 'B') { D.feedback = !D.feedback; }
     else if (e.key === 'k' || e.key === 'K') { padHit(0.4 + Math.random() * 0.6, Math.random()); }   // a pretend hit, for trying it without the pad
+    else if (e.key === ',') { setAmt(pad.amt - 10); }
+    else if (e.key === '.') { setAmt(pad.amt + 10); }
     else if (e.key === '[') { setThr(1.25); }
     else if (e.key === ']') { setThr(0.8); }
     else if (e.key === 'g' || e.key === 'G') { roll(); }
@@ -1250,8 +1754,18 @@ async function boot() {
 
   // The drum pad: one input of the audio interface, heard by an onset detector running on the audio
   // thread. A hit lands at a point that wanders: rolls cluster, sparse hits leap, bright hits sit higher.
-  const pad = { hits: [], kick: 0, agit: 0, bright: 0.5, pos: [0, 0], last: -9, on: false, thr: 0.02, meter: 0, lit: 0 };
+  const pad = { hits: [], kick: 0, agit: 0, bright: 0.5, pos: [0, 0], last: -9, on: false, thr: 0.02, meter: 0, lit: 0, amt: 50 };
   try { pad.thr = +localStorage.getItem('lisztmachine-pad-thr') || 0.02; } catch {}
+  try { const a = localStorage.getItem('lisztmachine-pad-amt'); if (a !== null) pad.amt = +a; } catch {}
+  // How much a hit does, 0 to 100: its strength and how long its effects last (0: a trace, 100: drastic and long).
+  const padK = () => { const a = pad.amt / 100; return { s: 0.05 + 1.95 * Math.pow(a, 1.2), dur: 0.35 + 2.65 * a }; };
+  const padAge = h => (visT - h.t) / padK().dur;
+  const setAmt = v => {
+    pad.amt = Math.max(0, Math.min(100, Math.round(v)));
+    $('pad-amt').value = pad.amt;
+    $('pad-amt-v').textContent = pad.amt;
+    try { localStorage.setItem('lisztmachine-pad-amt', pad.amt); } catch {}
+  };
   window.__pad = pad;
   const dB = x => 20 * Math.log10(Math.max(x, 1e-6));
   function padHit(vel, bright) {
@@ -1262,7 +1776,7 @@ async function boot() {
     pad.pos[1] = Math.max(-0.75, Math.min(0.75, pad.pos[1] * 0.85 + (Math.random() - 0.5) * step + (bright - 0.5) * 0.3));
     pad.hits.unshift({ t: visT, x: pad.pos[0], y: pad.pos[1], vel });
     pad.hits.length = Math.min(pad.hits.length, 8);
-    pad.agit = Math.min(1.5, pad.agit + vel * 0.35);
+    pad.agit = Math.min(1.5, pad.agit + vel * 0.35 * padK().s);
     pad.bright = bright;
     pad.lit = 6;
   }
@@ -1342,6 +1856,8 @@ async function boot() {
   }
   try { const d = localStorage.getItem('lisztmachine-pad-device'); if (d) $('pad-device').append(Object.assign(document.createElement('option'), { value: d, textContent: 'Last used input', selected: true })); } catch {}
   $('pad-go').onclick = padStart;
+  setAmt(pad.amt);
+  $('pad-amt').oninput = e => setAmt(+e.target.value);
   $('pad-device').onchange = () => { if (pad.on) padStart(); };
   $('pad-ch').onchange = () => pad.node?.port.postMessage({ ch: +$('pad-ch').value });
   const setThr = k => {
@@ -1360,7 +1876,7 @@ async function boot() {
   // keep spinning between cuts, and flash on the bass.
   const PALETTE = [[1, 0.2, 0.06], [0.45, 0.62, 1], [1, 1, 1], [0.85, 0.3, 1], [1, 0.62, 0.2], [0.25, 1, 0.85]];
   const D = { cam: [0, 0, 1, 0], fx: [0, 0, 0, 0], col: [1, 1, 1, 0], target: [0, 0, 1], spin: 0, cut: 0, chord: -1, bar: -1, si: -1, strobe: true, invertUntil: 0,
-    feedback: true, gene: new Float32Array(16), fbg: new Float32Array(8), gen: 0, salt: Math.random() * 1000 };   // a fresh lineage every time the page opens
+    feedback: true, camT: Math.random() * 600, gene: new Float32Array(16), fbg: new Float32Array(8), gen: 0, salt: Math.random() * 1000 };   // a fresh lineage every time the page opens
   const hash01 = k => { const x = Math.sin(k * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); };
   window.__D = D;
   // The genome: every section gets a new one, every cut mutates two of its numbers. G rolls by hand.
@@ -1383,6 +1899,7 @@ async function boot() {
       else for (let k = 5; k < 7; k++) D.gene[Math.floor(r(k) * 16)] = r(k + 10);
     }
     D.chord = F.count[0]; D.bar = bar;
+    D.camT += dt * (0.6 + 1.6 * e);                                               // the camera journeys run faster when loud
     D.target[0] += D.spin * dt;                                                   // keeps turning between cuts
     const glide = 1 - Math.exp(-dt / (0.12 + 1.6 * (1 - e)));                     // a whip when loud, a drift when calm
     for (let k = 0; k < 3; k++) D.cam[k] += (D.target[k] - D.cam[k]) * glide;
@@ -1455,19 +1972,20 @@ async function boot() {
     const bpm = show.bpm, beats = t * bpm / 60;
     const padArr = new Float32Array(36);
     pad.kick = 0;
+    const PK = padK();
     for (let k = 0; k < 8; k++) {
-      const h = pad.hits[k], age = h ? visT - h.t : 99;
-      padArr.set(h ? [h.x, h.y, age, h.vel] : [0, 0, 99, 0], k * 4);
-      if (h) pad.kick += h.vel * Math.exp(-age * 10);
+      const h = pad.hits[k], age = h ? (visT - h.t) / PK.dur : 99;      // the effect setting stretches time and scales strength
+      padArr.set(h ? [h.x, h.y, age, h.vel * PK.s] : [0, 0, 99, 0], k * 4);
+      if (h) pad.kick += h.vel * PK.s * Math.exp(-age * 10);
     }
-    pad.agit *= Math.exp(-dt / 2.5);
-    padArr.set([pad.agit, pad.bright, 0, 0], 32);
+    pad.agit *= Math.exp(-dt / (2.5 * PK.dur));
+    padArr.set([pad.agit, pad.bright, D.camT, 0], 32);
     if (frameNo % 15 === 0) padStatus();
     const blend = network(dt, visT, canvas.width / canvas.height);
     const enc = device.createCommandEncoder();
     for (const s of next ? [study, next] : [study]) {
       use(s);
-      s.cpu?.(g, F, t, D);
+      s.cpu?.(g, F, t, D, pad, padAge);
       Udata.set([visT, dt, beats % 1, (beats / 4) % 1, s.W, s.H, F.energy, F.progress,
         ...F.lv.slice(0, 4), F.lv[4], F.lv[5], F.lv[6], F.si, ...F.hit, ...F.pitch, ...F.since, ...F.chord, ...F.count,
         beats, frameNo, bpm, s.W / s.H, ...D.cam, ...D.fx, ...D.col, ...D.gene, ...padArr]);
