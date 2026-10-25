@@ -41,6 +41,11 @@ juce_add_gui_app(Lisztmachine
     BUNDLE_ID "com.keremaltaylar.lisztmachine")
 target_sources(Lisztmachine PRIVATE src/app/Main.cpp)
 target_link_libraries(Lisztmachine PRIVATE liszt_engine)
+if(APPLE) # the palette travels inside the .app
+    add_custom_command(TARGET Lisztmachine POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_SOURCE_DIR}/sounds
+                "$<TARGET_BUNDLE_CONTENT_DIR:Lisztmachine>/Resources/sounds")
+endif()
 
 # Offline renderer: N minutes of the concert to a WAV, as fast as the CPU allows.
 juce_add_console_app(liszt_render PRODUCT_NAME "liszt_render")

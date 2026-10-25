@@ -258,7 +258,8 @@ juce::File findPalette(const juce::String& name)
     // Next to the executable, or in a sounds/ folder of any parent (the repo, in development).
     auto dir = juce::File::getSpecialLocation(juce::File::currentExecutableFile).getParentDirectory();
     for (int up = 0; up < 8 && dir.exists(); ++up, dir = dir.getParentDirectory())
-        if (auto f = dir.getChildFile("sounds").getChildFile(name + ".txt"); f.existsAsFile()) return f;
+        for (auto sub : { "sounds", "Resources/sounds" }) // Resources/: inside the Mac .app bundle
+            if (auto f = dir.getChildFile(sub).getChildFile(name + ".txt"); f.existsAsFile()) return f;
     return juce::File("C:/Users/kerem/OneDrive/Desktop/Claude/Projects/Lisztmachine/sounds").getChildFile(name + ".txt");
 }
 
