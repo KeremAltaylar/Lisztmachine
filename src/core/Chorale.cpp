@@ -9,7 +9,7 @@ namespace liszt {
 
 namespace {
 
-constexpr uint8_t bit(int t) { return uint8_t(1u << t); }
+constexpr uint16_t bit(int t) { return uint16_t(1u << t); }
 constexpr int k16 = kSixteenth; // ticks
 constexpr int kLeadingTone = 11, kDominant = 7;
 
@@ -185,17 +185,18 @@ ChoraleComposer::ChoraleComposer(uint64_t seed) : Composer(seed ^ 0xC0A1E5ull)
 // ---------------------------------------------------------------- the form
 void ChoraleComposer::planForm()
 {
-    struct T { const char* name; float energy; uint8_t layers; std::vector<Kind> phrases; };
-    const uint8_t voices = bit(Pad), micro = bit(Seq), drums = bit(Bass), piano = bit(Lead);
+    struct T { const char* name; float energy; uint16_t layers; std::vector<Kind> phrases; };
+    const uint16_t voices = bit(Soprano) | bit(Alto) | bit(Tenor) | bit(BassVoice);
+    const uint16_t micro = bit(Micro), drums = bit(Drums), piano = bit(Piano), blips = bit(Blips), sub = bit(Sub);
     const std::vector<T> plan = {
         { "Invocation", .12f, voices, { AntSlow, ConsSlow } },
-        { "Pulse", .30f, uint8_t(voices | micro), { Ant, Cons, Ant, ConsPlag } },
-        { "Theme", .55f, uint8_t(voices | micro | drums | piano), { Ant, Cons, Ant, Cons, Ant, Cons, Ant, Cons } },
-        { "Episode", .68f, uint8_t(voices | micro | drums | piano), { SeqA, SeqB, Euph, Euph, SeqA, SeqB, Ant, Cons } },
-        { "Breakdown", .35f, uint8_t(voices | micro | piano), { Pedal, Pedal, Ant, ConsDec } },
-        { "Return", .78f, uint8_t(voices | micro | drums | piano), { Ant, ConsDec, Ant, Cons, Ant, ConsDec, Ant, Cons } },
-        { "Apotheosis", 1.0f, uint8_t(voices | micro | drums | piano), { Euph, Euph, Euph, Euph, Euph, Euph, Ant, Cons } },
-        { "Dissolution", .22f, uint8_t(voices | micro | piano), { AntSlow, EuphSlow, ConsSlow, Final } },
+        { "Pulse", .30f, uint16_t(voices | micro), { Ant, Cons, Ant, ConsPlag } },
+        { "Theme", .55f, uint16_t(voices | micro | drums | blips | piano), { Ant, Cons, Ant, Cons, Ant, Cons, Ant, Cons } },
+        { "Episode", .68f, uint16_t(voices | micro | drums | blips | piano | sub), { SeqA, SeqB, Euph, Euph, SeqA, SeqB, Ant, Cons } },
+        { "Breakdown", .35f, uint16_t(voices | micro | piano), { Pedal, Pedal, Ant, ConsDec } },
+        { "Return", .78f, uint16_t(voices | micro | drums | blips | piano | sub), { Ant, ConsDec, Ant, Cons, Ant, ConsDec, Ant, Cons } },
+        { "Apotheosis", 1.0f, uint16_t(voices | micro | drums | blips | piano | sub), { Euph, Euph, Euph, Euph, Euph, Euph, Ant, Cons } },
+        { "Dissolution", .22f, uint16_t(voices | micro | piano), { AntSlow, EuphSlow, ConsSlow, Final } },
     };
 
     // Phrases recur where the form says the theme recurs: the Theme's choices are kept and the
@@ -618,16 +619,17 @@ void ChoraleComposer::writeVoices()
             const float energy = energyAt(bar);
             auto& c = *std::find_if(chords_.rbegin(), chords_.rend(), [&](const Chord& ch) { return ch.start <= L[i].start; });
             const double pos = double(L[i].start - c.phraseStart) / c.phraseLen;
-            float vel = float((0.36 + 0.4 * energy) * (0.86 + 0.24 * std::sin(3.14159265 * pos)));
-            vel += v == 3 ? 0.06f : v == 0 ? 0.02f : -0.05f;
+            float vel = float((0.40 + 0.36 * energy) * (0.86 + 0.24 * std::sin(3.14159265 * pos)));
+            vel += v == 3 ? 0.02f : 0.0f; // the balance between the voices is set per track in the palette
             const int64_t t0 = int64_t(L[i].start) * k16 + lean[v] + r.range(-5, 5);
             const int64_t t1 = int64_t(end16) * k16 + (j < L.size() && L[j].pitch != L[i].pitch ? 10 : -6);
-            if (active(Pad, bar)) notes_.push_back({ Pad, L[i].pitch, std::max<int64_t>(0, t0), t1, std::clamp(vel, .05f, 1.0f) });
+            static constexpr int trackOfVoice[4] = { BassVoice, Tenor, Alto, Soprano };
+            if (active(trackOfVoice[v], bar)) notes_.push_back({ trackOfVoice[v], L[i].pitch, std::max<int64_t>(0, t0), t1, std::clamp(vel, .05f, 1.0f) });
             // the piano doubles the melody, an octave up at the peak, and breaks chords there
-            if (v == 3 && active(Lead, bar))
+            if (v == 3 && active(Piano, bar))
             {
                 const int pp = L[i].pitch + (energy > .9f ? 12 : 0);
-                notes_.push_back({ Lead, pp, std::max<int64_t>(0, t0 + 4), std::max(t0 + 60, t1 - 40), std::clamp(vel + (energy > .9f ? -.06f : .04f), .05f, 1.0f) });
+                notes_.push_back({ Piano, pp, std::max<int64_t>(0, t0 + 4), std::max(t0 + 60, t1 - 40), std::clamp(vel + (energy > .9f ? -.06f : .04f), .05f, 1.0f) });
             }
             i = j - 1;
         }
@@ -637,31 +639,41 @@ void ChoraleComposer::writeVoices()
         const auto& c = chords_[size_t(k)];
         const int bar = c.start / 16;
         const auto& sec = sections_[size_t(c.section)];
-        if (!active(Lead, bar) || c.len < 16 || sec.energy < .6f || !r.chance(.5)) continue;
+        // The sub: the chord's root, an octave and more under the bass voice, where the music is highest.
+        if (active(Sub, bar) && sec.energy >= .65f)
+        {
+            int sp = 26 + pc(tonicPc_ + c.root - 26);
+            if (sp > 38) sp -= 12;
+            notes_.push_back({ Sub, sp, int64_t(c.start) * k16, int64_t(c.start + c.len) * k16 + 20, .8f });
+        }
+        if (!active(Piano, bar) || c.len < 16 || sec.energy < .6f || !r.chance(.5)) continue;
         const auto& vo = voicings_[size_t(k)];
         const int arp[4] = { vo[1] + 12, vo[2] + 12, vo[3] + 12, vo[2] + 12 };
         for (int i = 0; i < 4; ++i)
         {
             const int64_t t = int64_t(c.start + c.len / 2 + 2 * i) * k16 + (i % 2 ? swingTicks_ / 2 : 0);
-            if (arp[i] <= 96) notes_.push_back({ Lead, arp[i], t, t + 2 * k16 - 20, .2f + .04f * float(i % 2 == 0) });
+            if (arp[i] <= 96) notes_.push_back({ Piano, arp[i], t, t + 2 * k16 - 20, .2f + .04f * float(i % 2 == 0) });
         }
     }
 }
 
 // ---------------------------------------------------------------- the rhythm section
+// Euclidean rhythm: k onsets spread as evenly as they go over n steps, rotated.
+static std::vector<bool> euclid(int k, int n, int rot)
+{
+    std::vector<bool> out(size_t(n), false);
+    for (int i = 0; i < n; ++i) out[size_t((i + rot) % n)] = (i * k) % n < k;
+    return out;
+}
+
 void ChoraleComposer::writeRhythm()
 {
     Rng r(rng_.next());
-    enum : int { kKick = 36, kGhost = 36, kBack = 43, kLowTom = 40, kSub = 31 };
-    enum : int { kTick = 84, kClick = 72, kAccent = 79, kLow = 67 };
-    // Deep drum patterns, 16 steps. Step 0 (the kick) and step 8 (the backbeat) never move: they
-    // are what keeps the time under everything else. K kick, k ghost kick, t low tom.
-    static const char* bank[] = {
-        "K.......T.......", "K.......T.....k.", "K.....k.T.......", "K..k....T..K....",
-        "K......KT...k..t", "K.k.....T.k..K..", "K..K..k.T....k.t", "K..k..K.T.k..t.k",
-    };
-    std::string pattern = bank[0];
-    int crossPeriod = 5;
+    // Micro percussion pitches, for the impulse instrument: under 96 a sine impulse (higher
+    // pitch, higher frequency, up to about 15 kHz), from 96 up a noise tick.
+    enum : int { kBeat = 84, kOne = 88, kNoise = 100, kNoiseHi = 104 };
+    enum : int { kKick = 36, kTom = 43, kSubDrop = 31 };
+    int crossPeriod = 5, grid = 16, rot = 0, onsets = 5;
 
     for (int bar = 0; bar < totalBars(); ++bar)
     {
@@ -674,87 +686,155 @@ void ChoraleComposer::writeRhythm()
 
         if (inSec == 0) crossPeriod = r.chance(.5) ? 5 : 7;
 
-        // ---- micro percussion: a click on every beat, then swing, ratchets and cross-accents
-        if (active(Seq, bar))
+        // ---- micro percussion
+        if (active(Micro, bar))
         {
             const bool drop = lastBarOfSection && r.chance(.6); // a breath before the next section
-            for (int step = 0; step < 16; ++step)
+            // the anchor: an impulse on every beat, brighter on one
+            for (int beat = 0; beat < 4; ++beat)
             {
-                if (drop && step >= 12) break;
-                const bool beat = step % 4 == 0, eighth = step % 2 == 0;
-                if (beat)
+                if (drop && beat == 3) break;
+                const int64_t t = b0 + beat * kPPQ;
+                notes_.push_back({ Micro, beat == 0 ? kOne : kBeat, t, t + 60, beat == 0 ? .7f : .5f });
+            }
+            // the ornament: every two bars a new grid (sixteenths, triplets, quintuplets, sextuplets,
+            // septuplets, thirty-seconds) and a Euclidean pattern on it
+            if (inSec % 2 == 0)
+            {
+                static constexpr std::array<int, 6> grids = { 16, 12, 20, 24, 28, 32 };
+                const std::array<double, 6> w = { 1.0, .5, .35 + .4 * e, .3, .25 + .4 * e, .1 + .6 * e };
+                grid = grids[size_t(r.weighted(w))];
+                onsets = std::max(2, int(std::lround(grid * (.18 + .38 * e + .08 * r.uniform()))));
+                rot = r.range(0, grid - 1);
+            }
+            if (e > .2f)
+            {
+                const auto pat = euclid(onsets, grid, rot);
+                for (int i = 0; i < grid; ++i)
                 {
-                    const bool one = step == 0;
-                    const int p = one ? (inSec == 0 ? kAccent + 5 : kAccent) : kTick;
-                    notes_.push_back({ Seq, p, b0 + step * k16, b0 + step * k16 + 90, one ? .72f : .55f });
-                    continue;
-                }
-                const double density = .12 + .72 * e;
-                if (r.chance(eighth ? density * 1.15 : density * .8))
-                {
-                    const int64_t t = stepTick(step) + (eighth ? 0 : r.range(-6, 6));
-                    const float vel = float(eighth ? .4 + .08 * r.uniform() : .24 + .1 * r.uniform());
-                    notes_.push_back({ Seq, eighth ? kClick : (r.chance(.5) ? kTick : kClick + 2), t, t + 70, vel });
+                    if (!pat[size_t(i)]) continue;
+                    int64_t t = b0 + int64_t(i) * kBarTicks / grid;
+                    if (grid == 16 && i % 2) t += swingTicks_;
+                    if ((t - b0) % kPPQ < 30 || (t - b0) % kPPQ > kPPQ - 30) continue; // leave the beat to the anchor
+                    if (drop && t - b0 >= 3 * kPPQ) continue;
+                    const bool strong = (i * 4) % grid == 0;
+                    const int p = strong ? r.range(78, 92) : (r.chance(.6) ? kNoise : r.range(66, 94));
+                    notes_.push_back({ Micro, p, t, t + 40, float(strong ? .42 : .2 + .14 * r.uniform()) });
                 }
             }
             // cross-accents every 5 or 7 sixteenths, running across the barlines
-            for (int step = 0; step < 16 && e > .25f; ++step)
+            for (int step = 0; step < 16 && e > .3f; ++step)
                 if ((bar * 16 + step) % crossPeriod == 0 && step % 4 != 0 && !(drop && step >= 12))
-                    notes_.push_back({ Seq, kLow, stepTick(step), stepTick(step) + 80, .38f + .12f * e });
-            // ratchets: one sixteenth split into 3 to 6 hits, its pitch sweeping
-            if (std::strcmp(sec.name, "Invocation") != 0 && r.chance(.1 + .5 * e))
+                    notes_.push_back({ Micro, kNoiseHi, stepTick(step), stepTick(step) + 40, .3f + .15f * e });
+            // ratchets: one sixteenth split into 4 to 8 impulses, sweeping up or down
+            if (std::strcmp(sec.name, "Invocation") != 0 && r.chance(.1 + .45 * e))
             {
                 static constexpr std::array<int, 6> spots = { 15, 7, 14, 11, 3, 13 };
                 const int step = spots[size_t(r.weighted(std::array<double, 6> { .35, .2, .15, .1, .1, .1 }))];
-                const int hits = r.range(3, 6), dir = r.chance(.5) ? 1 : -1;
-                int p = r.range(66, 80);
+                const int hits = r.range(4, 8), dir = r.chance(.5) ? 1 : -1;
+                int p = dir > 0 ? r.range(70, 80) : r.range(84, 94);
                 for (int h = 0; h < hits; ++h, p += dir * r.range(1, 3))
                 {
                     const int64_t t = b0 + step * k16 + h * (k16 / hits);
-                    notes_.push_back({ Seq, std::clamp(p, kMicroPitchRange[0], kMicroPitchRange[1]), t, t + std::max(20, k16 / hits - 12),
-                                       float(dir > 0 ? .22 + .08 * h : .55 - .07 * h) });
+                    notes_.push_back({ Micro, std::clamp(p, kMicroPitchRange[0], kMicroPitchRange[1]), t, t + std::max(15, k16 / hits - 10),
+                                       float(dir > 0 ? .18 + .06 * h : .5 - .05 * h) });
                 }
             }
         }
 
-        // ---- deep drums
-        if (active(Bass, bar))
+        // ---- deep drums: sparse now, a pulse at the start of every other bar, the backbeat now and
+        // then, a fill only where a section ends, a sub drop where the big sections arrive
+        if (active(Drums, bar))
         {
-            if (inSec % 4 == 0)
-            {   // a new four bars: a pattern by energy, then a mutation of its weak steps
-                const int lo = e < .5f ? 0 : e < .8f ? 2 : 4;
-                pattern = bank[r.range(lo, lo + 3 > 7 ? 7 : lo + 3)];
-                if (r.chance(.4))
-                {
-                    const int s = r.range(1, 15);
-                    if (s != 8) pattern[size_t(s)] = pattern[size_t(s)] == '.' ? 'k' : '.';
-                }
-            }
-            const bool fill = inSec % 8 == 7 && e > .4f;
-            for (int step = 0; step < 16; ++step)
+            if (inSec % 2 == 0) notes_.push_back({ Drums, kKick, b0, b0 + 200, .85f });
+            if (r.chance(.15 + .3 * e)) notes_.push_back({ Drums, kTom, b0 + 2 * kPPQ, b0 + 2 * kPPQ + 200, .55f + .2f * e });
+            if (lastBarOfSection && e > .5f)
             {
-                if (fill && step >= 8) break;
-                const char x = pattern[size_t(step)];
-                if (x == '.') continue;
-                int p = x == 'T' ? kBack : x == 't' ? kLowTom : kKick;
-                float vel = x == 'K' ? .9f : x == 'T' ? .76f : x == 't' ? .5f : .45f;
-                int64_t t = step == 0 || step == 8 ? b0 + step * k16 : stepTick(step) + (x == 'k' ? r.range(4, 12) : 0); // ghosts lay back
-                notes_.push_back({ Bass, p, t, t + 160, vel });
-            }
-            if (fill)
-            {   // a tom fill over beats 3 and 4: sixteenths or sextuplets, falling, louder
                 static constexpr int toms[] = { 48, 45, 43, 41, 40, 38, 36 };
                 const bool sextuplets = r.chance(.45);
-                const int count = sextuplets ? 12 : 8, spacing = sextuplets ? kPPQ / 6 : k16;
+                const int count = sextuplets ? 6 : 4, spacing = sextuplets ? kPPQ / 6 : k16;
                 for (int h = 0; h < count; ++h)
                 {
-                    const int64_t t = b0 + 2 * kPPQ + h * spacing;
-                    const int p = toms[std::min(6, h * 7 / count)];
-                    notes_.push_back({ Bass, p, t, t + spacing - 10, .45f + .4f * float(h) / count });
+                    const int64_t t = b0 + 3 * kPPQ + h * spacing;
+                    notes_.push_back({ Drums, toms[std::min(6, h * 7 / count)], t, t + spacing - 10, .45f + .4f * float(h) / count });
                 }
             }
             const bool arrival = inSec == 0 && (std::strcmp(sec.name, "Theme") == 0 || std::strcmp(sec.name, "Return") == 0 || std::strcmp(sec.name, "Apotheosis") == 0);
-            if (arrival) notes_.push_back({ Bass, kSub, b0, b0 + 2 * kPPQ, .9f });
+            if (arrival) notes_.push_back({ Drums, kSubDrop, b0, b0 + 2 * kPPQ, .9f });
+        }
+    }
+    writeSentences(r);
+}
+
+// The rhythm sentences: pitched impulses in sixteenths, eighths and dotted eighths around the
+// melody, shaped like a classical sentence over eight bars: an idea (two bars), its repetition,
+// a continuation that breaks it into shorter pieces, and a cadence that lands and holds.
+void ChoraleComposer::writeSentences(Rng& r)
+{
+    // cells in sixteenths; a negative length is a rest
+    static const std::vector<std::vector<int>> cells = {
+        { 1, 1, 2 }, { 3, 1 }, { 2, 2 }, { 3, 3, 2 }, { 1, 2, 1 }, { 2, 1, 1 }, { 3, -1 }, { -2 }, { 2, -2 }, { 1, 1, 1, 1 },
+    };
+    auto makeIdea = [&](int length, double density) {
+        std::vector<int> out;
+        int at = 0;
+        while (at < length)
+        {
+            std::vector<int> c = r.chance(density) ? cells[size_t(r.range(0, int(cells.size()) - 1))] : std::vector<int> { -2 };
+            for (int d : c)
+            {
+                const int len = std::min(std::abs(d), length - at);
+                if (len <= 0) break;
+                out.push_back(d < 0 ? -len : len);
+                at += len;
+            }
+        }
+        return out;
+    };
+    // Phrases two at a time: eight bars for a full sentence.
+    std::vector<std::pair<int, int>> phrases; // start16, len16
+    for (auto& c : chords_)
+        if (phrases.empty() || phrases.back().first != c.phraseStart) phrases.push_back({ c.phraseStart, c.phraseLen });
+    for (size_t ph = 0; ph < phrases.size(); ph += 2)
+    {
+        const int start = phrases[ph].first;
+        const int len = phrases[ph].second + (ph + 1 < phrases.size() ? phrases[ph + 1].second : 0);
+        const int bar0 = start / 16;
+        if (!active(Blips, bar0) || len < 64) continue;
+        const float e = energyAt(bar0);
+
+        const auto idea = makeIdea(32, .45 + .4 * e);
+        std::vector<int> rhythm = idea;                                     // bars 1-2: the idea
+        auto again = idea;                                                  // bars 3-4: again, its end varied
+        if (again.size() > 2) { int tail = 0; while (!again.empty() && tail < 8) { tail += std::abs(again.back()); again.pop_back(); } auto v = makeIdea(tail, .8); again.insert(again.end(), v.begin(), v.end()); }
+        rhythm.insert(rhythm.end(), again.begin(), again.end());
+        if (len >= 128)
+        {
+            std::vector<int> half;                                          // bars 5-6: the idea's first bar, broken up, twice
+            int at = 0;
+            for (int d : idea) { if (at >= 16) break; half.push_back(d); at += std::abs(d); }
+            for (int k = 0; k < 2; ++k) for (int d : half) rhythm.push_back(d);
+            for (int d : { 3, 3, 2, 2, 2, 4, 8, -8 }) rhythm.push_back(d); // bars 7-8: the cadence lands and holds
+        }
+        // Pitches: chord tones above the melody, walking up and down through them.
+        int at = start, dir = 1, idx = 0;
+        for (size_t i = 0; i < rhythm.size() && at < start + len; ++i)
+        {
+            const int d = rhythm[i];
+            if (d < 0) { at -= d; continue; }
+            const auto it = std::find_if(chords_.rbegin(), chords_.rend(), [&](const Chord& ch) { return ch.start <= at; });
+            const size_t k = size_t(chords_.rend() - it - 1);
+            auto pcs = chordPcs(chords_[k]);
+            std::vector<int> ladder;
+            for (int p = 84; p <= 100; ++p) if (std::find(pcs.begin(), pcs.end(), pc(p)) != pcs.end()) ladder.push_back(p);
+            idx = std::clamp(idx + dir, 0, int(ladder.size()) - 1);
+            if (idx == 0 || idx == int(ladder.size()) - 1 || r.chance(.2)) dir = -dir;
+            const bool longNote = d >= 4;
+            const int pitch = longNote ? std::clamp(voicings_[k][3] + 12 + (voicings_[k][3] + 12 < 84 ? 12 : 0), 84, 100) : ladder[size_t(idx)];
+            const bool onCell = (at - start) % 4 == 0;
+            const int64_t t0 = int64_t(at) * k16 + ((at % 2) ? swingTicks_ : 0);
+            notes_.push_back({ Blips, pitch, t0, t0 + int64_t(d * k16 * 0.85), float((longNote ? .55 : onCell ? .5 : .36) * (.7 + .3 * e)) });
+            at += d;
         }
     }
 }
@@ -763,7 +843,7 @@ void ChoraleComposer::writeRhythm()
 void ChoraleComposer::writeLevels()
 {
     for (int bar = 0; bar < totalBars(); ++bar)
-        for (int tr = 0; tr < kNumTracks; ++tr)
+        for (int tr = 0; tr < kChoraleTracks; ++tr)
         {
             float level = 0;
             if (active(tr, bar))
@@ -773,7 +853,7 @@ void ChoraleComposer::writeLevels()
                 const float fadeIn = active(tr, sec.startBar - 1) ? 1.0f : std::min(1.0f, (in + 1) / 2.0f);
                 const float fadeOut = active(tr, sec.startBar + sec.bars) || bar + 1 == totalBars() ? 1.0f : std::min(1.0f, (left - 0.5f) / 1.5f);
                 level = std::min(fadeIn, fadeOut);
-                if (tr == Pad) level *= 0.7f + 0.3f * energyAt(bar); // calm sections sit lower (measured: the Dissolution was louder than the Theme)
+                if (tr <= BassVoice) level *= 0.7f + 0.3f * energyAt(bar); // calm sections sit lower (measured: the Dissolution was louder than the Theme)
             }
             levels_.push_back({ int64_t(bar) * kBarTicks, Event::Level, uint8_t(tr), 0, level });
         }

@@ -60,7 +60,7 @@ BerlinComposer::BerlinComposer(uint64_t seed) : Composer(seed)
 
 void BerlinComposer::planForm()
 {
-    struct T { const char* name; int bars; float energy; uint8_t layers; bool theme; };
+    struct T { const char* name; int bars; float energy; uint16_t layers; bool theme; };
     static const T plan[] = {
         { "Drift",     16, .15f, bit(Pad), false },
         { "Pulse",     16, .30f, uint8_t(bit(Pad) | bit(Bass)), false },
@@ -411,6 +411,23 @@ std::string BerlinComposer::describe() const
     std::snprintf(buf, sizeof buf, "%s %s (shift: %s) · %.0f bpm · %d bars · %d:%02d", names[tonicPc_],
                   homeMode_->name, shiftMode_->name, bpm_, totalBars(), int(secs) / 60, int(secs) % 60);
     return buf;
+}
+
+const SceneInfo& sceneInfo(const std::string& scene)
+{
+    static const SceneInfo berlin {
+        "berlin", 4, { "pad", "bass", "seq", "lead" }, { 0, 1, 2, 3 },
+        { { .15f, .35f }, { .05f, .15f }, { .35f, .25f }, { .30f, .35f } }, { -1, -1, -1, -1 }, {},
+    };
+    // The chorale: each voice its own track (and its own delay), the voices change sound as one.
+    static const SceneInfo chorale {
+        "chorale", 9, { "soprano", "alto", "tenor", "bass", "sub", "drums", "micro", "blips", "piano" },
+        { 0, 0, 0, 0, 1, 1, 2, 2, 3 },
+        { { 0, .30f }, { 0, .30f }, { 0, .30f }, { 0, .26f }, { 0, .04f }, { .04f, .12f }, { .22f, .12f }, { .28f, .22f }, { .15f, .28f } },
+        { -1, 0, 0, 0, -1, -1, -1, -1, -1 },
+        { true, true, true, true, false, false, false, false, false }, // not the piano: pure broke its patches (an octave off)
+    };
+    return scene == "chorale" ? chorale : berlin;
 }
 
 std::unique_ptr<Composer> makeComposer(const std::string& scene, uint64_t seed)

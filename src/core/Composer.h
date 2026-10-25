@@ -10,8 +10,32 @@ constexpr int kPPQ = 960;                 // ticks per quarter note
 constexpr int kSixteenth = kPPQ / 4;
 constexpr int kBarTicks = 4 * kPPQ;       // 4/4 throughout this scene
 
+// The Berlin scene's tracks. Other scenes name their own (see SceneInfo).
 enum Track : uint8_t { Pad, Bass, Seq, Lead, kNumTracks };
 inline const char* kTrackNames[kNumTracks] = { "pad", "bass", "seq", "lead" };
+
+constexpr int kMaxTracks = 10;
+
+// What a scene asks of the engine: its tracks by name, what each is to the visuals
+// (0 harmony, 1 bass and drums, 2 rhythm, 3 melody), its sends to the shared delay and
+// reverb, which tracks change sound together (the first one's plan; -1 its own), and which
+// get pure tuning (no unison detune, no drift, no chorus-type effects).
+struct SceneInfo
+{
+    const char* name;
+    int numTracks;
+    const char* trackNames[kMaxTracks];
+    int role[kMaxTracks];
+    float sends[kMaxTracks][2];
+    int group[kMaxTracks];
+    bool pure[kMaxTracks];
+    int trackOf(const std::string& n) const
+    {
+        for (int t = 0; t < numTracks; ++t) if (n == trackNames[t]) return t;
+        return -1;
+    }
+};
+const SceneInfo& sceneInfo(const std::string& scene);
 
 struct Event
 {
@@ -36,7 +60,7 @@ struct Section
     const char* name;
     int startBar, bars;
     float energy;   // reached halfway through the section
-    uint8_t layers; // bit per Track
+    uint16_t layers; // bit per track
     bool restoreTheme; // the original sequences come back here
 };
 

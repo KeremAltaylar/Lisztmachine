@@ -23,10 +23,19 @@ struct PaletteEntry
     float gainDb;       // this patch's level in the mix
     float brightness;   // measured spectral centroid, Hz: the dark-to-bright order
 };
+// A per-track echo, ping-pong between left and right: its time in beats, how much comes back,
+// and how much is heard.
+struct InsertDelay { float beats = 0, feedback = 0, mix = 0; };
 struct Palette
 {
-    std::vector<PaletteEntry> parts[kNumTracks];
-    juce::String load(const juce::File& file); // returns an error or empty
+    std::string scene = "berlin";
+    const SceneInfo* info = &sceneInfo("berlin");
+    std::vector<PaletteEntry> parts[kMaxTracks];
+    float trackGainDb[kMaxTracks] = {}; // "gain <track> dB": the balance between tracks
+    InsertDelay delays[kMaxTracks];     // "delay <track> beats feedback mix"
+    // Lines: "part gain bright Category/Patch" (a Surge patch, or internal/click|blip|sub),
+    // "voices ..." for every track of the voice group, "gain ...", "delay ...".
+    juce::String load(const juce::File& file, const std::string& scene = "berlin"); // returns an error or empty
 };
 juce::File findPalette(const juce::String& name); // sounds/<name>.txt, searched upward from the executable
 
@@ -36,8 +45,45 @@ struct SoundChange { int bar, track, entry; };
 // sections and a few bars apart, never all at once. Deterministic per seed.
 std::vector<SoundChange> planSounds(const Composer& composer, const Palette& palette, uint64_t seed);
 
-// Sends into the shared delay and reverb, per part.
-inline constexpr float kSends[kNumTracks][2] = { { 0.15f, 0.35f }, { 0.05f, 0.15f }, { 0.35f, 0.25f }, { 0.30f, 0.35f } };
+// The engine's own instrument for impulses: no plugin, sample-exact, nothing to detune.
+//   click: under note 96 a sine impulse (pitch +36 semitones, up to 15 kHz) decaying in 2-6 ms;
+//          from 96 up a noise tick, 1.5 ms
+//   blip:  a sine at the note's pitch, 1 ms attack, 30-90 ms decay by velocity
+//   sub:   a held sine (and a little of its octave, for small speakers), 40 ms in, 400 ms out
+class InternalSynth
+{
+public:
+    enum Kind { Click, Blip, Sub };
+    void prepare(double sampleRate, Kind kind) { sr_ = sampleRate; kind_ = kind; for (auto& v : voices_) v.note = -1; }
+    void render(const juce::MidiBuffer& midi, float* left, float* right, int numSamples);
+    void allOff() { for (auto& v : voices_) v.note = -1; }
+
+private:
+    struct Voice { int note = -1; double phase = 0, inc = 0, env = 0, gain = 0, decay = 0, attack = 0, release = 0; float panL = 0.7f, panR = 0.7f; bool noise = false, held = false; float lastNoise = 0; };
+    void start(int note, float velocity);
+    void stopNote(int note);
+    void run(float* l, float* r, int from, int to);
+    std::array<Voice, 64> voices_;
+    double sr_ = 48000;
+    Kind kind_ = Click;
+    uint32_t seed_ = 12345;
+    int flip_ = 0;
+};
+
+// The ping-pong echo of one track: the dry signal and its echoes, darkened and thinned a
+// little each time round so long feedback stays clear instead of muddy.
+class FeedbackDelay
+{
+public:
+    void prepare(double sampleRate);
+    void set(double seconds, float feedback, float mix);
+    void process(float* left, float* right, int numSamples);
+
+private:
+    std::vector<float> l_, r_;
+    int w_ = 0, d_ = 1;
+    float fb_ = 0, mix_ = 0, lpL_ = 0, lpR_ = 0, hpL_ = 0, hpR_ = 0, lpA_ = 0.4f, hpA_ = 0.02f;
+};
 
 // The shared buses. Delay times are set from the tempo when a concert starts.
 inline const FxSpec kDelayBus { "Delay", { { "Feedback/EQ Feedback", "68 %" }, { "Feedback/EQ Crossfeed", "35 %" },
@@ -61,6 +107,9 @@ juce::File findSurgePatch(const juce::String& categoryAndName);
 // Loads a Surge XT factory patch (.fxp) into a hosted Surge instance and reads the
 // state back to confirm it took. Returns an error, or empty on success.
 juce::String loadSurgePatch(juce::AudioPluginInstance& surge, const juce::File& fxp);
+// Pure tuning for a loaded patch: one voice per oscillator, no detune or drift, whole-semitone
+// oscillators, no chorus-type effects.
+void purify(juce::AudioPluginInstance& surge);
 
 std::unique_ptr<juce::AudioPluginInstance> createSurge(double sampleRate, int maxBlock, juce::String& error);
 
@@ -92,7 +141,8 @@ public:
     juce::String load(double sampleRate, int maxBlock, const Palette& palette);
     // Message thread. A new concert from this seed, from bar 0 or from any later bar.
     void start(uint64_t seed, int startBar = 0);
-    std::string scene = "berlin"; // which composer start() uses
+    std::string scene = "berlin"; // which composer start() uses: the palette's scene
+    float feedbackOverride = -1;  // >= 0: every track's echo feeds back this much (the app's control, the renderer's --feedback)
     void stop();
     // Message thread, often (a timer): loads each part's next sound into its idle instance
     // ahead of the change. The audio thread never waits for this; a sound not ready in
@@ -115,13 +165,13 @@ public:
     std::atomic<double> seconds { 0 }; // playhead
     std::atomic<float> peakPre { 0 }, peakPost { 0 }; // master, before and after the limiter
     struct Meter { std::atomic<float> peak { 0 }; std::atomic<double> sumSquares { 0 }; std::atomic<int64_t> samples { 0 }; };
-    Meter meters[kNumTracks];
+    Meter meters[kMaxTracks];
     Meter delayMeter, reverbMeter; // what the shared buses return to the mix
     bool effects = true;           // false: no delay or reverb (the renderer's --dry)
     std::atomic<int> changesMade { 0 }, missedChanges { 0 };
     float clickLevel = 0.5f;
     PeakLimiter limiter;
-    uint8_t enabledTracks = 0x0F; // bit per Track; the renderer's --solo
+    uint16_t enabledTracks = 0xFFFF; // bit per track; the renderer's --solo
 
 private:
     // Each part has two instances: one live, the other loading the next sound or ringing out.
@@ -148,6 +198,11 @@ private:
         float held[128] = {}; // velocity of each note sounding now, 0 when off
         std::vector<SoundChange> changes;
         std::atomic<size_t> nextChange { 0 };
+        bool internal = false;      // the engine's own instrument, not Surge
+        InternalSynth synth;
+        FeedbackDelay echo;
+        bool hasEcho = false;
+        float trim = 1;             // the track's balance gain
     };
     juce::String loadInto(Slot& slot, int track, int entry);
     void changeSound(int track, int at);
@@ -158,7 +213,8 @@ private:
 
     double sampleRate_ = 48000;
     int maxBlock_ = 512;
-    TrackState tracks_[kNumTracks];
+    TrackState tracks_[kMaxTracks];
+    int numTracks_ = 4;
     std::vector<float> gains_;
     Palette palette_;
     std::vector<SoundChange> plan_;

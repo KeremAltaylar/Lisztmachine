@@ -12,14 +12,17 @@ namespace liszt {
 // parallel fifths or octaves, leading tones rise, sevenths fall, nothing missing, good
 // spacing), then decorated with suspensions, passing tones and appoggiaturas.
 //
-// Around them: micro percussion that keeps a click on every beat under swing, ratchets and
-// cross-accents, and deep drums anchored on 1 and 3 with ghost notes, fills and sub drops.
+// Around them: micro impulses that keep one on every beat, with Euclidean patterns on changing
+// grids (sixteenths, triplets, quintuplets, sextuplets, septuplets, thirty-seconds), cross-accents
+// and ratchets; pitched impulse sentences in sixteenths, eighths and dotted eighths around the
+// melody; sparse deep drums; a sine sub under the climax.
 //
-// Track slots: Pad = the four voices, Bass = deep drums, Seq = micro percussion,
-// Lead = piano doubling the melody.
+// Nine tracks (see sceneInfo("chorale")): each voice its own, a sine sub under the climax,
+// sparse deep drums, micro impulses, pitched impulse sentences, and the piano doubling the melody.
 class ChoraleComposer : public Composer
 {
 public:
+    enum CTrack : uint8_t { Soprano, Alto, Tenor, BassVoice, Sub, Drums, Micro, Blips, Piano, kChoraleTracks };
     explicit ChoraleComposer(uint64_t seed);
     void generateBar(int bar, std::vector<Event>& out) override;
     std::string describe() const override;
@@ -45,7 +48,7 @@ public:
 
     static constexpr int kVoiceRange[4][2] = { { 36, 62 }, { 48, 69 }, { 55, 76 }, { 60, 81 } };
     static constexpr int kDrumPitchRange[2] = { 28, 52 };
-    static constexpr int kMicroPitchRange[2] = { 55, 100 };
+    static constexpr int kMicroPitchRange[2] = { 55, 108 };
 
 private:
     struct Note { int track; int pitch; int64_t start, end; float vel; };
@@ -54,6 +57,7 @@ private:
     void voiceLowerParts();
     void writeVoices();
     void writeRhythm();
+    void writeSentences(Rng& r);
     void writeLevels();
     void finish();
     bool active(int track, int bar) const;

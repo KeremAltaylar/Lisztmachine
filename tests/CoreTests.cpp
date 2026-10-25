@@ -162,8 +162,8 @@ int main()
             steps += 1; stepwise += d <= 2 ? 1 : 0;
         }
 
-        // the rhythm keeps time: a click on every beat while the micro percussion plays (the bar
-        // before a new section may drop its last beat), a kick on every downbeat with the drums
+        // the rhythm keeps time: an impulse on every beat while the micro percussion plays (the bar
+        // before a new section may drop its last beat), a deep pulse every other downbeat with the drums
         std::set<std::pair<int, int64_t>> onsets;
         for (auto& x : ev) if (x.type == Event::NoteOn) onsets.insert({ int(x.track), x.tick });
         int beats = 0, missing = 0;
@@ -171,14 +171,15 @@ int main()
         {
             const auto& sec = c.sectionAt(bar);
             const int64_t t0 = int64_t(bar) * kBarTicks;
-            if (sec.layers & (1 << Seq))
+            using C = ChoraleComposer;
+            if (sec.layers & (1 << C::Micro))
                 for (int b = 0; b < 4; ++b)
                 {
                     ++beats;
-                    if (!onsets.count({ int(Seq), t0 + b * kPPQ })) ++missing;
+                    if (!onsets.count({ int(C::Micro), t0 + b * kPPQ })) ++missing;
                 }
-            if (sec.layers & (1 << Bass))
-                CHECK(onsets.count({ int(Bass), t0 }), "chorale: no kick on the downbeat of bar %d", bar);
+            if ((sec.layers & (1 << C::Drums)) && (bar - sec.startBar) % 2 == 0)
+                CHECK(onsets.count({ int(C::Drums), t0 }), "chorale: no pulse on the downbeat of bar %d", bar);
         }
         CHECK(missing <= beats / 40, "chorale: %d of %d beats without a click", missing, beats);
     }

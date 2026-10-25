@@ -222,9 +222,13 @@ void PeakLimiter::process(float* l, float* r, int n)
     }
 }
 
-juce::String Palette::load(const juce::File& file)
+juce::String Palette::load(const juce::File& file, const std::string& sceneName)
 {
+    scene = sceneName;
+    info = &sceneInfo(sceneName);
     for (auto& p : parts) p.clear();
+    for (auto& g : trackGainDb) g = 0;
+    for (auto& d : delays) d = {};
     if (!file.existsAsFile()) return "no palette at " + file.getFullPathName();
 
     juce::StringArray lines;
@@ -235,21 +239,31 @@ juce::String Palette::load(const juce::File& file)
         if (line.isEmpty()) continue;
         auto tokens = juce::StringArray::fromTokens(line, " \t", "");
         tokens.removeEmptyStrings();
-        int track = -1;
-        for (int t = 0; t < kNumTracks; ++t)
-            if (tokens[0] == kTrackNames[t]) track = t;
-        if (track < 0 || tokens.size() < 4)
-            return file.getFileName() + " line " + juce::String(n + 1) + ": expected 'part gain bright Category/Patch'";
+        const auto where = file.getFileName() + " line " + juce::String(n + 1) + ": ";
+        if (tokens[0] == "gain" || tokens[0] == "delay")
+        {
+            const int t = info->trackOf(tokens[1].toStdString());
+            if (t < 0) return where + "no track '" + tokens[1] + "' in the " + juce::String(scene) + " scene";
+            if (tokens[0] == "gain") trackGainDb[t] = tokens[2].getFloatValue();
+            else if (tokens.size() >= 5) delays[t] = { tokens[2].getFloatValue(), juce::jlimit(0.0f, 0.95f, tokens[3].getFloatValue()), tokens[4].getFloatValue() };
+            else return where + "expected 'delay <track> beats feedback mix'";
+            continue;
+        }
+        std::vector<int> targets;
+        if (tokens[0] == "voices") { for (int t = 0; t < info->numTracks; ++t) if (t == 0 ? info->group[1] == 0 : info->group[t] == 0) targets.push_back(t); }
+        else if (int t = info->trackOf(tokens[0].toStdString()); t >= 0) targets.push_back(t);
+        if (targets.empty() || tokens.size() < 4)
+            return where + "expected 'part gain bright Category/Patch'";
         // The patch name is the rest of the line: it may contain spaces.
         auto patch = line.fromFirstOccurrenceOf(tokens[2], false, false).trim();
-        if (!findSurgePatch(patch).existsAsFile())
-            return file.getFileName() + " line " + juce::String(n + 1) + ": no Surge patch '" + patch + "'";
-        parts[track].push_back({ patch, tokens[1].getFloatValue(), tokens[2].getFloatValue() });
+        if (!patch.startsWith("internal/") && !findSurgePatch(patch).existsAsFile())
+            return where + "no Surge patch '" + patch + "'";
+        for (int t : targets) parts[t].push_back({ patch, tokens[1].getFloatValue(), tokens[2].getFloatValue() });
     }
     for (auto& p : parts)
         std::stable_sort(p.begin(), p.end(), [](auto& a, auto& b) { return a.brightness < b.brightness; });
-    for (int t = 0; t < kNumTracks; ++t)
-        if (parts[t].empty()) return file.getFileName() + ": no patches for " + kTrackNames[t];
+    for (int t = 0; t < info->numTracks; ++t)
+        if (parts[t].empty()) return file.getFileName() + ": no patches for " + info->trackNames[t];
     return {};
 }
 
@@ -265,18 +279,28 @@ juce::File findPalette(const juce::String& name)
 
 std::vector<SoundChange> planSounds(const Composer& composer, const Palette& palette, uint64_t seed)
 {
-    static constexpr int offsetBars[kNumTracks] = { 0, 4, 2, 0 }; // pad, bass, seq, lead
+    static constexpr int offsetBars[kMaxTracks] = { 0, 4, 2, 0, 4, 2, 0, 4, 2, 0 }; // Berlin: pad, bass, seq, lead
     Rng rng(seed * 0x9E3779B97F4A7C15ull + 7);
     std::vector<SoundChange> plan;
     const auto& sections = composer.sections();
-    for (int t = 0; t < kNumTracks; ++t)
+    const auto& info = *palette.info;
+    for (int t = 0; t < info.numTracks; ++t)
     {
+        // A track in a group follows the group's first track: same bars, same entries.
+        if (info.group[t] >= 0)
+        {
+            const int lead = info.group[t];
+            for (size_t k = 0, m = plan.size(); k < m; ++k)
+                if (plan[k].track == lead) plan.push_back({ plan[k].bar, t, std::min(plan[k].entry, int(palette.parts[t].size()) - 1) });
+            continue;
+        }
+        if (palette.parts[t].size() == 1 && palette.parts[t][0].patch.startsWith("internal/")) { plan.push_back({ 0, t, 0 }); continue; }
         const int n = int(palette.parts[t].size());
         int last = -1, beforeLast = -1;
         for (int s = 0; s < int(sections.size()); ++s)
         {
             // Pad and sequence change on even sections, bass and lead on odd ones.
-            const bool evenPart = t == Pad || t == Seq;
+            const bool evenPart = t % 2 == 0;
             if (s > 0 && (s % 2 == 0) != evenPart) continue;
 
             // Energy picks a place on the dark-to-bright line, with a little seeded wander,
@@ -313,10 +337,25 @@ juce::String Engine::load(double sampleRate, int maxBlock, const Palette& palett
     palette_ = palette;
     gains_.assign(size_t(maxBlock), 0);
 
-    for (int i = 0; i < kNumTracks; ++i)
+    numTracks_ = palette.info->numTracks;
+    scene = palette.scene;
+    for (int i = 0; i < numTracks_; ++i)
     {
         auto& t = tracks_[i];
         int channels = 2;
+        const auto& first = palette.parts[i].front().patch;
+        t.internal = first.startsWith("internal/");
+        t.trim = juce::Decibels::decibelsToGain(palette.trackGainDb[i]);
+        t.echo.prepare(sampleRate);
+        t.hasEcho = palette.delays[i].beats > 0 && palette.delays[i].mix > 0;
+        if (t.internal)
+        {
+            const auto kind = first.endsWith("sub") ? InternalSynth::Sub : first.endsWith("blip") ? InternalSynth::Blip : InternalSynth::Click;
+            t.synth.prepare(sampleRate, kind);
+            for (auto& s : t.slots) { s.plugin.reset(); s.midi.ensureSize(8192); s.state = Idle; s.entry = 0; s.gain = juce::Decibels::decibelsToGain(palette.parts[i].front().gainDb); }
+            t.buffer.setSize(2, maxBlock);
+            continue;
+        }
         for (auto& s : t.slots)
         {
             juce::String err;
@@ -344,11 +383,50 @@ juce::String Engine::load(double sampleRate, int maxBlock, const Palette& palett
     return {};
 }
 
+// Pure tuning: one voice per oscillator, no unison detune, oscillators on whole semitones, no
+// analog drift, and no chorus-type effect (they all move the pitch). Measured on the factory
+// choirs: up to 16 voices spread +-38 cents, one oscillator 0.32 semitones sharp.
+void purify(juce::AudioPluginInstance& p)
+{
+    auto find = [&](const juce::String& name) -> juce::AudioProcessorParameter* {
+        for (auto* q : p.getParameters()) if (q->getName(128) == name) return q;
+        return nullptr;
+    };
+    for (auto sc : { "A", "B" })
+    {
+        const juce::String scn(sc);
+        for (int o = 1; o <= 3; ++o)
+        {
+            const auto osc = scn + " Osc " + juce::String(o) + " ";
+            setParameterText(p, osc + "Unison Voices", "1 voice");
+            setParameterText(p, osc + "Unison Detune", "0.00 cents");
+            if (auto* q = find(osc + "Pitch"))
+            {
+                const double v = q->getCurrentValueAsText().retainCharacters("-0123456789.").getDoubleValue();
+                if (std::abs(v - std::round(v)) > 0.004) setParameterText(p, osc + "Pitch", juce::String(std::round(v), 2) + " semitones");
+            }
+        }
+        setParameterText(p, scn + " Osc Drift", "0.00 %");
+        if (auto* q = find(scn + " Pitch"))
+        {
+            const double v = q->getCurrentValueAsText().retainCharacters("-0123456789.").getDoubleValue();
+            if (std::abs(v - std::round(v)) > 0.004) setParameterText(p, scn + " Pitch", juce::String(std::round(v), 2) + " semitones");
+        }
+    }
+    static const char* moving[] = { "Chorus", "Ensemble", "Flanger", "Phaser", "Rotary Speaker", "Frequency Shifter", "Ring Modulator", "Vocoder" };
+    for (auto* q : p.getParameters())
+        if (q->getName(128).endsWith("FX Type"))
+            for (auto* m : moving)
+                if (q->getCurrentValueAsText().equalsIgnoreCase(m)) { setParameterText(p, q->getName(128), "Off"); break; }
+}
+
 // Message thread, on an instance the audio thread is not touching (Idle or Loading).
 juce::String Engine::loadInto(Slot& slot, int track, int entry)
 {
     const auto& e = palette_.parts[track][size_t(entry)];
+    if (tracks_[track].internal) { slot.entry = entry; return {}; }
     if (auto err = loadSurgePatch(*slot.plugin, findSurgePatch(e.patch)); err.isNotEmpty()) return err;
+    if (palette_.info->pure[track]) purify(*slot.plugin);
     slot.plugin->reset();
     slot.cutoff = nullptr;
     for (auto* p : slot.plugin->getParameters())
@@ -388,7 +466,7 @@ void Engine::start(uint64_t seed, int startBar)
     // the new bar, and without that release the re-struck old chord hung under the new one.
     for (int b = 0; b <= startBar; ++b) next->generateBar(b, earlier);
     std::sort(earlier.begin(), earlier.end());
-    float level[kNumTracks] = {}, filter[kNumTracks] = {}, held[kNumTracks][128] = {};
+    float level[kMaxTracks] = {}, filter[kMaxTracks] = {}, held[kMaxTracks][128] = {};
     for (auto& e : earlier)
     {
         // A note-off on the start tick ends a note before it can be re-struck.
@@ -403,7 +481,7 @@ void Engine::start(uint64_t seed, int startBar)
         else
             carried.push_back(e);
     }
-    for (int t = 0; t < kNumTracks; ++t)
+    for (int t = 0; t < numTracks_; ++t)
         for (int p = 0; p < 128; ++p)
             if (held[t][p] > 0) carried.push_back({ startTick, Event::NoteOn, uint8_t(t), uint8_t(p), held[t][p] });
     std::sort(carried.begin(), carried.end());
@@ -434,9 +512,12 @@ void Engine::start(uint64_t seed, int startBar)
     pos_ = sampleOf(startTick) - preRollSamples(); // 50 ms pre-roll: the all-notes-off sent on start must reach the plugins before bar 0. Sent in the same block, Surge applied it after the first notes and the opening pad was silent for 8 bars.
     clickEnv_ = 0;
     const double barSeconds = 4 * 60.0 / composer_->bpm();
-    for (int i = 0; i < kNumTracks; ++i)
+    for (int i = 0; i < numTracks_; ++i)
     {
         auto& t = tracks_[i];
+        const auto& d = palette_.delays[i];
+        if (t.hasEcho) t.echo.set(d.beats * 60.0 / composer_->bpm(), feedbackOverride >= 0 ? feedbackOverride : d.feedback, d.mix);
+        if (t.internal) t.synth.allOff();
         t.gain.reset(sampleRate_, barSeconds); // level changes glide across a whole bar
         t.gain.setCurrentAndTargetValue(level[i]);
         t.filterNow = t.filterTarget = filter[i];
@@ -447,7 +528,7 @@ void Engine::start(uint64_t seed, int startBar)
         int entry = 0;
         for (auto& c : plan_)
             if (c.track == i && c.bar <= startBar) entry = c.entry;
-            else if (c.track == i) t.changes.push_back(c);
+            else if (c.track == i && !t.internal) t.changes.push_back(c);
         t.nextChange = 0;
         t.live = 0;
         t.slots[1].state = Idle;
@@ -472,7 +553,7 @@ void Engine::stop()
 
 void Engine::service()
 {
-    for (int i = 0; i < kNumTracks; ++i)
+    for (int i = 0; i < numTracks_; ++i)
     {
         auto& t = tracks_[i];
         const size_t next = t.nextChange.load();
@@ -559,11 +640,14 @@ void Engine::renderChunk(float* const* out, int numChannels, int offset, int len
 
     if (panic_.exchange(false))
         for (auto& t : tracks_)
+        {
+            if (t.internal) { t.synth.allOff(); continue; }
             for (auto& s : t.slots)
             {
                 s.midi.addEvent(juce::MidiMessage::allNotesOff(1), 0);
                 s.midi.addEvent(juce::MidiMessage::allSoundOff(1), 0);
             }
+        }
 
     if (playing)
     {
@@ -603,7 +687,7 @@ void Engine::renderChunk(float* const* out, int numChannels, int offset, int len
                 case Event::Filter:  t.filterTarget = e.value; break;
             }
         }
-        for (int i = 0; i < kNumTracks; ++i) changesDue(i, end - 1);
+        for (int i = 0; i < numTracks_; ++i) changesDue(i, end - 1);
 
         if (head_ > 8192) // keep the queue's memory; just drop what has played
         {
@@ -624,9 +708,10 @@ void Engine::renderChunk(float* const* out, int numChannels, int offset, int len
         noMidi_.clear();
     };
 
-    for (int i = 0; i < kNumTracks; ++i)
+    for (int i = 0; i < numTracks_; ++i)
     {
         auto& t = tracks_[i];
+        const float* sends = palette_.info->sends[i];
         // Glide the filter towards its target over about a quarter second.
         t.filterNow += (t.filterTarget - t.filterNow) * juce::jmin(1.0f, float(len / (0.25 * sampleRate_)));
         for (int n = 0; n < len; ++n) gains_[size_t(n)] = t.gain.getNextValue();
@@ -642,6 +727,31 @@ void Engine::renderChunk(float* const* out, int numChannels, int offset, int len
 
         float peak = 0;
         double sq = 0;
+        if (t.internal)
+        {   // the engine's own instrument: one voice pool, its MIDI in the first slot's buffer
+            auto& slot = t.slots[0];
+            t.buffer.clear();
+            t.synth.render(slot.midi, t.buffer.getWritePointer(0), t.buffer.getWritePointer(1), len);
+            slot.midi.clear();
+            if (t.hasEcho) t.echo.process(t.buffer.getWritePointer(0), t.buffer.getWritePointer(1), len);
+            for (int c = 0; c < 2; ++c)
+            {
+                const float* src = t.buffer.getReadPointer(c);
+                for (int n = 0; n < len; ++n)
+                {
+                    float x = src[n] * gains_[size_t(n)] * slot.gain * t.trim;
+                    pa[c][n] += x;
+                    delayIn.getWritePointer(c)[n] += x * sends[0];
+                    reverbIn.getWritePointer(c)[n] += x * sends[1];
+                    peak = juce::jmax(peak, std::abs(x));
+                    sq += double(x) * x;
+                }
+            }
+            meters[i].peak = juce::jmax(meters[i].peak.load(), peak);
+            meters[i].sumSquares = meters[i].sumSquares.load() + sq;
+            meters[i].samples = meters[i].samples.load() + 2 * len;
+            continue;
+        }
         for (auto& slot : t.slots)
         {
             const int state = slot.state.load();
@@ -663,6 +773,7 @@ void Engine::renderChunk(float* const* out, int numChannels, int offset, int len
             juce::AudioBuffer<float> view(t.buffer.getArrayOfWritePointers(), t.buffer.getNumChannels(), len);
             slot.plugin->processBlock(view, slot.midi);
             slot.midi.clear();
+            if (t.hasEcho && view.getNumChannels() >= 2) t.echo.process(view.getWritePointer(0), view.getWritePointer(1), len);
 
             float slotPeak = 0;
             for (int c = 0; c < 2; ++c)
@@ -670,15 +781,15 @@ void Engine::renderChunk(float* const* out, int numChannels, int offset, int len
                 const float* src = view.getReadPointer(juce::jmin(c, view.getNumChannels() - 1));
                 for (int n = 0; n < len; ++n)
                 {
-                    float x = src[n] * gains_[size_t(n)] * slot.gain;
+                    float x = src[n] * gains_[size_t(n)] * slot.gain * t.trim;
                     pa[c][n] += x;
-                    delayIn.getWritePointer(c)[n] += x * kSends[i][0];
-                    reverbIn.getWritePointer(c)[n] += x * kSends[i][1];
+                    delayIn.getWritePointer(c)[n] += x * sends[0];
+                    reverbIn.getWritePointer(c)[n] += x * sends[1];
                     slotPeak = juce::jmax(slotPeak, std::abs(src[n]));
                     sq += double(x) * x;
                 }
             }
-            peak = juce::jmax(peak, slotPeak * slot.gain);
+            peak = juce::jmax(peak, slotPeak * slot.gain * t.trim);
             // A sound that has rung out for two seconds frees its instance for the next one;
             // one that never quite falls silent (a noise layer) is cut after 20 seconds.
             if (state == Tail)
@@ -765,6 +876,121 @@ void Engine::renderClick(float* const* out, int numChannels, int offset, int len
         out[3][offset + n] = x;
     }
     juce::ignoreUnused(numChannels);
+}
+
+// ---------------------------------------------------------------- the engine's own instrument
+void InternalSynth::start(int note, float velocity)
+{
+    Voice* v = &voices_[0];
+    for (auto& x : voices_) if (x.note < 0) { v = &x; break; }       // a free voice, or steal the first
+    v->note = note;
+    v->phase = 0;
+    v->held = kind_ == Sub;
+    v->noise = kind_ == Click && note >= 96;
+    const double hz = 440.0 * std::pow(2.0, ((kind_ == Click ? note + 36 : note) - 69) / 12.0);
+    v->inc = juce::MathConstants<double>::twoPi * std::min(hz, 15000.0) / sr_;
+    v->gain = 0.5 * std::pow(double(velocity), 1.3);
+    double tau = 0.05;
+    if (kind_ == Click) tau = v->noise ? 0.0015 : 0.002 + 0.004 * juce::jlimit(0.0, 1.0, (96.0 - note) / 40.0);
+    if (kind_ == Blip) tau = 0.03 + 0.06 * velocity;
+    v->decay = std::exp(-1.0 / (tau * sr_));
+    v->attack = kind_ == Click ? 1.0 : 1.0 / ((kind_ == Sub ? 0.04 : 0.001) * sr_);
+    v->release = std::exp(-1.0 / (0.4 * sr_));
+    v->env = kind_ == Click ? v->gain : 0.0;
+    // stereo: clicks alternate a little left and right, blips spread by pitch, the sub sits centre
+    float pan = kind_ == Click ? ((flip_++ & 1) ? 0.3f : -0.3f) : kind_ == Blip ? juce::jlimit(-0.5f, 0.5f, float(note - 88) / 24.0f) : 0.0f;
+    v->panL = std::sqrt(0.5f * (1 - pan));
+    v->panR = std::sqrt(0.5f * (1 + pan));
+}
+
+void InternalSynth::stopNote(int note)
+{
+    for (auto& v : voices_) if (v.note == note && v.held) v.held = false;
+}
+
+void InternalSynth::run(float* l, float* r, int from, int to)
+{
+    for (auto& v : voices_)
+    {
+        if (v.note < 0) continue;
+        for (int n = from; n < to; ++n)
+        {
+            if (kind_ == Click) v.env *= v.decay;
+            else if (kind_ == Blip) { if (v.attack > 0 && v.env < v.gain) { v.env += v.gain * v.attack; if (v.env >= v.gain) { v.env = v.gain; v.attack = 0; } } else v.env *= v.decay; }
+            else { if (v.held) v.env += (v.gain - v.env) * v.attack * 3.0; else v.env *= v.release; }
+            float x;
+            if (v.noise)
+            {
+                seed_ = seed_ * 1664525u + 1013904223u;
+                const float w = float(int32_t(seed_)) * (1.0f / 2147483648.0f);
+                x = (w - v.lastNoise) * 0.7f; // differenced noise: the low end removed, a tick
+                v.lastNoise = w;
+            }
+            else
+                x = float(std::sin(v.phase) + (kind_ == Sub ? 0.12 * std::sin(2 * v.phase) : 0.0));
+            v.phase += v.inc;
+            if (v.phase > juce::MathConstants<double>::twoPi) v.phase -= juce::MathConstants<double>::twoPi;
+            x *= float(v.env);
+            l[n] += x * v.panL;
+            r[n] += x * v.panR;
+        }
+        const bool done = kind_ == Sub ? (!v.held && v.env < 1e-5) : kind_ == Blip ? (v.attack == 0 && v.env < 1e-5) : v.env < 1e-5;
+        if (done) v.note = -1;
+    }
+}
+
+void InternalSynth::render(const juce::MidiBuffer& midi, float* l, float* r, int numSamples)
+{
+    int at = 0;
+    for (const auto meta : midi)
+    {
+        const int pos = juce::jlimit(0, numSamples, meta.samplePosition);
+        run(l, r, at, pos);
+        at = pos;
+        const auto m = meta.getMessage();
+        if (m.isNoteOn()) start(m.getNoteNumber(), m.getFloatVelocity());
+        else if (m.isNoteOff()) stopNote(m.getNoteNumber());
+        else if (m.isAllNotesOff() || m.isAllSoundOff()) allOff();
+    }
+    run(l, r, at, numSamples);
+}
+
+// ---------------------------------------------------------------- one track's echo
+void FeedbackDelay::prepare(double sr)
+{
+    l_.assign(size_t(sr * 4.5) + 8, 0.0f);   // up to a whole bar at 60 bpm
+    r_.assign(l_.size(), 0.0f);
+    w_ = 0;
+    lpA_ = 1.0f - std::exp(-juce::MathConstants<float>::twoPi * 4500.0f / float(sr));
+    hpA_ = 1.0f - std::exp(-juce::MathConstants<float>::twoPi * 140.0f / float(sr));
+    lpL_ = lpR_ = hpL_ = hpR_ = 0;
+}
+
+void FeedbackDelay::set(double seconds, float feedback, float mix)
+{
+    d_ = juce::jlimit(1, int(l_.size()) - 1, int(std::lround(seconds * (double(l_.size() - 8) / 4.5))));
+    fb_ = juce::jlimit(0.0f, 0.95f, feedback);
+    mix_ = juce::jlimit(0.0f, 1.0f, mix);
+}
+
+void FeedbackDelay::process(float* left, float* right, int n)
+{
+    const int size = int(l_.size());
+    for (int i = 0; i < n; ++i)
+    {
+        const int rd = (w_ - d_ + size) % size;
+        const float el = l_[size_t(rd)], er = r_[size_t(rd)];
+        // darker and thinner every time round
+        lpL_ += (er - lpL_) * lpA_;  lpR_ += (el - lpR_) * lpA_;
+        hpL_ += (lpL_ - hpL_) * hpA_; hpR_ += (lpR_ - hpR_) * hpA_;
+        const float backL = lpL_ - hpL_, backR = lpR_ - hpR_;
+        const float in = 0.5f * (left[i] + right[i]);
+        l_[size_t(w_)] = in + backL * fb_;   // ping-pong: left feeds right feeds left
+        r_[size_t(w_)] = backR * fb_;
+        left[i] += el * mix_;
+        right[i] += er * mix_;
+        w_ = (w_ + 1) % size;
+    }
 }
 
 } // namespace liszt

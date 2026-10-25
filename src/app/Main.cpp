@@ -196,7 +196,7 @@ public:
 private:
     void preview()
     {
-        previewComposer = std::make_unique<Composer>(uint64_t(seed));
+        previewComposer = makeComposer("berlin", uint64_t(seed)); // ponytail: the app plays Berlin only until it gets a scene selector
         composer = previewComposer.get();
         props.getUserSettings()->setValue("seed", juce::String(seed));
         repaint();
