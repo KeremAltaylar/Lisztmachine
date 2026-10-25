@@ -386,7 +386,7 @@ juce::String Engine::load(double sampleRate, int maxBlock, const Palette& palett
 // Pure tuning: one voice per oscillator, no unison detune, oscillators on whole semitones, no
 // analog drift, and no chorus-type effect (they all move the pitch). Measured on the factory
 // choirs: up to 16 voices spread +-38 cents, one oscillator 0.32 semitones sharp.
-void purify(juce::AudioPluginInstance& p)
+void purify(juce::AudioPluginInstance& p, bool roundTuning)
 {
     auto find = [&](const juce::String& name) -> juce::AudioProcessorParameter* {
         for (auto* q : p.getParameters()) if (q->getName(128) == name) return q;
@@ -400,20 +400,21 @@ void purify(juce::AudioPluginInstance& p)
             const auto osc = scn + " Osc " + juce::String(o) + " ";
             setParameterText(p, osc + "Unison Voices", "1 voice");
             setParameterText(p, osc + "Unison Detune", "0.00 cents");
-            if (auto* q = find(osc + "Pitch"))
+            if (auto* q = roundTuning ? find(osc + "Pitch") : nullptr)
             {
                 const double v = q->getCurrentValueAsText().retainCharacters("-0123456789.").getDoubleValue();
                 if (std::abs(v - std::round(v)) > 0.004) setParameterText(p, osc + "Pitch", juce::String(std::round(v), 2) + " semitones");
             }
         }
         setParameterText(p, scn + " Osc Drift", "0.00 %");
-        if (auto* q = find(scn + " Pitch"))
+        if (auto* q = roundTuning ? find(scn + " Pitch") : nullptr)
         {
             const double v = q->getCurrentValueAsText().retainCharacters("-0123456789.").getDoubleValue();
             if (std::abs(v - std::round(v)) > 0.004) setParameterText(p, scn + " Pitch", juce::String(std::round(v), 2) + " semitones");
         }
     }
-    static const char* moving[] = { "Chorus", "Ensemble", "Flanger", "Phaser", "Rotary Speaker", "Frequency Shifter", "Ring Modulator", "Vocoder" };
+    static const char* moving[] = { "Chorus", "Ensemble", "Flanger", "Phaser", "Rotary Speaker", "Frequency Shifter", "Ring Modulator",
+                                    "Vocoder", "Delay", "Reverb 2", "Nimbus", "Treemonster" };
     for (auto* q : p.getParameters())
         if (q->getName(128).endsWith("FX Type"))
             for (auto* m : moving)
@@ -426,7 +427,7 @@ juce::String Engine::loadInto(Slot& slot, int track, int entry)
     const auto& e = palette_.parts[track][size_t(entry)];
     if (tracks_[track].internal) { slot.entry = entry; return {}; }
     if (auto err = loadSurgePatch(*slot.plugin, findSurgePatch(e.patch)); err.isNotEmpty()) return err;
-    if (palette_.info->pure[track]) purify(*slot.plugin);
+    if (palette_.info->pure[track]) purify(*slot.plugin, palette_.info->pure[track] == 1);
     slot.plugin->reset();
     slot.cutoff = nullptr;
     for (auto* p : slot.plugin->getParameters())
@@ -493,8 +494,12 @@ void Engine::start(uint64_t seed, int startBar)
     const double beat = 60.0 / next->bpm();
     delaySeconds_[0] = float(0.75 * beat);
     delaySeconds_[1] = float(beat);
-    if (delay_)
+    if (delay_ && reverb_)
     {
+        // Their pitch modulation (the delay's tape wobble, the reverb's chorus) reads as detune
+        // under a pure-tuned chorale; Berlin keeps it.
+        setParameterText(*delay_, "Modulation Depth", palette_.info->pureBuses ? "0 cents" : "8 cents");
+        setParameterText(*reverb_, "Reverb Modulation", palette_.info->pureBuses ? "0 %" : "60 %");
         setParameterText(*delay_, "Delay Time Left", juce::String(delaySeconds_[0] * 1000.0, 2) + " ms");
         setParameterText(*delay_, "Delay Time Right", juce::String(delaySeconds_[1] * 1000.0, 2) + " ms");
         setParameterText(*delay_, "Modulation Rate", juce::String(1.0 / (4 * beat), 3) + " Hz");

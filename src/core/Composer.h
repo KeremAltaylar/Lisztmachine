@@ -18,8 +18,10 @@ constexpr int kMaxTracks = 10;
 
 // What a scene asks of the engine: its tracks by name, what each is to the visuals
 // (0 harmony, 1 bass and drums, 2 rhythm, 3 melody), its sends to the shared delay and
-// reverb, which tracks change sound together (the first one's plan; -1 its own), and which
-// get pure tuning (no unison detune, no drift, no chorus-type effects).
+// reverb, which tracks change sound together (the first one's plan; -1 its own), and how pure
+// each track's tuning is: 0 as the patch is, 1 pure (one voice per oscillator, no detune, whole
+// semitones, no drift, no pitch-moving effects), 2 pure but the oscillators keep their tuning
+// (for patches whose tuning is part of the sound, like the pianos).
 struct SceneInfo
 {
     const char* name;
@@ -28,7 +30,8 @@ struct SceneInfo
     int role[kMaxTracks];
     float sends[kMaxTracks][2];
     int group[kMaxTracks];
-    bool pure[kMaxTracks];
+    uint8_t pure[kMaxTracks];
+    bool pureBuses;              // the shared delay and reverb without pitch modulation
     int trackOf(const std::string& n) const
     {
         for (int t = 0; t < numTracks; ++t) if (n == trackNames[t]) return t;

@@ -417,7 +417,7 @@ const SceneInfo& sceneInfo(const std::string& scene)
 {
     static const SceneInfo berlin {
         "berlin", 4, { "pad", "bass", "seq", "lead" }, { 0, 1, 2, 3 },
-        { { .15f, .35f }, { .05f, .15f }, { .35f, .25f }, { .30f, .35f } }, { -1, -1, -1, -1 }, {},
+        { { .15f, .35f }, { .05f, .15f }, { .35f, .25f }, { .30f, .35f } }, { -1, -1, -1, -1 }, {}, false,
     };
     // The chorale: each voice its own track (and its own delay), the voices change sound as one.
     static const SceneInfo chorale {
@@ -425,7 +425,8 @@ const SceneInfo& sceneInfo(const std::string& scene)
         { 0, 0, 0, 0, 1, 1, 2, 2, 3, 1 },
         { { 0, .30f }, { 0, .30f }, { 0, .30f }, { 0, .26f }, { 0, .04f }, { .04f, .12f }, { .22f, .12f }, { .28f, .22f }, { .15f, .28f }, { .12f, .20f } },
         { -1, 0, 0, 0, -1, -1, -1, -1, -1, -1 },
-        { true, true, true, true, false, false, false, false, false, true }, // not the piano: pure broke its patches (an octave off)
+        { 1, 1, 1, 1, 0, 0, 0, 0, 2, 1 }, // the piano keeps its oscillator tuning: rounding it put its patches an octave off
+        true,
     };
     return scene == "chorale" ? chorale : berlin;
 }

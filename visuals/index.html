@@ -31,6 +31,7 @@ button:focus-visible { outline: 1px solid var(--ember); outline-offset: 3px; }
 .lede { margin: 0; color: var(--ink); max-width: 60ch; font-size: 14px; }
 .go { justify-self: start; padding: 11px 20px; border: 1px solid var(--ember); color: var(--ember); letter-spacing: 0.08em; text-transform: uppercase; font-size: 12px; }
 .go:hover { background: var(--ember); color: var(--void); }
+.pieces { display: flex; flex-wrap: wrap; gap: 12px; }
 .go[disabled] { border-color: var(--rule); color: var(--dim); cursor: wait; background: none; }
 .keys { margin: 0; color: var(--dim); font-size: 11px; line-height: 1.9; }
 kbd { font: inherit; color: var(--ink); border: 1px solid var(--rule); padding: 0 5px; }
@@ -67,9 +68,13 @@ nav button[aria-pressed="true"] { color: var(--ember); }
 <div class="veil" id="veil">
   <div class="card">
     <h1>Lisztmachine</h1>
-    <p class="meta" id="meta">Loading the concert…</p>
+    <p class="meta" id="meta">Choose a piece</p>
     <p class="lede">Eight generative light studies for projecting onto the drummer, blending into each other. Each one reads the music itself: every note, every chord and the level of each part, so the light lands exactly with the sound.</p>
-    <button class="go" id="go" disabled>Loading…</button>
+    <div class="pieces" id="pieces">
+      <button class="go" id="piece-chorale" data-piece="chorale" disabled>Chorale</button>
+      <button class="go" id="piece-berlin" data-piece="berlin" disabled>Berlin</button>
+    </div>
+    <button class="go" id="go" hidden disabled>Loading…</button>
     <p class="keys"><kbd>1</kbd>–<kbd>8</kbd> study · <kbd>G</kbd> new look · <kbd>Space</kbd> pause · <kbd>←</kbd><kbd>→</kbd> 10 s · <kbd>↑</kbd><kbd>↓</kbd> section · <kbd>S</kbd> strobe on/off · <kbd>B</kbd> feedback on/off · <kbd>K</kbd> test drum hit · <kbd>[</kbd><kbd>]</kbd> pad sensitivity · <kbd>,</kbd><kbd>.</kbd> pad effect · <kbd>H</kbd> hide controls · <kbd>F</kbd> full screen</p>
     <p class="err" id="err" hidden></p>
   </div>
@@ -102,8 +107,13 @@ nav button[aria-pressed="true"] { color: var(--ember); }
 // The music, as data: what liszt_render writes next to the WAV (seed1.show.json). The live app
 // will send the same notes, sections and levels over a socket.
 // ---------------------------------------------------------------------------------------------
-const MEDIA = 'media/seed1';
-const RANGE = [[48, 76], [28, 52], [52, 81], [60, 88]];   // Composer::kRange: pad, bass, seq, lead
+// The pieces: their recording and data, and the pitch range of each role (harmony, bass and
+// drums, rhythm, melody), which the visuals map onto 0..1.
+const PIECES = {
+  chorale: { name: 'Chorale', media: 'media/chorale1', ranges: [[36, 81], [26, 64], [55, 108], [60, 100]] },
+  berlin: { name: 'Berlin', media: 'media/seed1', ranges: [[48, 76], [28, 52], [52, 81], [60, 88]] },
+};
+let RANGE = PIECES.chorale.ranges;
 const TAU = [1.2, 0.28, 0.16, 0.4];                          // how long a note-on lights up, seconds
 const L01 = rms => Math.min(1, Math.max(0, (20 * Math.log10(rms + 1e-9) + 54) / 42)); // -54..-12 dBFS
 const lowerBound = (a, t) => { let lo = 0, hi = a.length; while (lo < hi) { const m = (lo + hi) >> 1; if (a[m][0] < t) lo = m + 1; else hi = m; } return lo; };
@@ -1604,6 +1614,15 @@ async function boot() {
   device.addEventListener('uncapturederror', e => { window.__errors.push(e.error.message); console.error(e.error.message); });
   device.lost.then(info => fail('The graphics device was lost: ' + info.message + '. Reload the page.'));
 
+  // Which piece: from the start screen (or #chorale / #berlin in the address).
+  const piece = PIECES[location.hash.slice(1)] ?? await new Promise(res => {
+    for (const b of document.querySelectorAll('[data-piece]')) { b.disabled = false; b.onclick = () => res(PIECES[b.dataset.piece]); }
+  });
+  $('pieces').hidden = true;
+  $('go').hidden = false;
+  $('meta').textContent = 'Loading the ' + piece.name + '…';
+  RANGE = piece.ranges;
+  const MEDIA = piece.media;
   const [show, audioData] = await Promise.all([
     fetch(MEDIA + '.show.json').then(r => { if (!r.ok) throw new Error('show data ' + r.status); return r.json(); }),
     fetch(MEDIA + '.mp3').then(r => { if (!r.ok) throw new Error('audio ' + r.status); return r.arrayBuffer(); }),
@@ -1722,7 +1741,7 @@ async function boot() {
 
   // The clock is the audio: the position of what is coming out of the speakers right now.
   const sec = F.show.sections;
-  let playing = false, musicT = (sec.find(s => s.name === 'Summit') ?? sec[0]).t + 14;
+  let playing = false, musicT = (sec.find(s => s.name === 'Summit' || s.name === 'Apotheosis') ?? sec[0]).t + 14;
   const clock = now => {
     if (!playing) return musicT;
     musicT = Math.max(startT, startT + heard(now) - startAt);
@@ -1768,7 +1787,7 @@ async function boot() {
   });
   form.onclick = e => { const r = form.getBoundingClientRect(); seek((e.clientX - r.left) / r.width * F.duration); };
   const mmss = t => Math.floor(t / 60) + ':' + String(Math.floor(t % 60)).padStart(2, '0');
-  $('meta').textContent = 'Seed ' + show.seed + ' · ' + show.key;
+  $('meta').textContent = piece.name + ' · seed ' + show.seed + ' · ' + show.key;
 
   let hudTimer = 0, hudHidden = false;
   const hud = $('hud');

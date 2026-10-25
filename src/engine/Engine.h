@@ -109,7 +109,7 @@ juce::File findSurgePatch(const juce::String& categoryAndName);
 juce::String loadSurgePatch(juce::AudioPluginInstance& surge, const juce::File& fxp);
 // Pure tuning for a loaded patch: one voice per oscillator, no detune or drift, whole-semitone
 // oscillators, no chorus-type effects.
-void purify(juce::AudioPluginInstance& surge);
+void purify(juce::AudioPluginInstance& surge, bool roundTuning = true);
 
 std::unique_ptr<juce::AudioPluginInstance> createSurge(double sampleRate, int maxBlock, juce::String& error);
 
