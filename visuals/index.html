@@ -51,6 +51,11 @@ nav button[aria-pressed="true"] { color: var(--ember); }
 .form { position: relative; display: flex; align-items: flex-end; gap: 2px; height: 30px; cursor: pointer; }
 .form div { flex: 1 1 0; min-width: 0; background: var(--rule); }
 .form .head { position: absolute; top: -3px; bottom: -3px; width: 1px; background: var(--ember); pointer-events: none; }
+.pad { font-size: 12px; color: var(--dim); }
+.pad button { padding: 4px 10px; border: 1px solid var(--rule); color: var(--ink); }
+.pad button:hover { border-color: var(--ember); color: var(--ember); }
+.pad select { font: inherit; color: var(--ink); background: var(--void); border: 1px solid var(--rule); padding: 3px 6px; max-width: 46vw; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
 @media (prefers-reduced-motion: reduce) { #hud { transition: none; } }
 </style>
 
@@ -62,7 +67,7 @@ nav button[aria-pressed="true"] { color: var(--ember); }
     <p class="meta" id="meta">Loading the concert…</p>
     <p class="lede">Four generative light studies for projecting onto the drummer, blending into each other. Each one reads the music itself: every note, every chord and the level of each part, so the light lands exactly with the sound.</p>
     <button class="go" id="go" disabled>Loading…</button>
-    <p class="keys"><kbd>1</kbd>–<kbd>4</kbd> study · <kbd>G</kbd> new look · <kbd>Space</kbd> pause · <kbd>←</kbd><kbd>→</kbd> 10 s · <kbd>↑</kbd><kbd>↓</kbd> section · <kbd>S</kbd> strobe on/off · <kbd>B</kbd> feedback on/off · <kbd>H</kbd> hide controls · <kbd>F</kbd> full screen</p>
+    <p class="keys"><kbd>1</kbd>–<kbd>4</kbd> study · <kbd>G</kbd> new look · <kbd>Space</kbd> pause · <kbd>←</kbd><kbd>→</kbd> 10 s · <kbd>↑</kbd><kbd>↓</kbd> section · <kbd>S</kbd> strobe on/off · <kbd>B</kbd> feedback on/off · <kbd>K</kbd> test drum hit · <kbd>[</kbd><kbd>]</kbd> pad sensitivity · <kbd>H</kbd> hide controls · <kbd>F</kbd> full screen</p>
     <p class="err" id="err" hidden></p>
   </div>
 </div>
@@ -73,6 +78,12 @@ nav button[aria-pressed="true"] { color: var(--ember); }
     <nav id="studies"></nav>
   </div>
   <div class="form" id="form"><div class="head" id="head"></div></div>
+  <div class="row pad">
+    <button id="pad-go">Drum pad</button>
+    <label for="pad-device" class="sr">Input device</label><select id="pad-device"><option value="">Default input</option></select>
+    <label for="pad-ch" class="sr">Channel</label><select id="pad-ch"><option value="0">Input 1</option><option value="1">Input 2</option></select>
+    <span id="pad-state">Off</span>
+  </div>
 </div>
 
 <script type="module">
@@ -187,6 +198,8 @@ struct U {
   fx: vec4f,      // director: flash, invert, -, -
   col: vec4f,     // director: light colour, and how much of it replaces the white
   gene: array<vec4f, 4>,   // the genome: 16 numbers each study reads as its structure; re-rolled every section
+  pad: array<vec4f, 8>,    // the last eight drum-pad hits: where (x, y in -1..1), age in seconds, strength
+  padx: vec4f,             // agitation (builds while you play), brightness of the last hit
 };
 @group(0) @binding(0) var<uniform> u: U;
 fn gene(k: i32) -> f32 { return u.gene[k / 4][k % 4]; }
@@ -469,6 +482,8 @@ STUDIES.push({
       @group(0) @binding(4) var<uniform> S: array<vec4f, 32>;
       ${SPLAT}
       const C0 = vec3f(-0.9, 0.0, 0.0);   // where the attractor lives: behind the now-plane, in the past
+      fn padWorld(h: vec4f) -> vec3f { return vec3f(-0.9 + h.x * 1.3, h.y, 0.0); }
+      fn padBlossom() -> i32 { for (var k = 0; k < 8; k++) { if (u.pad[k].z < 0.15) { return k; } } return -1; }
       fn rotY(q: vec3f, a: f32) -> vec3f { return vec3f(q.x * cos(a) - q.z * sin(a), q.y, q.x * sin(a) + q.z * cos(a)); }
       fn attractor(p: vec3f) -> vec3f {
         let kind = u32(gene(0) * 5.0);
@@ -511,7 +526,14 @@ STUDIES.push({
           let s = fr * 1664525u + i * 2654435761u;
           var n = 0u;
           for (var k = 0u; k < 32u; k++) { if (S[k].y <= 0.0) { break; } n = k + 1u; }
-          if (n > 0u && rnd(s + 7u) < 0.1 + 0.8 * gene(3)) {
+          let bl = padBlossom();
+          if (bl >= 0 && rnd(s + 5u) < u.pad[bl].w * 0.5) {         // a drum hit: a blossom of new dust at the impact
+            let h = u.pad[bl];
+            let dir = normalize(vec3f(rnd(s), rnd(s + 1u), rnd(s + 2u)) - 0.5 + vec3f(1e-3));
+            p = vec4f(padWorld(h) + dir * 0.03, 1.0);
+            v = dir * (0.6 + 2.4 * h.w * rnd(s + 3u));
+            born = 5.0;
+          } else if (n > 0u && rnd(s + 7u) < 0.1 + 0.8 * gene(3)) {
             let k = min(u32(rnd(s + 9u) * f32(n)), n - 1u);
             let sn = S[k];
             p = vec4f(vec3f(0.0, (sn.x - 60.0) * 0.055, sn.z * 0.55 - 0.8) + (vec3f(rnd(s), rnd(s + 1u), rnd(s + 2u)) - 0.5) * vec3f(0.03, 0.012, 0.012), 1.0);
@@ -529,10 +551,20 @@ STUDIES.push({
         let att = attractor(p.xyz) * (0.15 + 0.9 * e + 0.6 * u.hit.y) * (0.2 + gene(1));
         let fl = curl(p.xyz * (0.3 + 2.2 * gene(5)) + vec3f(0.0, u.time * 0.04, u.time * 0.02)) * (0.05 + 0.4 * gene(6)) * (1.0 + u.hit.y);
         var goal = att + fl;
-        if (born > 0.5) { goal = mix(scroll + fl * 0.25, att + fl, smoothstep(0.25, 0.95, age)); }   // trails peel off into the attractor
+        if (born > 0.5 && born < 4.5) { goal = mix(scroll + fl * 0.25, att + fl, smoothstep(0.25, 0.95, age)); }   // trails peel off into the attractor
         let rc = length(p.xyz - C0);
         goal -= (p.xyz - C0) * 0.5 * max(0.0, rc - 1.8);
         v = mix(v, goal, 1.0 - exp(-u.dt * 3.0));
+        var shock = 0.0;                               // drum hits: a shock bubble pushes through the dust and glows
+        for (var k = 0; k < 8; k++) {
+          let h = u.pad[k];
+          if (h.z > 1.6) { continue; }
+          let dp = p.xyz - padWorld(h);
+          let r = length(dp);
+          let prof = exp(-pow((r - h.z * 2.0) / (0.1 + 0.2 * h.z), 2.0)) * h.w * exp(-h.z * 2.0);
+          v += dp / (r + 1e-3) * prof * u.dt * 40.0;
+          shock += prof;
+        }
         if (u.since.y < u.dt) { v += normalize(p.xyz - C0 + vec3f(1e-4)) * (0.4 + 0.7 * u.hit.y) * (1.0 + 2.0 * e); }   // each bass note: a breath outward
         if (u.fx.x > 0.95) { v += normalize(p.xyz - C0 + vec3f(1e-4)) * 2.5; }                                         // a section change: it explodes
         p = vec4f(p.xyz + v * u.dt, p.w);
@@ -540,7 +572,7 @@ STUDIES.push({
         V[i] = vec4f(v, born);
 
         let shell = exp(-pow((rc - u.since.z * 2.6) / 0.1, 2.0)) * u.hit.z;
-        let w = smoothstep(0.0, 0.15, p.w) * (1.0 - smoothstep(0.85, 1.0, p.w)) * select(0.55, 1.5, born > 0.5) * (1.0 + 8.0 * shell);
+        let w = smoothstep(0.0, 0.15, p.w) * (1.0 - smoothstep(0.85, 1.0, p.w)) * select(0.55, 1.5, born > 0.5) * (1.0 + 8.0 * shell + 5.0 * shock);
         let layer = select(0u, 1u, born > 0.5);
         let focus = 4.4 * u.cam.z;
         let mirror = u32(gene(14) * 3.0);
@@ -733,6 +765,15 @@ STUDIES.push({
         var r = pow(pow(abs(q.x), p) + pow(abs(q.y), p), 1.0 / p);
         var ang = atan2(q.y, q.x);
         r *= 1.0 + gene(2) * 0.35 * sin(ang * floor(3.0 + gene(5) * 6.0) + u.time * 0.4);  // petals
+        var dent = 0.0;                                // drum hits: the wall dents where a hit lands, and the dent races away down the tunnel
+        let z0 = 0.35 / max(r, 1e-3);
+        for (var k = 0; k < 8; k++) {
+          let h = u.pad[k];
+          if (h.z > 2.5) { continue; }
+          let da = abs(fract((ang - atan2(h.y, h.x + 1e-4)) / 6.2831853 + 0.5) - 0.5) * 6.2831853;
+          dent += h.w * exp(-h.z * 1.4) * exp(-pow((z0 - 1.2 - h.z * 5.0) / (0.3 + h.z * 0.5), 2.0)) * exp(-da * da / (0.15 + h.z * 1.5));
+        }
+        r *= 1.0 - 0.45 * min(dent, 1.5);
         let z = 0.35 / max(r, 1e-3);                                                     // depth into the tunnel
         let now = u.beats * 60.0 / u.bpm;
         let tz = now + (z - 1.2) * 1.2;                                                  // the music time written at this depth
@@ -748,6 +789,7 @@ STUDIES.push({
         let beats = tz * u.bpm / 60.0;
         c += tint(u.energy) * (0.10 * hair(beats) + 0.35 * hair(beats / 4.0));          // beat and bar rings rushing past
         c += tint(u.energy) * nowRing * (0.25 + 1.5 * u.hit.y);
+        c += mix(tint(u.energy), u.col.rgb, 0.5) * dent * 2.5;
         let mode = u32(gene(6) * 3.0);
         if (mode == 1u) {                                                                // Ikeda bars along the walls
           let cell = floor(z * 24.0 - u.time * (2.0 + 10.0 * u.energy));
@@ -850,6 +892,15 @@ STUDIES.push({
         let uv = i.pos.xy / u.res;
         var v = pattern(uv, 0.0);
         if (gene(6) > 0.6) { v = abs(v - pattern(vec2f(1.0) - uv.yx, 5.0)); }   // XOR with a second, crossed system
+        for (var k = 0; k < 8; k++) {                  // drum hits: a ragged front of inversion spreads from the impact, re-coding what it passes
+          let h = u.pad[k];
+          if (h.z > 1.5) { continue; }
+          let hp = vec2f(0.5 + h.x * 0.45, 0.5 - h.y * 0.45);
+          let d = length((uv - hp) * vec2f(u.aspect, 1.0)) + (h2(floor(uv.x * 64.0) + floor(uv.y * 36.0) * 64.0, f32(k) + u.fx.z) - 0.5) * 0.06;
+          let front = h.z * (0.5 + 1.2 * h.w);
+          if (abs(d - front) < 0.02 + 0.03 * h.w) { v = 1.0 - v; }
+          else if (d < front && h.z < 0.8) { v = abs(v - pattern(uv, 9.0 + f32(k)) * (1.0 - h.z / 0.8)); }
+        }
         if (gene(8) > 0.88) { v = 1.0 - v; }                                   // a negative section
         return vec4f(mix(vec3f(1.0), tint(u.energy), 0.35) * v * 3.0, 1.0);    // near pure white, as Ikeda's
       }`);
@@ -902,7 +953,14 @@ const FIELD = binding => /* wgsl */`
         }
         let ringPhase = length(q) * (4.0 + 6.0 * u.pitch.y) - (u.count.y + smoothstep(0.0, 0.25, u.since.y)) * 0.5;
         let rings = pow(max(0.5 + 0.5 * cos(6.2831853 * ringPhase), 0.0), 3.0) * u.level.y;
-        return blades * (0.3 + 1.2 * gene(2)) + moire * (0.3 + 1.5 * gene(3)) + rings * gene(4);
+        var waves = 0.0;                               // drum hits: wave packets from where they land, interfering with everything else
+        for (var k = 0; k < 8; k++) {
+          let h = u.pad[k];
+          if (h.z > 2.5) { continue; }
+          let r = length(q0 - vec2f(h.x * 1.6, h.y));
+          waves += h.w * exp(-h.z * 1.1) * max(0.0, cos(6.2831853 * (r * 7.0 - h.z * 5.0))) * exp(-pow((r - h.z * 1.4) / (0.2 + 0.5 * h.z), 2.0));
+        }
+        return blades * (0.3 + 1.2 * gene(2)) + moire * (0.3 + 1.5 * gene(3)) + rings * gene(4) + waves * 1.6;
       }`;
 STUDIES.push({
   id: 'interference', name: 'Interference', scale: 1, exposure: 1.0, bloom: 0.13,
@@ -1025,7 +1083,7 @@ async function boot() {
   const format = navigator.gpu.getPreferredCanvasFormat();
   ctx.configure({ device, format, alphaMode: 'opaque' });
   const smp = device.createSampler({ magFilter: 'linear', minFilter: 'linear', addressModeU: 'clamp-to-edge', addressModeV: 'clamp-to-edge' });
-  const Udata = new Float32Array(68);
+  const Udata = new Float32Array(104);
   const g = {
     device,
     U: device.createBuffer({ size: Udata.byteLength, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST }),
@@ -1174,6 +1232,9 @@ async function boot() {
     }
     else if (e.key === 's' || e.key === 'S') { D.strobe = !D.strobe; }
     else if (e.key === 'b' || e.key === 'B') { D.feedback = !D.feedback; }
+    else if (e.key === 'k' || e.key === 'K') { padHit(0.4 + Math.random() * 0.6, Math.random()); }   // a pretend hit, for trying it without the pad
+    else if (e.key === '[') { setThr(1.25); }
+    else if (e.key === ']') { setThr(0.8); }
     else if (e.key === 'g' || e.key === 'G') { roll(); }
     else if (e.key === 'h' || e.key === 'H') { hudHidden = !hudHidden; hud.classList.toggle('gone', hudHidden); }
     else if (e.key === 'f' || e.key === 'F') { document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen?.().catch(() => {}); }
@@ -1186,6 +1247,108 @@ async function boot() {
   };
   $('go').disabled = false; $('go').textContent = 'Play from the start';
   $('go').onclick = () => { $('veil').hidden = true; stop(); musicT = 0; toggle(); poke(); };
+
+  // The drum pad: one input of the audio interface, heard by an onset detector running on the audio
+  // thread. A hit lands at a point that wanders: rolls cluster, sparse hits leap, bright hits sit higher.
+  const pad = { hits: [], kick: 0, agit: 0, bright: 0.5, pos: [0, 0], last: -9, on: false, thr: 0.02, meter: 0, lit: 0 };
+  try { pad.thr = +localStorage.getItem('lisztmachine-pad-thr') || 0.02; } catch {}
+  window.__pad = pad;
+  const dB = x => 20 * Math.log10(Math.max(x, 1e-6));
+  function padHit(vel, bright) {
+    const ioi = visT - pad.last;
+    pad.last = visT;
+    const step = 0.1 + 0.6 * Math.min(1, ioi / 1.2);
+    pad.pos[0] = Math.max(-0.85, Math.min(0.85, pad.pos[0] * 0.85 + (Math.random() - 0.5) * step * 2));
+    pad.pos[1] = Math.max(-0.75, Math.min(0.75, pad.pos[1] * 0.85 + (Math.random() - 0.5) * step + (bright - 0.5) * 0.3));
+    pad.hits.unshift({ t: visT, x: pad.pos[0], y: pad.pos[1], vel });
+    pad.hits.length = Math.min(pad.hits.length, 8);
+    pad.agit = Math.min(1.5, pad.agit + vel * 0.35);
+    pad.bright = bright;
+    pad.lit = 6;
+  }
+  const WORKLET = `
+    class Onset extends AudioWorkletProcessor {
+      constructor() {
+        super();
+        Object.assign(this, { hp: 0, px: 0, lp: 0, fast: 0, slow: 0, hold: 0, peak: 0, hi: 0, lo: 0, refr: 0, thr: 0.02, ch: 0, meter: 0, n: 0 });
+        this.port.onmessage = e => { if (e.data.thr) this.thr = e.data.thr; if (e.data.ch != null) this.ch = e.data.ch; };
+      }
+      process(inputs) {
+        const x = inputs[0] && (inputs[0][this.ch] || inputs[0][0]);
+        if (!x) return true;
+        for (let i = 0; i < x.length; i++) {
+          this.hp = 0.996 * (this.hp + x[i] - this.px); this.px = x[i];          // rumble out
+          const a = Math.abs(this.hp), d = this.hp - this.lp; this.lp = this.hp;
+          this.fast = Math.max(a, this.fast * 0.9985);
+          this.slow += (this.fast - this.slow) * 0.0004;
+          this.meter = Math.max(this.meter * 0.99995, a);
+          if (this.hold > 0) {                                                   // 6 ms after the onset: the true peak and the brightness
+            this.peak = Math.max(this.peak, a); this.hi += d * d; this.lo += this.hp * this.hp;
+            if (--this.hold === 0) this.port.postMessage({ peak: this.peak, ratio: this.hi / (this.lo + 1e-12) });
+          }
+          if (this.refr > 0) this.refr--;
+          else if (this.fast > this.thr && this.fast > this.slow * 2.2) {
+            this.hold = Math.round(0.006 * sampleRate); this.peak = a; this.hi = 0; this.lo = 0; this.refr = Math.round(0.045 * sampleRate);
+          }
+        }
+        if (++this.n % 16 === 0) this.port.postMessage({ meter: this.meter });
+        return true;
+      }
+    }
+    registerProcessor('onset', Onset);`;
+  function padStatus() {
+    const el = $('pad-state');
+    if (!pad.on) return;
+    el.textContent = 'On · input ' + dB(pad.meter).toFixed(0) + ' dB · threshold ' + dB(pad.thr).toFixed(0) + ' dB ( [ ] )' + (pad.lit > 0 ? '  ●' : '');
+    if (pad.lit > 0) pad.lit--;
+  }
+  async function padStart() {
+    try {
+      if (!navigator.mediaDevices?.getUserMedia) throw { name: 'NoInput' };
+      const id = $('pad-device').value;
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: { deviceId: id ? { exact: id } : undefined, echoCancellation: false, noiseSuppression: false, autoGainControl: false, channelCount: { ideal: 2 } } });
+      if (!pad.node) {
+        await actx.audioWorklet.addModule(URL.createObjectURL(new Blob([WORKLET], { type: 'application/javascript' })));
+        pad.node = new AudioWorkletNode(actx, 'onset', { channelCount: 2, channelCountMode: 'explicit', channelInterpretation: 'discrete' });
+        const mute = actx.createGain();
+        mute.gain.value = 0;
+        pad.node.connect(mute).connect(actx.destination);   // keeps the detector pulled; nothing is heard
+        pad.node.port.onmessage = e => {
+          const m = e.data;
+          if (m.meter != null) { pad.meter = m.meter; return; }
+          padHit(Math.max(0.15, Math.min(1, (dB(m.peak) - dB(pad.thr)) / 30)), Math.max(0, Math.min(1, (Math.log10(m.ratio + 1e-9) + 2.2) / 2)));
+        };
+      }
+      pad.src?.disconnect();
+      pad.stream?.getTracks().forEach(t => t.stop());
+      pad.stream = stream;
+      pad.src = actx.createMediaStreamSource(stream);
+      pad.src.connect(pad.node);
+      pad.node.port.postMessage({ thr: pad.thr, ch: +$('pad-ch').value });
+      await actx.resume();
+      pad.on = true;
+      $('pad-go').textContent = 'Drum pad on';
+      const sel = $('pad-device'), keep = sel.value;
+      const inputs = (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === 'audioinput');
+      sel.replaceChildren(...[{ deviceId: '', label: 'Default input' }, ...inputs].map(d => Object.assign(document.createElement('option'), { value: d.deviceId, textContent: d.label || 'Input' })));
+      sel.value = keep || stream.getAudioTracks()[0]?.getSettings().deviceId || '';
+      try { localStorage.setItem('lisztmachine-pad-device', sel.value); } catch {}
+    } catch (err) {
+      pad.on = false;
+      $('pad-state').textContent = location.protocol === 'https:' && location.hostname.endsWith('claude.ai') || err.name === 'NotAllowedError'
+        ? 'The drum pad needs the local version (Start Visuals.command on the Mac). Press K to try a hit.'
+        : 'No audio input (' + (err.name || 'error') + '). Check the interface, then try again.';
+    }
+  }
+  try { const d = localStorage.getItem('lisztmachine-pad-device'); if (d) $('pad-device').append(Object.assign(document.createElement('option'), { value: d, textContent: 'Last used input', selected: true })); } catch {}
+  $('pad-go').onclick = padStart;
+  $('pad-device').onchange = () => { if (pad.on) padStart(); };
+  $('pad-ch').onchange = () => pad.node?.port.postMessage({ ch: +$('pad-ch').value });
+  const setThr = k => {
+    pad.thr = Math.max(0.001, Math.min(0.5, pad.thr * k));
+    pad.node?.port.postMessage({ thr: pad.thr });
+    try { localStorage.setItem('lisztmachine-pad-thr', pad.thr); } catch {}
+  };
 
   const hash = location.hash.slice(1);
   study = STUDIES.find(s => s.id === hash) ?? study;
@@ -1223,7 +1386,7 @@ async function boot() {
     D.target[0] += D.spin * dt;                                                   // keeps turning between cuts
     const glide = 1 - Math.exp(-dt / (0.12 + 1.6 * (1 - e)));                     // a whip when loud, a drift when calm
     for (let k = 0; k < 3; k++) D.cam[k] += (D.target[k] - D.cam[k]) * glide;
-    D.cam[3] = F.hit[1] * (0.05 + 0.35 * e);
+    D.cam[3] = F.hit[1] * (0.05 + 0.35 * e) + pad.kick * 0.25;
     let flash = D.fx[0] * Math.exp(-dt / 0.07);
     if (D.strobe && playing) {
       if (F.since[1] < dt && e > 0.4) flash = Math.max(flash, F.vel[1] * (e - 0.2) * 1.2);
@@ -1260,14 +1423,15 @@ async function boot() {
       }
     }
     if (mode <= 2) { const k = dt * 60; taps[0][0] = Math.pow(taps[0][0], k); taps[0][1] *= k; }
+    if (mode <= 2) { taps[0][0] *= 1 - 0.06 * pad.kick; taps[0][1] += 0.05 * pad.kick * (pad.hits.length % 2 ? 1 : -1); }   // a hit shudders the recursion
     while (taps.length < 3) taps.push([1, 0, 0, 0]);
     const on = D.feedback ? 1 : 0;
     const bl = next ? tw * tw * (3 - 2 * tw) : 0, ga = study.feedback ?? 1, gain = ga + (((next ?? study).feedback ?? 1) - ga) * bl;
-    const decay = on * gain * Math.pow(mode === 5 ? 0.86 : 0.84 + 0.12 * f[1], dt * 60);   // how many generations stay visible
+    const decay = on * gain * (1 + 0.05 * pad.agit) * Math.pow(mode === 5 ? 0.86 : 0.84 + 0.12 * f[1], dt * 60);   // how many generations stay visible
     const folds = f[5] > 0.78 ? [2, 3, 4, 6][Math.floor(f[4] * 4)] : 0;
     const blend = next ? tw * tw * (3 - 2 * tw) : 0;
     M.set([blend, 0.04 * dt * 60, decay, mode >= 3 && mode <= 4 ? (mode === 3 ? 3 : 2) : 1,
-      (f[2] - 0.5) * 0.12, f[3] > 0.6 ? 0.004 + 0.012 * f[3] : 0, folds, aspect,
+      (f[2] - 0.5) * 0.12 + pad.kick * 0.1, f[3] > 0.6 ? 0.004 + 0.012 * f[3] : 0, folds, aspect,
       ...taps[0], ...taps[1], ...taps[2]]);
     D.fbMode = FB_MODES[mode];
     return blend;
@@ -1289,6 +1453,16 @@ async function boot() {
     F.update(t);
     direct(t, dt);
     const bpm = show.bpm, beats = t * bpm / 60;
+    const padArr = new Float32Array(36);
+    pad.kick = 0;
+    for (let k = 0; k < 8; k++) {
+      const h = pad.hits[k], age = h ? visT - h.t : 99;
+      padArr.set(h ? [h.x, h.y, age, h.vel] : [0, 0, 99, 0], k * 4);
+      if (h) pad.kick += h.vel * Math.exp(-age * 10);
+    }
+    pad.agit *= Math.exp(-dt / 2.5);
+    padArr.set([pad.agit, pad.bright, 0, 0], 32);
+    if (frameNo % 15 === 0) padStatus();
     const blend = network(dt, visT, canvas.width / canvas.height);
     const enc = device.createCommandEncoder();
     for (const s of next ? [study, next] : [study]) {
@@ -1296,7 +1470,7 @@ async function boot() {
       s.cpu?.(g, F, t, D);
       Udata.set([visT, dt, beats % 1, (beats / 4) % 1, s.W, s.H, F.energy, F.progress,
         ...F.lv.slice(0, 4), F.lv[4], F.lv[5], F.lv[6], F.si, ...F.hit, ...F.pitch, ...F.since, ...F.chord, ...F.count,
-        beats, frameNo, bpm, s.W / s.H, ...D.cam, ...D.fx, ...D.col, ...D.gene]);
+        beats, frameNo, bpm, s.W / s.H, ...D.cam, ...D.fx, ...D.col, ...D.gene, ...padArr]);
       device.queue.writeBuffer(s.U, 0, Udata);
       s.frame(g, enc, next ? 0.5 : 1);   // two studies at once: each simulates half its particles
     }
