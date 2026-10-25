@@ -1,5 +1,6 @@
 #pragma once
 #include "Music.h"
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -48,26 +49,49 @@ struct Step
     int rank = 0;      // density order: low ranks play first as energy rises
 };
 
-// Berlin-school scene: drone pad, sequenced bass, polymetric upper sequence and a
-// motif-based lead, over a slow modal progression shaped by a 10-minute energy arc.
+// A scene: a whole piece, composed bar by bar. The engine plays whichever scene it is given.
 class Composer
 {
 public:
-    explicit Composer(uint64_t seed);
+    virtual ~Composer() = default;
 
-    // Appends every event that starts in `bar` (lead phrases and note-offs may reach later).
-    // Bars must be requested in order from 0; the sequences mutate as they go.
-    void generateBar(int bar, std::vector<Event>& out);
+    // Appends every event that starts in `bar` (phrases and note-offs may reach later).
+    // Bars must be requested in order from 0.
+    virtual void generateBar(int bar, std::vector<Event>& out) = 0;
+    virtual std::string describe() const = 0; // key, mode, tempo, length
 
     double bpm() const { return bpm_; }
     int totalBars() const { return int(sectionOfBar_.size()); }
-    int tonicPc() const { return tonicPc_; }
-    const Mode& modeAt(int bar) const { return *modeOfBar_[size_t(bar)]; }
-    int chordAt(int bar) const { return chordOfBar_[size_t(bar)]; }
     float energyAt(int bar) const { return energyOfBar_[size_t(bar)]; }
     const Section& sectionAt(int bar) const { return sections_[size_t(sectionOfBar_[size_t(bar)])]; }
     const std::vector<Section>& sections() const { return sections_; }
-    std::string describe() const; // key, mode, tempo
+
+protected:
+    explicit Composer(uint64_t seed) : rng_(seed * 0x2545F4914F6CDD1Dull + 1) {}
+
+    Rng rng_;
+    double bpm_ = 116;
+    std::vector<Section> sections_;
+    std::vector<int> sectionOfBar_;
+    std::vector<float> energyOfBar_;
+};
+
+// "berlin" or "chorale"; anything else is Berlin.
+std::unique_ptr<Composer> makeComposer(const std::string& scene, uint64_t seed);
+inline const char* kScenes[] = { "berlin", "chorale" };
+
+// Berlin-school scene: drone pad, sequenced bass, polymetric upper sequence and a
+// motif-based lead, over a slow modal progression shaped by a 10-minute energy arc.
+class BerlinComposer : public Composer
+{
+public:
+    explicit BerlinComposer(uint64_t seed);
+    void generateBar(int bar, std::vector<Event>& out) override;
+    std::string describe() const override;
+
+    int tonicPc() const { return tonicPc_; }
+    const Mode& modeAt(int bar) const { return *modeOfBar_[size_t(bar)]; }
+    int chordAt(int bar) const { return chordOfBar_[size_t(bar)]; }
 
     // Pitch ranges, also used by the tests.
     static constexpr int kRange[kNumTracks][2] = { { 48, 76 }, { 28, 52 }, { 52, 81 }, { 60, 88 } };
@@ -88,16 +112,12 @@ private:
     void emitLeadPhrase(int bar, std::vector<Event>& out);
     void emitAutomation(int bar, std::vector<Event>& out);
 
-    Rng rng_;
-    double bpm_ = 116;
     int tonicPc_ = 4;
     const Mode* homeMode_ = &kAeolian;
     const Mode* shiftMode_ = &kDorian;
 
-    std::vector<Section> sections_;
-    std::vector<int> sectionOfBar_, chordOfBar_;
+    std::vector<int> chordOfBar_;
     std::vector<const Mode*> modeOfBar_;
-    std::vector<float> energyOfBar_;
 
     std::vector<Step> bass_, bassHome_, seq_, seqHome_;
 

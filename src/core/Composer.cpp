@@ -1,4 +1,5 @@
 #include "Composer.h"
+#include "Chorale.h"
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
@@ -39,7 +40,7 @@ void rankByPriority(std::vector<Step>& p, Rng& rng, T priority)
 
 } // namespace
 
-Composer::Composer(uint64_t seed) : rng_(seed * 0x2545F4914F6CDD1Dull + 1)
+BerlinComposer::BerlinComposer(uint64_t seed) : Composer(seed)
 {
     static constexpr int tonics[] = { 4, 9, 2, 7, 0, 5 }; // E A D G C F
     tonicPc_ = tonics[rng_.range(0, 5)];
@@ -57,7 +58,7 @@ Composer::Composer(uint64_t seed) : rng_(seed * 0x2545F4914F6CDD1Dull + 1)
     seqHome_ = seq_;
 }
 
-void Composer::planForm()
+void BerlinComposer::planForm()
 {
     struct T { const char* name; int bars; float energy; uint8_t layers; bool theme; };
     static const T plan[] = {
@@ -92,7 +93,7 @@ void Composer::planForm()
     }
 }
 
-void Composer::planHarmony()
+void BerlinComposer::planHarmony()
 {
     chordOfBar_.assign(sectionOfBar_.size(), 0);
     for (size_t s = 0; s < sections_.size(); ++s)
@@ -121,7 +122,7 @@ void Composer::planHarmony()
     }
 }
 
-void Composer::makeBassPattern()
+void BerlinComposer::makeBassPattern()
 {
     static constexpr std::array<int, 3> beatDegs = { 0, 4, 7 };
     static constexpr std::array<double, 3> beatW = { .55, .25, .20 };
@@ -141,7 +142,7 @@ void Composer::makeBassPattern()
     rankByPriority(bass_, rng_, [](int i) { return i == 0 ? -10.0 : i % 4 == 0 ? -2.0 : i % 2 == 0 ? -1.0 : 0.0; });
 }
 
-void Composer::makeSeqPattern()
+void BerlinComposer::makeSeqPattern()
 {
     static constexpr std::array<int, 4> lengths = { 12, 10, 14, 16 };
     int len = lengths[size_t(rng_.weighted(std::array<double, 4> { .35, .2, .2, .25 }))];
@@ -166,7 +167,7 @@ void Composer::makeSeqPattern()
     rankByPriority(seq_, rng_, [](int i) { return i == 0 ? -10.0 : i % 2 == 0 ? -1.0 : 0.0; });
 }
 
-void Composer::makeMotif()
+void BerlinComposer::makeMotif()
 {
     // Rhythms in sixteenths, each filling two bars: long notes, the occasional pickup.
     static const std::vector<std::vector<int>> rhythms = {
@@ -193,7 +194,7 @@ void Composer::makeMotif()
     }
 }
 
-void Composer::mutate(std::vector<Step>& p, double chance, bool isBass)
+void BerlinComposer::mutate(std::vector<Step>& p, double chance, bool isBass)
 {
     if (!rng_.chance(chance)) return;
     int i = rng_.range(1, int(p.size()) - 1); // step 0 is the spine and never moves
@@ -206,12 +207,12 @@ void Composer::mutate(std::vector<Step>& p, double chance, bool isBass)
         s.deg = kLadder[size_t(rng_.range(0, 6))];
 }
 
-bool Composer::active(int track, int bar) const
+bool BerlinComposer::active(int track, int bar) const
 {
     return bar >= 0 && bar < totalBars() && (sectionAt(bar).layers & bit(track));
 }
 
-float Composer::levelAt(int track, int bar) const
+float BerlinComposer::levelAt(int track, int bar) const
 {
     if (!active(track, bar)) return 0;
     auto& sec = sectionAt(bar);
@@ -221,7 +222,7 @@ float Composer::levelAt(int track, int bar) const
     return std::min(fadeIn, fadeOut);
 }
 
-int Composer::chordRootPitch(int track, int bar) const
+int BerlinComposer::chordRootPitch(int track, int bar) const
 {
     int semis = degreeSemis(modeAt(bar), chordAt(bar));
     if (track == Bass) { int p = 36 + tonicPc_ + semis; return p > 45 ? p - 12 : p; }
@@ -229,7 +230,7 @@ int Composer::chordRootPitch(int track, int bar) const
     return p > 67 ? p - 12 : p;
 }
 
-int Composer::stepPitch(int track, int bar, int deg) const
+int BerlinComposer::stepPitch(int track, int bar, int deg) const
 {
     auto& m = modeAt(bar);
     int c = chordAt(bar);
@@ -237,7 +238,7 @@ int Composer::stepPitch(int track, int bar, int deg) const
     return foldInto(p, kRange[track][0], kRange[track][1]);
 }
 
-void Composer::emitAutomation(int bar, std::vector<Event>& out)
+void BerlinComposer::emitAutomation(int bar, std::vector<Event>& out)
 {
     const int64_t t0 = int64_t(bar) * kBarTicks;
     for (int tr = 0; tr < kNumTracks; ++tr)
@@ -257,7 +258,7 @@ void Composer::emitAutomation(int bar, std::vector<Event>& out)
         }
 }
 
-void Composer::emitPad(int bar, std::vector<Event>& out)
+void BerlinComposer::emitPad(int bar, std::vector<Event>& out)
 {
     const int64_t t = int64_t(bar) * kBarTicks;
     auto release = [&](int64_t at) {
@@ -304,7 +305,7 @@ void Composer::emitPad(int bar, std::vector<Event>& out)
     if (bar == totalBars() - 1) release(t + kBarTicks);
 }
 
-void Composer::emitSequence(int track, int bar, std::vector<Event>& out)
+void BerlinComposer::emitSequence(int track, int bar, std::vector<Event>& out)
 {
     const auto& pat = track == Bass ? bass_ : seq_;
     const float e = energyAt(bar);
@@ -335,7 +336,7 @@ void Composer::emitSequence(int track, int bar, std::vector<Event>& out)
     }
 }
 
-void Composer::emitLeadPhrase(int bar, std::vector<Event>& out)
+void BerlinComposer::emitLeadPhrase(int bar, std::vector<Event>& out)
 {
     auto& sec = sectionAt(bar);
     const int phrase = (bar - sec.startBar) / 4;
@@ -380,7 +381,7 @@ void Composer::emitLeadPhrase(int bar, std::vector<Event>& out)
     }
 }
 
-void Composer::generateBar(int bar, std::vector<Event>& out)
+void BerlinComposer::generateBar(int bar, std::vector<Event>& out)
 {
     if (bar < 0 || bar >= totalBars()) return;
     auto& sec = sectionAt(bar);
@@ -402,7 +403,7 @@ void Composer::generateBar(int bar, std::vector<Event>& out)
     if (active(Lead, bar) && (bar - sec.startBar) % 4 == 0) emitLeadPhrase(bar, out);
 }
 
-std::string Composer::describe() const
+std::string BerlinComposer::describe() const
 {
     static const char* names[] = { "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B" };
     double secs = totalBars() * 4 * 60.0 / bpm_;
@@ -410,6 +411,12 @@ std::string Composer::describe() const
     std::snprintf(buf, sizeof buf, "%s %s (shift: %s) · %.0f bpm · %d bars · %d:%02d", names[tonicPc_],
                   homeMode_->name, shiftMode_->name, bpm_, totalBars(), int(secs) / 60, int(secs) % 60);
     return buf;
+}
+
+std::unique_ptr<Composer> makeComposer(const std::string& scene, uint64_t seed)
+{
+    if (scene == "chorale") return std::make_unique<ChoraleComposer>(seed);
+    return std::make_unique<BerlinComposer>(seed);
 }
 
 } // namespace liszt

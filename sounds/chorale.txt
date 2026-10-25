@@ -1,0 +1,36 @@
+# Lisztmachine sound palette: Chorale scene (four voices, IDM rhythm).
+# The slots mean different things here:
+#   pad   the four voices (soprano, alto, tenor, bass), held and legato
+#   bass  deep drums: kick on 1, backbeat tom on 3, ghosts, fills, sub drops (played at pitches 28-52)
+#   seq   micro percussion: the click on every beat, swung sixteenths, ratchets (pitches 55-100)
+#   lead  piano doubling the melody, broken chords at the peak
+# Each part rotates through its patches over the piece: calm sections the darker ones.
+#   gain     dB applied to this patch; set from single-note measurements, then trimmed on a full render
+#            (voices -8, drums -12, piano -2: four voices and stacked drums measured +7.8 dBFS before),
+#            then per patch from its loudness inside a full render of seed 1
+#   bright   spectral centroid in Hz, measured; for the drums an estimate (orders dark -> bright)
+# Left out after measuring: Ghost Pad, Semihaunt, Moody Statement, Distant (their pitch wobbles,
+# no good for harmony), Church and MKS-70 Warm Pad (sound an octave low), Plucks/Snap (peaks +10 dBFS),
+# FX/Geiger (random crackle that ignores the notes: no use as a metronome, -50 dB in the mix).
+# part  gain   bright  patch
+pad     -7.6    505  Pads/Ooh
+pad     -5.4   1000  Pads/Retro Choir
+pad     -5.9   1445  Pads/Synth Choir MW O-Ah
+pad    -15.3   1988  Winds/Tragic Winds
+pad     -6.0   3899  Pads/Subtle Comb Strings
+pad      2.4   4340  Pads/Choir Pad Thing
+bass   -18.0    200  Percussion/Kick Tech 1
+bass    -3.6    230  Percussion/Kick 909ish
+bass   -21.7    260  Percussion/Kick Tech 2
+bass    -8.4    300  Percussion/Synth Tom 1
+bass    -8.0    320  Percussion/Synth Tom 2
+bass    -2.3    360  Percussion/Drum One
+seq    -11.0    419  Percussion/Synth Tom 3
+seq     -8.4   2936  Plucks/Scrape Pluck
+seq    -14.6   3307  Plucks/Metallic
+seq     -1.5   9815  Percussion/Snare Tight
+lead    -4.3    587  Keys/Soft Suitcase
+lead    -0.4    594  Keys/EP 1
+lead     1.3   1765  Keys/DX EP
+lead    -6.3   1859  Plucks/Piano Remains 1
+lead    -5.6   2313  Plucks/Piano Remains 2

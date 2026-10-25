@@ -375,7 +375,7 @@ juce::String Engine::currentPatch(int track) const
 
 void Engine::start(uint64_t seed, int startBar)
 {
-    auto next = std::make_unique<Composer>(seed);
+    auto next = makeComposer(scene, seed);
     startBar = juce::jlimit(0, next->totalBars() - 1, startBar);
 
     // Starting later: compose the bars before it silently (the sequences mutate as they go,

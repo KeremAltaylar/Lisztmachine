@@ -92,6 +92,7 @@ public:
     juce::String load(double sampleRate, int maxBlock, const Palette& palette);
     // Message thread. A new concert from this seed, from bar 0 or from any later bar.
     void start(uint64_t seed, int startBar = 0);
+    std::string scene = "berlin"; // which composer start() uses
     void stop();
     // Message thread, often (a timer): loads each part's next sound into its idle instance
     // ahead of the change. The audio thread never waits for this; a sound not ready in

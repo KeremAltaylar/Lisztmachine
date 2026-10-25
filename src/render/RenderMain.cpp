@@ -3,6 +3,7 @@
 //                [--patch bass="Basses/Bass 1"]  (repeatable; any Surge factory patch)
 //                [--from Summit|<bar>] [--bars N]  start at a section or bar; render N bars + tail
 //                [--dry]                           no delay or reverb
+//                [--scene berlin|chorale]          which composer (and its palette, sounds/<scene>.txt)
 //                [--palette berlin]                sounds/<name>.txt
 //                                                             render a concert (+ .mid and .sections.txt)
 //   liszt_render --audition "Category/Patch" [note]           hold one note on a Surge patch, measure it
@@ -143,9 +144,12 @@ static int audition(const juce::String& patch, int note)
     return 0;
 }
 
+static std::string sceneName = "berlin"; // --scene berlin|chorale
+
 static void writeMidi(uint64_t seed, const juce::File& file)
 {
-    Composer c(seed);
+    auto cp = makeComposer(sceneName, seed);
+    auto& c = *cp;
     std::vector<Event> ev;
     for (int b = 0; b < c.totalBars(); ++b) c.generateBar(b, ev);
     juce::MidiFile mf;
@@ -171,7 +175,8 @@ static void writeMidi(uint64_t seed, const juce::File& file)
 // audio block. The live app will send the same over a socket.
 static void writeShow(uint64_t seed, double blockRate, const std::vector<std::array<float, 7>>& levels, const juce::File& file)
 {
-    Composer c(seed);
+    auto cp = makeComposer(sceneName, seed);
+    auto& c = *cp;
     std::vector<Event> ev;
     for (int b = 0; b < c.totalBars(); ++b) c.generateBar(b, ev);
     std::stable_sort(ev.begin(), ev.end());
@@ -230,12 +235,14 @@ static int renderConcert(uint64_t seed, double seconds, const juce::File& out, i
             if (p.upToFirstOccurrenceOf("=", false, false) == kTrackNames[t])
                 palette.parts[t] = { { p.fromFirstOccurrenceOf("=", false, false), 0.0f, 0.0f } };
     Engine engine;
+    engine.scene = sceneName;
     if (auto e = engine.load(sr, block, palette); e.isNotEmpty()) { std::cerr << e << "\n"; return 1; }
     if (solo >= 0) engine.enabledTracks = uint8_t(1 << solo);
     engine.effects = !dry;
     int startBar = 0;
     {
-        Composer plan(seed);
+        auto planned = makeComposer(sceneName, seed);
+        auto& plan = *planned;
         for (auto& s : plan.sections())
             if (from.equalsIgnoreCase(s.name)) startBar = s.startBar;
         if (from.isNotEmpty() && from.containsOnly("0123456789")) startBar = from.getIntValue() - 1; // bars count from 1
@@ -345,6 +352,7 @@ int main(int argc, char** argv)
         if (args[i] == "--from") from = args[i + 1];
         if (args[i] == "--bars") bars = args[i + 1].getIntValue();
     }
+    if (int i = args.indexOf("--scene"); i >= 0) paletteName = sceneName = args[i + 1].toStdString();   // a scene brings its own palette
     if (int i = args.indexOf("--palette"); i >= 0) paletteName = args[i + 1];
     return renderConcert(seed, seconds, out, solo, patches, args.contains("--dry"), from, bars);
 }

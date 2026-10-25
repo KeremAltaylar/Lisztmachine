@@ -25,6 +25,7 @@ Needs Surge XT installed. The build directory lives outside OneDrive on purpose.
 ## Render and listen
 
     liszt_render --seed 7 --out seed7.wav
+    liszt_render --scene chorale --seed 3 --out chorale3.wav   # the four-voice chorale with IDM rhythm (sounds/chorale.txt)
     liszt_render --seed 7 --seconds 120 --solo seq --patch "seq=Plucks/Saw Pluck" --out try.wav
     liszt_render --audition "Pads/Juno-60 Strings"
 

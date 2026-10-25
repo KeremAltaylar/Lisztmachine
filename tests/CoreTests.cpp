@@ -1,5 +1,8 @@
 // Checks on the composer alone, over many seeds. Run: liszt_tests
 #include "Composer.h"
+#include "Chorale.h"
+#include <cmath>
+#include <cstdlib>
 #include <algorithm>
 #include <cstdio>
 #include <map>
@@ -18,7 +21,7 @@ static std::vector<Event> generateAll(Composer& c)
     return ev;
 }
 
-static bool isChordTone(const Composer& c, int bar, int pitch)
+static bool isChordTone(const BerlinComposer& c, int bar, int pitch)
 {
     auto& m = c.modeAt(bar);
     for (int d : { 0, 2, 4 })
@@ -31,7 +34,7 @@ int main()
     std::set<std::string> descriptions;
     for (uint64_t seed = 1; seed <= 40; ++seed)
     {
-        Composer c(seed), again(seed);
+        BerlinComposer c(seed), again(seed);
         auto ev = generateAll(c);
         auto ev2 = generateAll(again);
         descriptions.insert(c.describe());
@@ -57,7 +60,7 @@ int main()
                     int b = int(x.tick / kBarTicks);
                     CHECK(sounding[key] == 0, "double trigger %s %d bar %d", kTrackNames[x.track], x.pitch, b);
                     ++sounding[key];
-                    CHECK(x.pitch >= Composer::kRange[x.track][0] && x.pitch <= Composer::kRange[x.track][1],
+                    CHECK(x.pitch >= BerlinComposer::kRange[x.track][0] && x.pitch <= BerlinComposer::kRange[x.track][1],
                           "%s pitch %d out of range", kTrackNames[x.track], x.pitch);
                     CHECK(b < c.totalBars() && inMode(c.modeAt(b), c.tonicPc(), x.pitch),
                           "%s pitch %d not in %s at bar %d", kTrackNames[x.track], x.pitch, c.modeAt(b).name, b);
@@ -94,7 +97,98 @@ int main()
     std::uint64_t seed = 0;
     CHECK(descriptions.size() > 10, "only %zu distinct concerts over 40 seeds", descriptions.size());
 
+    // ---- the chorale scene
+    double stepwise = 0, steps = 0;
+    int parallels = 0, chordsChecked = 0;
+    for (seed = 1; seed <= 24; ++seed)
+    {
+        ChoraleComposer c(seed), again(seed);
+        auto ev = generateAll(c);
+        auto ev2 = generateAll(again);
+        CHECK(ev.size() == ev2.size() && std::equal(ev.begin(), ev.end(), ev2.begin(), [](auto& a, auto& b) {
+                  return a.tick == b.tick && a.type == b.type && a.track == b.track && a.pitch == b.pitch && a.value == b.value;
+              }), "chorale: same seed must give the same piece");
+        const double minutes = c.totalBars() * 4 / c.bpm();
+        CHECK(minutes > 9.0 && minutes < 11.0, "chorale length %.1f min", minutes);
+
+        // no key struck twice while held, none left hanging, velocities sane
+        std::map<std::pair<int, int>, int> held;
+        for (auto& x : ev)
+        {
+            const auto key = std::make_pair(int(x.track), int(x.pitch));
+            if (x.type == Event::NoteOn)
+            {
+                CHECK(held[key] == 0, "chorale double trigger %s %d at tick %lld", kTrackNames[x.track], x.pitch, (long long) x.tick);
+                CHECK(x.value > 0 && x.value <= 1, "chorale velocity %f", x.value);
+                ++held[key];
+            }
+            else if (x.type == Event::NoteOff) { CHECK(held[key] == 1, "chorale note-off without note-on"); --held[key]; }
+        }
+        for (auto& [k, n] : held) CHECK(n == 0, "chorale stuck note %s %d", kTrackNames[k.first], k.second);
+
+        // the four voices: ranges, complete chords, no parallel fifths or octaves, cadences home
+        const auto& ch = c.chords();
+        const auto& vo = c.voicings();
+        for (size_t k = 0; k < ch.size(); ++k)
+        {
+            const auto pcs = c.chordPcs(ch[k]);
+            for (int v = 0; v < 4; ++v)
+                CHECK(vo[k][size_t(v)] >= ChoraleComposer::kVoiceRange[v][0] && vo[k][size_t(v)] <= ChoraleComposer::kVoiceRange[v][1],
+                      "chorale voice %d pitch %d out of range at chord %zu", v, vo[k][size_t(v)], k);
+            CHECK(vo[k][0] < vo[k][1] && vo[k][1] < vo[k][2] && vo[k][2] < vo[k][3], "chorale voices cross at chord %zu", k);
+            bool third = false;
+            for (int v = 0; v < 4; ++v) third = third || (vo[k][size_t(v)] % 12 == pcs[1]);
+            CHECK(third, "chorale chord %zu has no third", k);
+            if (ch[k].cadence == ChoraleComposer::Authentic)
+                CHECK(ch[k].root == 0 && vo[k][3] % 12 == c.tonicPc(), "authentic cadence at chord %zu not home (soprano %d)", k, vo[k][3]);
+            if (k == 0) continue;
+            ++chordsChecked;
+            for (int i = 0; i < 4; ++i)
+                for (int j = i + 1; j < 4; ++j)
+                {
+                    const int before = ((vo[k - 1][size_t(j)] - vo[k - 1][size_t(i)]) % 12 + 12) % 12;
+                    const int after = ((vo[k][size_t(j)] - vo[k][size_t(i)]) % 12 + 12) % 12;
+                    const int mi = vo[k][size_t(i)] - vo[k - 1][size_t(i)], mj = vo[k][size_t(j)] - vo[k - 1][size_t(j)];
+                    if (mi != 0 && mj != 0 && (mi > 0) == (mj > 0) && before == after && (after == 7 || after == 0))
+                    {
+                        if (++parallels <= 12 && std::getenv("LISZT_DEBUG"))
+                            std::printf("  parallel %s voices %d-%d  chord %zu: root %d q %d inv %d pedal %d -> root %d q %d inv %d pedal %d  [%d %d %d %d] -> [%d %d %d %d]\n",
+                                        after == 7 ? "5th" : "8ve", i, j, k, ch[k - 1].root, ch[k - 1].quality, ch[k - 1].inversion, ch[k - 1].pedal,
+                                        ch[k].root, ch[k].quality, ch[k].inversion, ch[k].pedal, vo[k - 1][0], vo[k - 1][1], vo[k - 1][2], vo[k - 1][3], vo[k][0], vo[k][1], vo[k][2], vo[k][3]);
+                    }
+                }
+            const int d = std::abs(vo[k][3] - vo[k - 1][3]);
+            CHECK(d <= 12, "chorale melody leaps %d at chord %zu", d, k);
+            steps += 1; stepwise += d <= 2 ? 1 : 0;
+        }
+
+        // the rhythm keeps time: a click on every beat while the micro percussion plays (the bar
+        // before a new section may drop its last beat), a kick on every downbeat with the drums
+        std::set<std::pair<int, int64_t>> onsets;
+        for (auto& x : ev) if (x.type == Event::NoteOn) onsets.insert({ int(x.track), x.tick });
+        int beats = 0, missing = 0;
+        for (int bar = 0; bar < c.totalBars(); ++bar)
+        {
+            const auto& sec = c.sectionAt(bar);
+            const int64_t t0 = int64_t(bar) * kBarTicks;
+            if (sec.layers & (1 << Seq))
+                for (int b = 0; b < 4; ++b)
+                {
+                    ++beats;
+                    if (!onsets.count({ int(Seq), t0 + b * kPPQ })) ++missing;
+                }
+            if (sec.layers & (1 << Bass))
+                CHECK(onsets.count({ int(Bass), t0 }), "chorale: no kick on the downbeat of bar %d", bar);
+        }
+        CHECK(missing <= beats / 40, "chorale: %d of %d beats without a click", missing, beats);
+    }
+    seed = 0;
+    CHECK(parallels == 0, "chorale: %d parallel fifths or octaves in %d chord changes", parallels, chordsChecked);
+    CHECK(stepwise / steps > 0.5, "chorale melody only %.0f%% stepwise", 100 * stepwise / steps);
+    std::printf("chorale: %d chord changes, %d parallels, melody %.0f%% stepwise\n", chordsChecked, parallels, 100 * stepwise / steps);
+
     std::printf("%s (%d failures)\n", failures ? "FAILED" : "all checks passed", failures);
-    std::printf("e.g. seed 1: %s\n", Composer(1).describe().c_str());
+    std::printf("e.g. seed 1: %s\n", BerlinComposer(1).describe().c_str());
+    std::printf("      chorale: %s\n", ChoraleComposer(1).describe().c_str());
     return failures ? 1 : 0;
 }
