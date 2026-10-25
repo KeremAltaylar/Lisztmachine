@@ -103,9 +103,9 @@ protected:
     std::vector<float> energyOfBar_;
 };
 
-// "berlin" or "chorale"; anything else is Berlin.
+// "berlin", "chorale" or "letallbeyours"; anything else is Berlin.
 std::unique_ptr<Composer> makeComposer(const std::string& scene, uint64_t seed);
-inline const char* kScenes[] = { "berlin", "chorale" };
+inline const char* kScenes[] = { "berlin", "chorale", "letallbeyours" };
 
 // Berlin-school scene: drone pad, sequenced bass, polymetric upper sequence and a
 // motif-based lead, over a slow modal progression shaped by a 10-minute energy arc.

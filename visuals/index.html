@@ -73,6 +73,7 @@ nav button[aria-pressed="true"] { color: var(--ember); }
     <div class="pieces" id="pieces">
       <button class="go" id="piece-chorale" data-piece="chorale" disabled>Chorale</button>
       <button class="go" id="piece-berlin" data-piece="berlin" disabled>Berlin</button>
+      <button class="go" id="piece-yours" data-piece="yours" disabled>Let All Be Yours</button>
     </div>
     <button class="go" id="go" hidden disabled>Loading…</button>
     <p class="keys"><kbd>1</kbd>–<kbd>8</kbd> study · <kbd>G</kbd> new look · <kbd>Space</kbd> pause · <kbd>←</kbd><kbd>→</kbd> 10 s · <kbd>↑</kbd><kbd>↓</kbd> section · <kbd>S</kbd> strobe on/off · <kbd>B</kbd> feedback on/off · <kbd>K</kbd> test drum hit · <kbd>[</kbd><kbd>]</kbd> pad sensitivity · <kbd>,</kbd><kbd>.</kbd> pad effect · <kbd>H</kbd> hide controls · <kbd>F</kbd> full screen</p>
@@ -108,10 +109,11 @@ nav button[aria-pressed="true"] { color: var(--ember); }
 // will send the same notes, sections and levels over a socket.
 // ---------------------------------------------------------------------------------------------
 // The pieces: their recording and data, and the pitch range of each role (harmony, bass and
-// drums, rhythm, melody), which the visuals map onto 0..1.
+// drums, rhythm, melody), which the visuals map onto 0..1, and the study each piece is shown in.
 const PIECES = {
-  chorale: { name: 'Chorale', media: 'media/chorale1', ranges: [[36, 81], [26, 64], [55, 108], [60, 100]] },
-  berlin: { name: 'Berlin', media: 'media/seed1', ranges: [[48, 76], [28, 52], [52, 81], [60, 88]] },
+  chorale: { name: 'Chorale', study: 'lumen', media: 'media/chorale1', ranges: [[36, 81], [26, 64], [55, 108], [60, 100]] },
+  berlin: { name: 'Berlin', study: 'dust', media: 'media/seed1', ranges: [[48, 76], [28, 52], [52, 81], [60, 88]] },
+  yours: { name: 'Let All Be Yours', media: 'media/yours1', ranges: [[36, 76], [24, 56], [39, 74], [33, 77]] }, // study: Kerem's choice
 };
 let RANGE = PIECES.chorale.ranges;
 const TAU = [1.2, 0.28, 0.16, 0.4];                          // how long a note-on lights up, seconds
@@ -1614,7 +1616,7 @@ async function boot() {
   device.addEventListener('uncapturederror', e => { window.__errors.push(e.error.message); console.error(e.error.message); });
   device.lost.then(info => fail('The graphics device was lost: ' + info.message + '. Reload the page.'));
 
-  // Which piece: from the start screen (or #chorale / #berlin in the address).
+  // Which piece: from the start screen (or #chorale / #berlin / #yours in the address).
   const piece = PIECES[location.hash.slice(1)] ?? await new Promise(res => {
     for (const b of document.querySelectorAll('[data-piece]')) { b.disabled = false; b.onclick = () => res(PIECES[b.dataset.piece]); }
   });
@@ -1700,7 +1702,7 @@ async function boot() {
     await s.init(g, F);
   }
 
-  let study = STUDIES[0], next = null, tw = 0, mips = [], downBG = [], upBG = [], compBG = [], mixBG = [], fb = [], fbo = [], outerBG = [], fbi = 0;
+  let study = STUDIES.find(s => s.id === piece.study) ?? STUDIES[0], next = null, tw = 0, mips = [], downBG = [], upBG = [], compBG = [], mixBG = [], fb = [], fbo = [], outerBG = [], fbi = 0;
   const tex = (w, h) => device.createTexture({ size: [w, h], format: 'rgba16float', usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING });
   let Q = 1;   // render quality, lowered when frames come late (see quality())
   function targets() {
@@ -1741,7 +1743,7 @@ async function boot() {
 
   // The clock is the audio: the position of what is coming out of the speakers right now.
   const sec = F.show.sections;
-  let playing = false, musicT = (sec.find(s => s.name === 'Summit' || s.name === 'Apotheosis') ?? sec[0]).t + 14;
+  let playing = false, musicT = (sec.find(s => ['Summit', 'Apotheosis', 'Possession'].includes(s.name)) ?? sec[0]).t + 14;
   const clock = now => {
     if (!playing) return musicT;
     musicT = Math.max(startT, startT + heard(now) - startAt);

@@ -1,5 +1,6 @@
 #include "Composer.h"
 #include "Chorale.h"
+#include "Yours.h"
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
@@ -428,12 +429,22 @@ const SceneInfo& sceneInfo(const std::string& scene)
         { 1, 1, 1, 1, 0, 0, 0, 0, 2, 1 }, // the piano keeps its oscillator tuning: rounding it put its patches an octave off
         true,
     };
-    return scene == "chorale" ? chorale : berlin;
+    // Let All Be Yours: the drone, the drums and the bass dry; the acid and the stabs into the echoes.
+    static const SceneInfo yours {
+        "letallbeyours", 9, { "drone", "kick", "bass", "acid", "stab", "hats", "clap", "sub", "fx" },
+        { 0, 1, 1, 3, 2, 2, 2, 1, 0 },
+        { { 0, .30f }, { 0, .03f }, { 0, .05f }, { .20f, .15f }, { .15f, .25f }, { .05f, .10f }, { .10f, .25f }, { 0, 0 }, { .10f, .35f } },
+        { -1, -1, -1, -1, -1, -1, -1, -1, -1 },
+        { 1, 0, 1, 1, 1, 0, 0, 0, 0 },
+        true,
+    };
+    return scene == "chorale" ? chorale : scene == "letallbeyours" ? yours : berlin;
 }
 
 std::unique_ptr<Composer> makeComposer(const std::string& scene, uint64_t seed)
 {
     if (scene == "chorale") return std::make_unique<ChoraleComposer>(seed);
+    if (scene == "letallbeyours") return std::make_unique<YoursComposer>(seed);
     return std::make_unique<BerlinComposer>(seed);
 }
 

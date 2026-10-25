@@ -350,7 +350,9 @@ juce::String Engine::load(double sampleRate, int maxBlock, const Palette& palett
         t.hasEcho = palette.delays[i].beats > 0 && palette.delays[i].mix > 0;
         if (t.internal)
         {
-            const auto kind = first.endsWith("sub") ? InternalSynth::Sub : first.endsWith("blip") ? InternalSynth::Blip : InternalSynth::Click;
+            const auto kind = first.endsWith("sub") ? InternalSynth::Sub : first.endsWith("blip") ? InternalSynth::Blip
+                            : first.endsWith("kick") ? InternalSynth::Kick : first.endsWith("hat") ? InternalSynth::Hat
+                            : first.endsWith("clap") ? InternalSynth::Clap : InternalSynth::Click;
             t.synth.prepare(sampleRate, kind);
             for (auto& s : t.slots) { s.plugin.reset(); s.midi.ensureSize(8192); s.state = Idle; s.entry = 0; s.gain = juce::Decibels::decibelsToGain(palette.parts[i].front().gainDb); }
             t.buffer.setSize(2, maxBlock);
@@ -891,19 +893,24 @@ void InternalSynth::start(int note, float velocity)
     v->note = note;
     v->phase = 0;
     v->held = kind_ == Sub;
-    v->noise = kind_ == Click && note >= 96;
+    v->noise = (kind_ == Click && note >= 96) || kind_ == Hat || kind_ == Clap;
+    v->age = 0;
+    v->lastNoise = v->lastNoise2 = 0;
     const double hz = 440.0 * std::pow(2.0, ((kind_ == Click ? note + 36 : note) - 69) / 12.0);
     v->inc = juce::MathConstants<double>::twoPi * std::min(hz, 15000.0) / sr_;
     v->gain = 0.5 * std::pow(double(velocity), 1.3);
     double tau = 0.05;
     if (kind_ == Click) tau = v->noise ? 0.0015 : 0.002 + 0.004 * juce::jlimit(0.0, 1.0, (96.0 - note) / 40.0);
     if (kind_ == Blip) tau = 0.03 + 0.06 * velocity;
+    if (kind_ == Kick) tau = 0.16 + 0.2 * velocity;                         // the kick's body, ending on the note
+    if (kind_ == Hat) tau = note >= 46 ? 0.07 + 0.1 * velocity : 0.012 + 0.02 * velocity; // 46 open, else closed
     v->decay = std::exp(-1.0 / (tau * sr_));
-    v->attack = kind_ == Click ? 1.0 : 1.0 / ((kind_ == Sub ? 0.04 : 0.001) * sr_);
+    const bool struck = kind_ == Click || kind_ == Kick || kind_ == Hat || kind_ == Clap;
+    v->attack = struck ? 1.0 : 1.0 / ((kind_ == Sub ? 0.04 : 0.001) * sr_);
     v->release = std::exp(-1.0 / (0.4 * sr_));
-    v->env = kind_ == Click ? v->gain : 0.0;
-    // stereo: clicks alternate a little left and right, blips spread by pitch, the sub sits centre
-    float pan = kind_ == Click ? ((flip_++ & 1) ? 0.3f : -0.3f) : kind_ == Blip ? juce::jlimit(-0.5f, 0.5f, float(note - 88) / 24.0f) : 0.0f;
+    v->env = struck ? v->gain : 0.0;
+    // stereo: clicks and hats alternate a little left and right, blips spread by pitch, the rest sits centre
+    float pan = kind_ == Click || kind_ == Hat ? ((flip_++ & 1) ? 0.3f : -0.3f) : kind_ == Blip ? juce::jlimit(-0.5f, 0.5f, float(note - 88) / 24.0f) : 0.0f;
     v->panL = std::sqrt(0.5f * (1 - pan));
     v->panR = std::sqrt(0.5f * (1 + pan));
 }
@@ -920,7 +927,13 @@ void InternalSynth::run(float* l, float* r, int from, int to)
         if (v.note < 0) continue;
         for (int n = from; n < to; ++n)
         {
-            if (kind_ == Click) v.env *= v.decay;
+            if (kind_ == Click || kind_ == Kick || kind_ == Hat) v.env *= v.decay;
+            else if (kind_ == Clap)
+            {
+                // three hand claps 11 ms apart, then the room
+                const double t = double(v.age) / sr_;
+                v.env = v.gain * (t < 0.033 ? std::exp(-std::fmod(t, 0.011) / 0.003) : 0.7 * std::exp(-(t - 0.033) / 0.09));
+            }
             else if (kind_ == Blip) { if (v.attack > 0 && v.env < v.gain) { v.env += v.gain * v.attack; if (v.env >= v.gain) { v.env = v.gain; v.attack = 0; } } else v.env *= v.decay; }
             else { if (v.held) v.env += (v.gain - v.env) * v.attack * 3.0; else v.env *= v.release; }
             float x;
@@ -928,11 +941,26 @@ void InternalSynth::run(float* l, float* r, int from, int to)
             {
                 seed_ = seed_ * 1664525u + 1013904223u;
                 const float w = float(int32_t(seed_)) * (1.0f / 2147483648.0f);
-                x = (w - v.lastNoise) * 0.7f; // differenced noise: the low end removed, a tick
+                if (kind_ == Hat) x = (w - 2 * v.lastNoise + v.lastNoise2) * 0.35f; // twice differenced: only the top
+                else x = (w - v.lastNoise) * 0.7f; // differenced noise: the low end removed, a tick
+                v.lastNoise2 = v.lastNoise;
                 v.lastNoise = w;
             }
             else
                 x = float(std::sin(v.phase) + (kind_ == Sub ? 0.12 * std::sin(2 * v.phase) : 0.0));
+            if (kind_ == Kick)
+            {
+                // the pitch falls from two octaves above the note in a few milliseconds, then saturates a little
+                v.phase += v.inc * 3.0 * std::exp(-double(v.age) / (0.022 * sr_));
+                x = float(std::tanh(2.0 * x * v.env) * 0.55);
+                v.phase += v.inc;
+                if (v.phase > juce::MathConstants<double>::twoPi) v.phase -= juce::MathConstants<double>::twoPi;
+                ++v.age;
+                l[n] += x * v.panL;
+                r[n] += x * v.panR;
+                continue;
+            }
+            ++v.age;
             v.phase += v.inc;
             if (v.phase > juce::MathConstants<double>::twoPi) v.phase -= juce::MathConstants<double>::twoPi;
             x *= float(v.env);

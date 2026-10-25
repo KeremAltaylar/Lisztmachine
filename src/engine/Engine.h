@@ -53,13 +53,13 @@ std::vector<SoundChange> planSounds(const Composer& composer, const Palette& pal
 class InternalSynth
 {
 public:
-    enum Kind { Click, Blip, Sub };
+    enum Kind { Click, Blip, Sub, Kick, Hat, Clap };
     void prepare(double sampleRate, Kind kind) { sr_ = sampleRate; kind_ = kind; for (auto& v : voices_) v.note = -1; }
     void render(const juce::MidiBuffer& midi, float* left, float* right, int numSamples);
     void allOff() { for (auto& v : voices_) v.note = -1; }
 
 private:
-    struct Voice { int note = -1; double phase = 0, inc = 0, env = 0, gain = 0, decay = 0, attack = 0, release = 0; float panL = 0.7f, panR = 0.7f; bool noise = false, held = false; float lastNoise = 0; };
+    struct Voice { int note = -1; double phase = 0, inc = 0, env = 0, gain = 0, decay = 0, attack = 0, release = 0; float panL = 0.7f, panR = 0.7f; bool noise = false, held = false; float lastNoise = 0, lastNoise2 = 0; int64_t age = 0; };
     void start(int note, float velocity);
     void stopNote(int note);
     void run(float* l, float* r, int from, int to);
