@@ -57,6 +57,7 @@ nav button[aria-pressed="true"] { color: var(--ember); }
 .pad select { font: inherit; color: var(--ink); background: var(--void); border: 1px solid var(--rule); padding: 3px 6px; max-width: 46vw; }
 .amt { display: inline-flex; align-items: center; gap: 8px; color: var(--ink); font-variant-numeric: tabular-nums; }
 .amt input { width: 140px; accent-color: var(--ember); }
+.cam .amt input { width: 110px; }
 .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
 @media (prefers-reduced-motion: reduce) { #hud { transition: none; } }
 </style>
@@ -80,6 +81,13 @@ nav button[aria-pressed="true"] { color: var(--ember); }
     <nav id="studies"></nav>
   </div>
   <div class="form" id="form"><div class="head" id="head"></div></div>
+  <div class="row pad cam">
+    <span>Camera</span>
+    <label class="amt" for="cam-speed">Speed <input id="cam-speed" type="range" min="0" max="100" value="40"> <span id="cam-speed-v">40</span></label>
+    <label class="amt" for="cam-range">Range <input id="cam-range" type="range" min="0" max="100" value="60"> <span id="cam-range-v">60</span></label>
+    <label class="amt" for="cam-cuts">Cuts <input id="cam-cuts" type="range" min="0" max="100" value="70"> <span id="cam-cuts-v">70</span></label>
+    <label class="amt" for="cam-shake">Shake <input id="cam-shake" type="range" min="0" max="100" value="50"> <span id="cam-shake-v">50</span></label>
+  </div>
   <div class="row pad">
     <button id="pad-go">Drum pad</button>
     <label for="pad-device" class="sr">Input device</label><select id="pad-device"><option value="">Default input</option></select>
@@ -203,6 +211,8 @@ struct U {
   gene: array<vec4f, 4>,   // the genome: 16 numbers each study reads as its structure; re-rolled every section
   pad: array<vec4f, 8>,    // the last eight drum-pad hits: where (x, y in -1..1), age in seconds, strength
   padx: vec4f,             // agitation (builds while you play), brightness of the last hit
+  jour: vec4f,             // this study's camera journey: yaw, pitch, distance factor, roll
+  trav: vec4f,             // and its travel through space: x, y, z
 };
 @group(0) @binding(0) var<uniform> u: U;
 fn gene(k: i32) -> f32 { return u.gene[k / 4][k % 4]; }
@@ -266,17 +276,10 @@ fn curl(p: vec3f) -> vec3f {
   let z0 = pot(p - vec3f(0, 0, e)); let z1 = pot(p + vec3f(0, 0, e));
   return vec3f((y1.z - y0.z) - (z1.y - z0.y), (z1.x - z0.x) - (x1.z - x0.z), (x1.y - x0.y) - (y1.x - y0.x)) / (2.0 * e);
 }
-// A long camera journey: slow sines with periods of 40 to 110 s on every axis, offset per study, so each
-// study travels its own path that does not repeat for many minutes. Its clock (u.padx.z) runs faster
-// when the music is loud. Returns yaw, pitch, a distance factor and roll.
-fn traj(s: f32) -> vec4f {
-  let t = u.padx.z;
-  return vec4f(
-    sin(t * 0.131 + s) * 1.6 + sin(t * 0.083 + s * 2.3) * 1.1 + sin(t * 0.057 + s * 0.7) * 0.8,
-    sin(t * 0.097 + s * 1.7) * 0.35 + sin(t * 0.061 + s * 3.1) * 0.25,
-    1.0 + 0.3 * sin(t * 0.071 + s * 0.4) + 0.18 * sin(t * 0.113 + s * 1.9),
-    sin(t * 0.049 + s * 2.7) * 0.35 + sin(t * 0.089 + s) * 0.2);
-}
+// The camera journey of this study, integrated on the CPU from Perlin noise and four trajectory types
+// (wander, orbit, figure-8, dive) that blend between sections; speed and range are the viewer's.
+fn traj(s: f32) -> vec4f { return u.jour; }
+fn travel() -> vec3f { return u.trav.xyz; }
 // Calm sections light cold, the peak warm: the colour temperature of the form.
 fn tint(e: f32) -> vec3f {
   let white = mix(vec3f(0.74, 0.84, 1.0), vec3f(1.0, 0.83, 0.64), smoothstep(0.2, 0.9, e));
@@ -466,7 +469,7 @@ STUDIES.push({
     this.S = new Float32Array(32 * 4);
     this.sb = g.device.createBuffer({ size: this.S.byteLength, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
     const CAM = /* wgsl */`
-      fn aim() -> vec3f { return vec3f(0.2, 0.0, 0.0); }
+      fn aim() -> vec3f { return vec3f(0.2, 0.0, 0.0) + travel() * vec3f(1.2, 0.6, 1.0); }
       fn eye() -> vec3f {
         let j = traj(1.0);
         let a = 0.6 + u.cam.x * 0.7 + u.time * 0.015 + j.x;
@@ -776,7 +779,7 @@ STUDIES.push({
         return clamp(1.0 - abs(fract(v + 0.5) - 0.5) / max(fw, 1e-4), 0.0, 1.0) * (1.0 - smoothstep(0.15, 0.45, fw));
       }
       @fragment fn fs(i: VO) -> @location(0) vec4f {
-        let vp = vec2f(sin(u.time * 0.13) * 0.12, cos(u.time * 0.11) * 0.08) + vec2f(u.cam.x, u.cam.y) * vec2f(0.02, 0.12);
+        let vp = vec2f(sin(u.time * 0.13) * 0.12, cos(u.time * 0.11) * 0.08) + vec2f(u.cam.x, u.cam.y) * vec2f(0.02, 0.12) + travel().xy * 0.12;
         let j = traj(2.0);
         var q = ((i.pos.xy - u.res * 0.5) / u.res.y - vp - vec2f(sin(j.x) * 0.18, j.y * 0.3) + shake().xy * 0.05) * j.z;
         q = rot2(u.time * (gene(3) - 0.5) * 0.6 + u.cam.x * 0.5 + j.w * 2.0) * q;       // roll
@@ -850,7 +853,7 @@ STUDIES.push({
 // note. The genome picks the layout (full strips, recursive cells, rings), the orientation, the code
 // (random, the note counter in binary, the pitch in binary, Gray code), and can XOR two systems.
 STUDIES.push({
-  id: 'pattern', name: 'Test Pattern', scale: 1, exposure: 1.0, feedback: 0.82,   // mostly white: a lighter recursion
+  id: 'pattern', name: 'Test Pattern', scale: 1, exposure: 1.0, feedback: 0.35,   // bright bars: a light recursion, or it floods white
   bloom: 0.006,   // hard edges: glow would lift the black
   about: 'After Ryoji Ikeda: binary barcode strips, each driven by one part and re-coded on every note. The layout keeps mutating: recursive cells, rings, crossed systems, codes made from the notes themselves.',
   init(g) {
@@ -864,7 +867,7 @@ STUDIES.push({
         if (kind == 2u) { return f32((u32(u.pitch[part] * 127.0) >> (ci % 7u)) & 1u); }          // the pitch, in binary
         if (kind == 3u) { return f32(((n ^ (n >> 1u)) >> (ci % 10u)) & 1u); }                    // Gray code of the counter
         let code = f32(n * 977u % 65521u);
-        return select(0.0, 1.0, h2(cell + 70000.0, rs + code) < 0.06 + 0.34 * u.level[part] + 0.3 * (gene(4) - 0.5));
+        return select(0.0, 1.0, h2(cell + 70000.0, rs + code) < 0.04 + 0.22 * u.level[part] + 0.12 * (gene(4) - 0.5));
       }
       fn pattern(uv: vec2f, salt: f32) -> f32 {
         let shape = u32(gene(0) * 3.0);                         // 0 strips · 1 recursive cells · 2 rings
@@ -901,15 +904,17 @@ STUDIES.push({
         let speed = select(-1.0, 1.0, h2(rs, 4.0) > 0.5) * (30.0 + h2(rs, 5.0) * 900.0 * (0.15 + u.energy)) * (0.3 + 1.4 * gene(5));
         let cell = floor((across + u.time * speed) / wpx);
         let on = smoothstep(0.02, 0.15, lvl + hit);              // a silent part's strip is dark
-        var v = bitOf(part, cell, rs) * on;
-        if (u.since.y < 0.09 && h2(rs + floor(u.count.y) * 13.0, 9.0) < 0.35 * u.hit.y) { v = on - v; }   // a bass note inverts strips, briefly
+        let rowOn = select(0.0, 1.0, h2(rs, 33.0) < 0.3 + 0.45 * lvl);          // many strips stay dark, so the drummer shows between them
+        let bar = step(fract((across + u.time * speed) / wpx), 0.6);           // each bit a bar with black beside it
+        var v = bitOf(part, cell, rs) * on * rowOn * bar;
+        if (u.since.y < 0.09 && h2(rs + floor(u.count.y) * 13.0, 9.0) < 0.35 * u.hit.y) { v = on * rowOn * bar - v; }   // a bass note inverts strips, briefly
         let fr = fract(along * rows) * alongPx / rows;
         let edge = min(min(local.x * size.x * u.res.x, local.y * size.y * u.res.y), fr);
         return max(v, select(0.0, 0.45, edge < 1.0 && rows < 40.0 && shape != 2u));
       }
       @fragment fn fs(i: VO) -> @location(0) vec4f {
         let j = traj(3.0);                             // the camera's journey turns, zooms and drifts the whole pattern
-        let cuv = rot2(j.w * 0.7 + sin(j.x) * 0.2) * ((i.pos.xy / u.res - 0.5) * vec2f(u.aspect, 1.0)) / j.z + vec2f(sin(j.x) * 0.08, j.y * 0.25);
+        let cuv = rot2(j.w * 0.7 + sin(j.x) * 0.2) * ((i.pos.xy / u.res - 0.5) * vec2f(u.aspect, 1.0)) / j.z + vec2f(sin(j.x) * 0.08, j.y * 0.25) + travel().xy * 0.15;
         let uv = cuv / vec2f(u.aspect, 1.0) + 0.5;
         var v = pattern(uv, 0.0);
         if (gene(6) > 0.6) { v = abs(v - pattern(vec2f(1.0) - uv.yx, 5.0)); }   // XOR with a second, crossed system
@@ -922,8 +927,7 @@ STUDIES.push({
           if (abs(d - front) < 0.02 + 0.03 * h.w) { v = 1.0 - v; }
           else if (d < front && h.z < 0.8) { v = abs(v - pattern(uv, 9.0 + f32(k)) * (1.0 - h.z / 0.8)); }
         }
-        if (gene(8) > 0.88) { v = 1.0 - v; }                                   // a negative section
-        return vec4f(mix(vec3f(1.0), tint(u.energy), 0.35) * v * 3.0, 1.0);    // near pure white, as Ikeda's
+        return vec4f(mix(vec3f(1.0), tint(u.energy), 0.35) * v * 1.7, 1.0);    // white, as Ikeda's, but sparse enough that the drummer shows
       }`);
   },
   resize(g) { this.bg = g.bind(this.pipe, [g.U]); },
@@ -936,7 +940,7 @@ STUDIES.push({
 const FIELD = binding => /* wgsl */`
       @group(0) @binding(${binding}) var<uniform> S: array<vec4f, 32>;
       fn zoom() -> f32 { return (0.7 + 0.9 * gene(15)) * max(u.cam.z, 0.6) * traj(4.0).z; }
-      fn pan() -> vec2f { let j = traj(4.0); return vec2f(sin(j.x) * 0.35, j.y * 0.5); }
+      fn pan() -> vec2f { let j = traj(4.0); return vec2f(sin(j.x) * 0.35, j.y * 0.5) + travel().xy * 0.4; }
       fn turn() -> f32 { return u.cam.x * 0.4 + u.time * 0.06 * (gene(13) - 0.5) + traj(4.0).w + traj(4.0).x * 0.25; }
       fn toWorld(px: vec2f) -> vec2f { return rot2(turn()) * ((px - u.res * 0.5) / u.res.y * 2.0 * zoom()) + shake().xy * 0.1 + pan(); }
       fn toScreen(q: vec2f) -> vec2f { return rot2(-turn()) * (q - shake().xy * 0.1 - pan()) / (2.0 * zoom()) * u.res.y + u.res * 0.5; }
@@ -1068,7 +1072,7 @@ STUDIES.push({
 // classic four lamps, a ring of beams closing in, searchlights sweeping up from the floor, or a curtain
 // of light walls; drum hits burst as shells of light that push the haze.
 STUDIES.push({
-  id: 'lumen', name: 'Lumen', scale: 0.5, exposure: 1.0, bloom: 0.12,
+  id: 'lumen', name: 'Lumen', scale: 0.4, exposure: 1.0, bloom: 0.12,
   about: 'Haze and lamps aimed at the drummer: a classic rig, a ring of beams, searchlights or a curtain of light walls, chosen by the genome. Every part drives its lamps; drum hits burst as shells of light.',
   init(g) {
     this.pipe = g.fullscreen(COMMON + /* wgsl */`
@@ -1091,7 +1095,7 @@ STUDIES.push({
         let j = traj(5.0);
         let ya = u.cam.x * 0.35 + j.x * 0.6;
         let dist = 8.5 * (0.6 + 0.4 * u.cam.z) * j.z;
-        let aim = vec3f(0.0, 2.0, 0.0);
+        let aim = vec3f(0.0, 2.0, 0.0) + travel() * vec3f(1.5, 0.6, 1.5);
         let ro = aim + vec3f(sin(ya) * dist, -0.6 + (u.cam.y + j.y) * 4.0, -cos(ya) * dist) + shake();
         let fw = normalize(aim - ro);
         var rt = normalize(cross(fw, vec3f(0, 1, 0)));
@@ -1147,21 +1151,24 @@ STUDIES.push({
         let far = 16.0;
         var tmax = far;
         if (rd.y < 0.0) { tmax = min(far, -ro.y / rd.y); }
-        let N = 44;
+        let N = 30;                                                               // measured: 44 steps cost 190 ms a frame on the laptop GPU
         let dt = tmax / f32(N);
+        var live = false;
+        for (var k = 0; k < 8; k++) { if (u.pad[k].z < 2.0) { live = true; } }
         let jit = rnd(u32(i.pos.x) * 1973u + u32(i.pos.y) * 9277u + u32(u.frame) * 26699u);
         let hazeScale = 0.3 + 0.6 * gene(2);
         var T = 1.0;
         var acc = vec3f(0.0);
         for (var s = 0; s < N; s++) {
           let x = ro + rd * ((f32(s) + jit) * dt);
-          let h = clamp(fbm(x * hazeScale + vec3f(0.0, -u.time * (0.02 + 0.08 * gene(5)), u.time * 0.03)) + 0.3, 0.0, 1.5);
+          let hq = x * hazeScale + vec3f(0.0, -u.time * (0.02 + 0.08 * gene(5)), u.time * 0.03);
+          let h = clamp(0.5 * gnoise(hq) + 0.25 * gnoise(hq * 2.03 + 1.7) + 0.3, 0.0, 1.5);   // two octaves are enough in moving haze
           var dens = 0.012 + 0.35 * h * h;
           var L = vec3f(0.0);
           for (var k = 0u; k < n; k++) {
             L += lc[k] * spot(x, lp[k], ld[k], lw[k], 1.0 - (1.0 - lw[k]) * 0.3) * hg(dot(rd, ld[k]));
           }
-          for (var k = 0; k < 8; k++) {                                           // drum hits: shells of light pushing the haze
+          for (var k = 0; k < select(0, 8, live); k++) {                           // drum hits: shells of light pushing the haze
             let hh = u.pad[k];
             if (hh.z > 2.0) { continue; }
             let c = vec3f(hh.x * 3.0, 1.2 + (hh.y + 1.0) * 1.4, 0.5);
@@ -1222,7 +1229,7 @@ STUDIES.push({
       }
       fn clip(w: vec3f) -> vec4f {
         let j = traj(6.0);
-        let e = vec3f(sin(j.x) * 2.5 + sin(u.cam.x) * 2.0, 1.55 + (u.cam.y + j.y) * 2.0, -2.4 - (j.z - 1.0) * 3.0) + shake() * 0.5;
+        let e = vec3f(sin(j.x) * 2.5 + sin(u.cam.x) * 2.0, 1.55 + (u.cam.y + j.y) * 2.0, -2.4 - (j.z - 1.0) * 3.0) + travel() * vec3f(2.0, 0.8, 1.5) + shake() * 0.5;
         let fw = normalize(vec3f(sin(j.x) * 1.5, 0.3, 7.0) - e);
         var rt = normalize(cross(fw, vec3f(0, 1, 0)));
         var up = cross(rt, fw);
@@ -1381,7 +1388,7 @@ STUDIES.push({
         let a = u.time * 0.031 + u.cam.x + j.x;
         let el = u.cam.y + j.y * 1.5;
         let dist = select(5.4, 7.5, gene(4) > 0.7) * u.cam.z * j.z;
-        let ro = vec3f(sin(a) * dist * cos(el), sin(el) * dist, cos(a) * dist * cos(el)) + shake() * 0.4;
+        let ro = vec3f(sin(a) * dist * cos(el), sin(el) * dist, cos(a) * dist * cos(el)) + travel() * 0.8 + shake() * 0.4;
         let fw = normalize(-ro);
         var rt = normalize(cross(fw, vec3f(0, 1, 0)));
         var up = cross(rt, fw);
@@ -1446,7 +1453,7 @@ STUDIES.push({
         }
         let j = traj(8.0);
         var c = (q * 2.0 - 1.0) * vec2f(u.aspect, 1.0);
-        c = rot2(j.w * 0.8 + u.cam.x * 0.15) * c / (0.75 + 0.45 * j.z * u.cam.z) + vec2f(sin(j.x) * 0.25, j.y * 0.35) + shake().xy * 0.05;
+        c = rot2(j.w * 0.8 + u.cam.x * 0.15) * c / (0.75 + 0.45 * j.z * u.cam.z) + vec2f(sin(j.x) * 0.25, j.y * 0.35) + travel().xy * 0.25 + shake().xy * 0.05;
         return c / vec2f(u.aspect, 1.0);
       }
       fn bright(n: vec4f) -> f32 {
@@ -1585,7 +1592,7 @@ async function boot() {
   const format = navigator.gpu.getPreferredCanvasFormat();
   ctx.configure({ device, format, alphaMode: 'opaque' });
   const smp = device.createSampler({ magFilter: 'linear', minFilter: 'linear', addressModeU: 'clamp-to-edge', addressModeV: 'clamp-to-edge' });
-  const Udata = new Float32Array(104);
+  const Udata = new Float32Array(112);
   const g = {
     device,
     U: device.createBuffer({ size: Udata.byteLength, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST }),
@@ -1637,8 +1644,9 @@ async function boot() {
 
   let study = STUDIES[0], next = null, tw = 0, mips = [], downBG = [], upBG = [], compBG = [], mixBG = [], fb = [], fbi = 0;
   const tex = (w, h) => device.createTexture({ size: [w, h], format: 'rgba16float', usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING });
+  let Q = 1;   // render quality, lowered when frames come late (see quality())
   function targets() {
-    const pr = Math.min(devicePixelRatio || 1, 2, Math.sqrt(2.2e6 / (innerWidth * innerHeight)));
+    const pr = Math.min(devicePixelRatio || 1, 2, Math.sqrt(2.2e6 / (innerWidth * innerHeight))) * Q;
     canvas.width = Math.max(1, Math.floor(innerWidth * pr));
     canvas.height = Math.max(1, Math.floor(innerHeight * pr));
     for (const s of STUDIES) {
@@ -1876,7 +1884,7 @@ async function boot() {
   // keep spinning between cuts, and flash on the bass.
   const PALETTE = [[1, 0.2, 0.06], [0.45, 0.62, 1], [1, 1, 1], [0.85, 0.3, 1], [1, 0.62, 0.2], [0.25, 1, 0.85]];
   const D = { cam: [0, 0, 1, 0], fx: [0, 0, 0, 0], col: [1, 1, 1, 0], target: [0, 0, 1], spin: 0, cut: 0, chord: -1, bar: -1, si: -1, strobe: true, invertUntil: 0,
-    feedback: true, camT: Math.random() * 600, gene: new Float32Array(16), fbg: new Float32Array(8), gen: 0, salt: Math.random() * 1000 };   // a fresh lineage every time the page opens
+    feedback: true, gene: new Float32Array(16), fbg: new Float32Array(8), gen: 0, salt: Math.random() * 1000 };   // a fresh lineage every time the page opens
   const hash01 = k => { const x = Math.sin(k * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); };
   window.__D = D;
   // The genome: every section gets a new one, every cut mutates two of its numbers. G rolls by hand.
@@ -1892,18 +1900,18 @@ async function boot() {
     if (F.count[0] !== D.chord || (e > 0.75 && bar !== D.bar) || sectionStart) {
       D.cut++;
       const r = k => hash01(D.cut * 7 + k);
-      D.target = [D.cam[0] + (r(1) - 0.5) * 6.0 * (0.3 + e), (r(2) - 0.4) * 0.9 * e, 0.55 + r(3) * 0.9];
-      D.spin = (r(8) - 0.5) * 2.4 * e;
+      const cu = CAM.cuts / 100;
+      D.target = [D.cam[0] + (r(1) - 0.5) * 6.0 * (0.3 + e) * cu, (r(2) - 0.4) * 0.9 * e * cu, 1 + (r(3) * 0.9 - 0.45) * cu];
+      D.spin = (r(8) - 0.5) * 2.4 * e * cu;
       D.col = [...PALETTE[Math.floor(r(4) * PALETTE.length)], Math.max(0, Math.min(1, (e - 0.35) * 2.2))];
       if (sectionStart) roll();
       else for (let k = 5; k < 7; k++) D.gene[Math.floor(r(k) * 16)] = r(k + 10);
     }
     D.chord = F.count[0]; D.bar = bar;
-    D.camT += dt * (0.6 + 1.6 * e);                                               // the camera journeys run faster when loud
     D.target[0] += D.spin * dt;                                                   // keeps turning between cuts
-    const glide = 1 - Math.exp(-dt / (0.12 + 1.6 * (1 - e)));                     // a whip when loud, a drift when calm
+    const glide = 1 - Math.exp(-dt / (0.12 + 1.6 * (1 - e) + 2.0 * (1 - CAM.cuts / 100)));   // a whip when loud, a drift when calm
     for (let k = 0; k < 3; k++) D.cam[k] += (D.target[k] - D.cam[k]) * glide;
-    D.cam[3] = F.hit[1] * (0.05 + 0.35 * e) + pad.kick * 0.25;
+    D.cam[3] = (F.hit[1] * (0.05 + 0.35 * e) + pad.kick * 0.25) * CAM.shake / 50;
     let flash = D.fx[0] * Math.exp(-dt / 0.07);
     if (D.strobe && playing) {
       if (F.since[1] < dt && e > 0.4) flash = Math.max(flash, F.vel[1] * (e - 0.2) * 1.2);
@@ -1923,7 +1931,8 @@ async function boot() {
   const M = new Float32Array(20);
   const FB_MODES = ['TUNNEL IN', 'TUNNEL OUT', 'SPIRAL', 'FRACTAL 3', 'FRACTAL 2', 'ECHO'];
   function network(dt, visT, aspect) {
-    const f = D.fbg, e = F.energy, hit = F.hit[1];
+    const f = Float32Array.from(D.fbg), e = F.energy, hit = F.hit[1];
+    for (const k of [1, 2, 3, 7]) f[k] = Math.max(0, Math.min(0.999, f[k] + fbm1(visT * 0.04 + k * 7.7, k + 40) * 0.12));   // the continuous ones wander
     const mode = Math.min(5, Math.floor(f[0] * 6));
     const taps = [];
     if (mode === 0) taps.push([0.985 - 0.03 * f[7] - 0.05 * hit, (f[6] - 0.5) * 0.03 + D.spin * 0.01, Math.sin(visT * 0.3) * 0.006, Math.cos(visT * 0.23) * 0.006]);
@@ -1954,8 +1963,63 @@ async function boot() {
     return blend;
   }
 
-  let last = performance.now(), visT = 0, frameNo = 0, fps = 60;
+  // Smooth 1D gradient (Perlin) noise and a fractal sum of it: the drift behind the camera journeys and
+  // the slow wandering of the genome. A few numbers a frame on the CPU; nothing on the GPU.
+  const grad1 = i => { const x = Math.sin(i * 127.1 + 311.7) * 43758.5453; return (x - Math.floor(x)) * 2 - 1; };
+  const noise1 = x => { const i = Math.floor(x), f = x - i, w = f * f * f * (f * (f * 6 - 15) + 10); return grad1(i) * f * (1 - w) + grad1(i + 1) * (f - 1) * w; };
+  const fbm1 = (x, sd) => noise1(x + sd * 17.3) + 0.5 * noise1(x * 2.03 + sd * 5.1) + 0.25 * noise1(x * 4.01 + sd * 9.7);
+  const geneNow = new Float32Array(16);
+
+  // The camera settings (0-100): speed (0 nearly still, 100 moderately fast), range of travel, how hard
+  // the chord cuts and whips are, and shake.
+  const CAM = { speed: 40, range: 60, cuts: 70, shake: 50 };
+  try { Object.assign(CAM, JSON.parse(localStorage.getItem('lisztmachine-camera') || '{}')); } catch {}
+  for (const k of Object.keys(CAM)) {
+    const el = $('cam-' + k), out = $('cam-' + k + '-v');
+    el.value = CAM[k]; out.textContent = CAM[k];
+    el.oninput = () => { CAM[k] = +el.value; out.textContent = el.value; try { localStorage.setItem('lisztmachine-camera', JSON.stringify(CAM)); } catch {} };
+  }
+  // Each study travels its own journey: Perlin wander, a steady orbit, a figure-8 through x, y and z, or
+  // a dive in and out. Each section picks a type per study, and the types crossfade over a few seconds.
+  const JT = STUDIES.map(() => ({ T: Math.random() * 500, w: [1, 0, 0, 0], dir: Math.random() < 0.5 ? -1 : 1 }));
+  const journeyOut = new Float32Array(8);
+  function journey(k, dt) {
+    const J = JT[k - 1], e = F.energy;
+    J.T += dt * (0.01 + 1.2 * Math.pow(CAM.speed / 100, 1.6)) * (0.6 + 1.6 * e);
+    const T = J.T, A = CAM.range / 60;
+    const want = Math.floor(hash01(D.gen * 13 + k * 7) * 4);
+    for (let m = 0; m < 4; m++) J.w[m] += ((m === want ? 1 : 0) - J.w[m]) * (1 - Math.exp(-dt / 2.5));
+    const n = (f, sd) => fbm1(T * f, k * 31 + sd);
+    const types = [
+      [n(0.12, 1) * 2.2, n(0.10, 3) * 0.5, 1 + n(0.09, 7) * 0.35, n(0.07, 11) * 0.4, n(0.08, 13) * 1.2, n(0.07, 17) * 0.7, n(0.06, 19) * 1.2],   // wander
+      [T * 0.08 * J.dir + n(0.05, 2) * 0.4, 0.25 * Math.sin(T * 0.05), 1 + 0.15 * Math.sin(T * 0.04), n(0.05, 5) * 0.15, n(0.04, 6) * 0.3, 0, n(0.04, 8) * 0.3],   // orbit
+      [Math.sin(T * 0.07) * 0.8, Math.sin(T * 0.14) * 0.3, 1 + 0.2 * Math.sin(T * 0.105), Math.sin(T * 0.035) * 0.3, Math.sin(T * 0.07) * 1.4, Math.sin(T * 0.14) * 0.7, Math.sin(T * 0.105) * 1.1],   // figure-8
+      [n(0.06, 9) * 1.0, n(0.05, 10) * 0.3, 0.75 + 0.45 * Math.sin(T * 0.09), T * 0.03 * J.dir, n(0.05, 12) * 0.4, n(0.05, 14) * 0.3, Math.sin(T * 0.05) * 1.5],   // dive
+    ];
+    const o = [0, 0, 0, 0, 0, 0, 0];
+    for (let m = 0; m < 4; m++) for (let a = 0; a < 7; a++) o[a] += types[m][a] * J.w[m];
+    journeyOut.set([o[0] * A, o[1] * A, 1 + (o[2] - 1) * A, o[3] * A, o[4] * A, o[5] * A, o[6] * A, 0]);
+    return journeyOut;
+  }
+
+  // Quality: if frames come late, lower the resolution and the particle load a step; when there is room
+  // again, raise them. The best rate seen stands for the display's refresh rate.
+  let qLow = 0, qHigh = 0, best = 60, rawFps = 60;
+  window.__q = () => ({ Q, rawFps, best });
+  function quality(raw) {
+    rawFps += (1 / Math.max(raw, 1e-3) - rawFps) * 0.08;
+    best = Math.max(best * 0.9995, Math.min(rawFps, 240));
+    if (rawFps < best * 0.8) { qLow += raw; qHigh = 0; } else if (rawFps > best * 0.95) { qHigh += raw; qLow = 0; } else { qLow = qHigh = 0; }
+    if (qLow > 2 && Q > 0.45) { Q = Math.max(0.45, Q - 0.15); qLow = qHigh = 0; targets(); }
+    else if (qHigh > 8 && Q < 1) { Q = Math.min(1, Q + 0.1); qLow = qHigh = 0; targets(); }
+  }
+
+  // Never more than two frames in flight: when the GPU falls behind, skip a frame rather than queue it.
+  // Queued frames pile up into seconds of lag and then a frozen page (measured on the laptop GPU).
+  let last = performance.now(), visT = 0, frameNo = 0, fps = 60, inFlight = 0, gpuMs = 0;
+  window.__gpu = () => ({ inFlight, gpuMs, frames: frameNo });
   function frame(now) {
+    if (inFlight >= 2) { requestAnimationFrame(frame); return; }
     const raw = (now - last) / 1000;
     const dt = Math.min(0.1, raw);
     last = now;
@@ -1963,6 +2027,8 @@ async function boot() {
     window.__fps = fps;
     visT += dt;
     frameNo++;
+    if (raw < 1) quality(raw);
+    for (let k = 0; k < 16; k++) geneNow[k] = Math.max(0, Math.min(0.999, D.gene[k] + fbm1(visT * 0.05 + k * 3.1, k) * 0.05));   // the genome wanders slowly between rolls
     if (next) { tw += Math.min(raw, 1) / BLEND;   // real time: a slow frame must not stretch the blend
       if (tw >= 1) { study = next; next = null; tw = 0; } }
 
@@ -1979,7 +2045,7 @@ async function boot() {
       if (h) pad.kick += h.vel * PK.s * Math.exp(-age * 10);
     }
     pad.agit *= Math.exp(-dt / (2.5 * PK.dur));
-    padArr.set([pad.agit, pad.bright, D.camT, 0], 32);
+    padArr.set([pad.agit, pad.bright, 0, 0], 32);
     if (frameNo % 15 === 0) padStatus();
     const blend = network(dt, visT, canvas.width / canvas.height);
     const enc = device.createCommandEncoder();
@@ -1988,9 +2054,9 @@ async function boot() {
       s.cpu?.(g, F, t, D, pad, padAge);
       Udata.set([visT, dt, beats % 1, (beats / 4) % 1, s.W, s.H, F.energy, F.progress,
         ...F.lv.slice(0, 4), F.lv[4], F.lv[5], F.lv[6], F.si, ...F.hit, ...F.pitch, ...F.since, ...F.chord, ...F.count,
-        beats, frameNo, bpm, s.W / s.H, ...D.cam, ...D.fx, ...D.col, ...D.gene, ...padArr]);
+        beats, frameNo, bpm, s.W / s.H, ...D.cam, ...D.fx, ...D.col, ...geneNow, ...padArr, ...journey(STUDIES.indexOf(s) + 1, dt)]);
       device.queue.writeBuffer(s.U, 0, Udata);
-      s.frame(g, enc, next ? 0.5 : 1);   // two studies at once: each simulates half its particles
+      s.frame(g, enc, (next ? 0.5 : 1) * (0.4 + 0.6 * Q));   // two studies at once: half the particles each; less when frames are late
     }
     Udata[4] = canvas.width; Udata[5] = canvas.height;
     device.queue.writeBuffer(postIn, 0, Udata);
@@ -2003,15 +2069,36 @@ async function boot() {
     for (let k = 4; k >= 0; k--) g.draw(enc, pUp, upBG[k], g.mipViews[k], 'load');
     g.draw(enc, pComp, compBG[fbi], ctx.getCurrentTexture().createView());
     device.queue.submit([enc.finish()]);
+    inFlight++;
+    const sent = performance.now();
+    device.queue.onSubmittedWorkDone().then(() => { inFlight--; gpuMs += (performance.now() - sent - gpuMs) * 0.1; });
 
     const name = next ? study.name + ' → ' + next.name + ' ' + Math.round(blend * 100) + '%' : study.name;
-    $('now').innerHTML = '<b>' + name + '</b>  <span>' + F.section.name + ' · ' + (D.feedback ? D.fbMode : 'NO FEEDBACK') + ' · GEN ' + D.gen + '</span>  ' + mmss(t) + ' <span>/ ' + mmss(F.duration) + '</span>';
+    $('now').innerHTML = '<b>' + name + '</b>  <span>' + F.section.name + ' · ' + (D.feedback ? D.fbMode : 'NO FEEDBACK') + ' · GEN ' + D.gen + ' · ' + Math.round(rawFps) + ' FPS · QUALITY ' + Math.round(Q * 100) + '%</span>  ' + mmss(t) + ' <span>/ ' + mmss(F.duration) + '</span>';
     $('head').style.left = (t / F.duration * 100) + '%';
     [...nav.children].forEach((bt, k) => bt.setAttribute('aria-pressed', STUDIES[k] === study || STUDIES[k] === next));
     requestAnimationFrame(frame);
   }
   requestAnimationFrame(frame);
 
+  // For measuring: how many milliseconds of GPU time one frame of a study costs, rendered back to back
+  // (the study must have been on screen once, so its uniforms are filled).
+  window.__bench = async (id, n = 60) => {
+    const s = STUDIES.find(x => x.id === id);
+    use(s);
+    await device.queue.onSubmittedWorkDone();
+    const t0 = performance.now();
+    for (let i = 0; i < n; i++) {
+      const enc = device.createCommandEncoder();
+      s.frame(g, enc, 1);
+      g.draw(enc, pMix, mixGroup(s, s, 0), g.fbViews[0]);
+      for (let k = 0; k < 6; k++) g.draw(enc, k ? pDown : pKaris, downBG[0][k], g.mipViews[k]);
+      for (let k = 4; k >= 0; k--) g.draw(enc, pUp, upBG[k], g.mipViews[k], 'load');
+      device.queue.submit([enc.finish()]);
+    }
+    await device.queue.onSubmittedWorkDone();
+    return +((performance.now() - t0) / n).toFixed(1);
+  };
   // For measuring: show one study at a music time without sound (no blend).
   window.__look = (id, t) => { const s = STUDIES.find(x => x.id === id); if (s) { study = s; next = null; } if (t != null) seek(t); };
   window.__choose = id => choose(STUDIES.find(x => x.id === id));
