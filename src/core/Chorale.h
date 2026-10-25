@@ -15,14 +15,15 @@ namespace liszt {
 // Around them: micro impulses that keep one on every beat, with Euclidean patterns on changing
 // grids (sixteenths, triplets, quintuplets, sextuplets, septuplets, thirty-seconds), cross-accents
 // and ratchets; pitched impulse sentences in sixteenths, eighths and dotted eighths around the
-// melody; sparse deep drums; a sine sub under the climax.
+// melody; sparse deep drums; a sine sub under the climax; and a distorted guitar playing the
+// chords as power chords, long at first, then in rhythm, then chugging at the peak.
 //
 // Nine tracks (see sceneInfo("chorale")): each voice its own, a sine sub under the climax,
 // sparse deep drums, micro impulses, pitched impulse sentences, and the piano doubling the melody.
 class ChoraleComposer : public Composer
 {
 public:
-    enum CTrack : uint8_t { Soprano, Alto, Tenor, BassVoice, Sub, Drums, Micro, Blips, Piano, kChoraleTracks };
+    enum CTrack : uint8_t { Soprano, Alto, Tenor, BassVoice, Sub, Drums, Micro, Blips, Piano, Guitar, kChoraleTracks };
     explicit ChoraleComposer(uint64_t seed);
     void generateBar(int bar, std::vector<Event>& out) override;
     std::string describe() const override;
@@ -58,6 +59,7 @@ private:
     void writeVoices();
     void writeRhythm();
     void writeSentences(Rng& r);
+    void writeGuitar(Rng& r);
     void writeLevels();
     void finish();
     bool active(int track, int bar) const;

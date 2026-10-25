@@ -187,15 +187,15 @@ void ChoraleComposer::planForm()
 {
     struct T { const char* name; float energy; uint16_t layers; std::vector<Kind> phrases; };
     const uint16_t voices = bit(Soprano) | bit(Alto) | bit(Tenor) | bit(BassVoice);
-    const uint16_t micro = bit(Micro), drums = bit(Drums), piano = bit(Piano), blips = bit(Blips), sub = bit(Sub);
+    const uint16_t micro = bit(Micro), drums = bit(Drums), piano = bit(Piano), blips = bit(Blips), sub = bit(Sub), guitar = bit(Guitar);
     const std::vector<T> plan = {
         { "Invocation", .12f, voices, { AntSlow, ConsSlow } },
-        { "Pulse", .30f, uint16_t(voices | micro), { Ant, Cons, Ant, ConsPlag } },
-        { "Theme", .55f, uint16_t(voices | micro | drums | blips | piano), { Ant, Cons, Ant, Cons, Ant, Cons, Ant, Cons } },
-        { "Episode", .68f, uint16_t(voices | micro | drums | blips | piano | sub), { SeqA, SeqB, Euph, Euph, SeqA, SeqB, Ant, Cons } },
-        { "Breakdown", .35f, uint16_t(voices | micro | piano), { Pedal, Pedal, Ant, ConsDec } },
-        { "Return", .78f, uint16_t(voices | micro | drums | blips | piano | sub), { Ant, ConsDec, Ant, Cons, Ant, ConsDec, Ant, Cons } },
-        { "Apotheosis", 1.0f, uint16_t(voices | micro | drums | blips | piano | sub), { Euph, Euph, Euph, Euph, Euph, Euph, Ant, Cons } },
+        { "Pulse", .30f, uint16_t(voices | micro | blips), { Ant, Cons, Ant, ConsPlag } },
+        { "Theme", .55f, uint16_t(voices | micro | drums | blips | piano | guitar), { Ant, Cons, Ant, Cons, Ant, Cons, Ant, Cons } },
+        { "Episode", .68f, uint16_t(voices | micro | drums | blips | piano | sub | guitar), { SeqA, SeqB, Euph, Euph, SeqA, SeqB, Ant, Cons } },
+        { "Breakdown", .35f, uint16_t(voices | micro | blips | piano | guitar), { Pedal, Pedal, Ant, ConsDec } },
+        { "Return", .78f, uint16_t(voices | micro | drums | blips | piano | sub | guitar), { Ant, ConsDec, Ant, Cons, Ant, ConsDec, Ant, Cons } },
+        { "Apotheosis", 1.0f, uint16_t(voices | micro | drums | blips | piano | sub | guitar), { Euph, Euph, Euph, Euph, Euph, Euph, Ant, Cons } },
         { "Dissolution", .22f, uint16_t(voices | micro | piano), { AntSlow, EuphSlow, ConsSlow, Final } },
     };
 
@@ -704,10 +704,10 @@ void ChoraleComposer::writeRhythm()
                 static constexpr std::array<int, 6> grids = { 16, 12, 20, 24, 28, 32 };
                 const std::array<double, 6> w = { 1.0, .5, .35 + .4 * e, .3, .25 + .4 * e, .1 + .6 * e };
                 grid = grids[size_t(r.weighted(w))];
-                onsets = std::max(2, int(std::lround(grid * (.18 + .38 * e + .08 * r.uniform()))));
+                onsets = std::max(3, int(std::lround(grid * (.26 + .42 * e + .08 * r.uniform()))));
                 rot = r.range(0, grid - 1);
             }
-            if (e > .2f)
+            if (e > .1f)
             {
                 const auto pat = euclid(onsets, grid, rot);
                 for (int i = 0; i < grid; ++i)
@@ -723,11 +723,11 @@ void ChoraleComposer::writeRhythm()
                 }
             }
             // cross-accents every 5 or 7 sixteenths, running across the barlines
-            for (int step = 0; step < 16 && e > .3f; ++step)
+            for (int step = 0; step < 16 && e > .2f; ++step)
                 if ((bar * 16 + step) % crossPeriod == 0 && step % 4 != 0 && !(drop && step >= 12))
                     notes_.push_back({ Micro, kNoiseHi, stepTick(step), stepTick(step) + 40, .3f + .15f * e });
             // ratchets: one sixteenth split into 4 to 8 impulses, sweeping up or down
-            if (std::strcmp(sec.name, "Invocation") != 0 && r.chance(.1 + .45 * e))
+            if (std::strcmp(sec.name, "Invocation") != 0 && r.chance(.2 + .5 * e))
             {
                 static constexpr std::array<int, 6> spots = { 15, 7, 14, 11, 3, 13 };
                 const int step = spots[size_t(r.weighted(std::array<double, 6> { .35, .2, .15, .1, .1, .1 }))];
@@ -764,6 +764,70 @@ void ChoraleComposer::writeRhythm()
         }
     }
     writeSentences(r);
+    writeGuitar(r);
+}
+
+// The guitar: the chords as power chords (root, fifth, octave: consonant under heavy distortion,
+// where a full triad turns to mud), plus the third an octave up at the peak. Over the form it
+// goes from long held chords to long notes in a 3+3+2 rhythm to chugs mixed with long notes;
+// over the dominant pedal it is a swelling drone. L: a long note, held to the next attack;
+// s: a short palm-muted note.
+void ChoraleComposer::writeGuitar(Rng& r)
+{
+    static const char* patterns[] = {
+        "L.....L.....L...", "L.....L...s.s...", "L..s..L..s..L.s.", "L.ss..L.ss..L.s.", "Lsss.sL.ss.sL.ss",
+    };
+    const char* pattern = patterns[0];
+    for (int bar = 0; bar < totalBars(); ++bar)
+    {
+        if (!active(Guitar, bar)) continue;
+        const auto& sec = sectionAt(bar);
+        const float e = energyAt(bar);
+        const int inSec = bar - sec.startBar;
+        if (inSec % 4 == 0)
+        {
+            const int lo = e < .8f ? 0 : e < .95f ? 1 : 3;
+            pattern = patterns[r.range(lo, std::min(4, lo + 1))];
+        }
+        auto chordAt16 = [&](int at) -> size_t {
+            for (size_t k = chords_.size(); k-- > 0;) if (chords_[k].start <= at) return k;
+            return 0;
+        };
+        auto power = [&](size_t k, bool tenth) {
+            const auto& c = chords_[k];
+            const auto pcs = chordPcs(c);
+            const int rootPc = c.pedal ? pc(tonicPc_ + kDominant) : pcs[0];
+            int root = 40 + pc(rootPc - 40);
+            std::vector<int> v = { root, root + 12 };
+            const bool perfectFifth = c.pedal || c.quality == Min || c.quality == Maj || c.quality == Min7 || c.quality == Dom7
+                                   || c.quality == Maj7 || c.quality == MinAdd9 || c.quality == MajAdd9;
+            if (perfectFifth) v.push_back(root + 7);          // a diminished fifth stays out: just the octave
+            if (tenth && !c.pedal) v.push_back(root + 12 + pc(pcs[1] - rootPc)); // the third, an octave up: a tenth
+            return v;
+        };
+        // where the guitar attacks in this bar: the pattern, and every chord change
+        std::vector<std::pair<int, char>> attacks;
+        const bool drone = std::strcmp(sec.name, "Breakdown") == 0;
+        for (int s = 0; s < 16; ++s)
+        {
+            char x = drone ? (s == 0 && inSec % 2 == 0 ? 'L' : '.') : e < .6f ? '.' : pattern[s];
+            const int at = bar * 16 + s;
+            const bool change = std::any_of(chords_.begin(), chords_.end(), [&](const Chord& c) { return c.start == at; });
+            if (change && x == '.' && !(drone && s != 0)) x = 'L';
+            if (x != '.') attacks.push_back({ s, x });
+        }
+        for (size_t a = 0; a < attacks.size(); ++a)
+        {
+            const int s = attacks[a].first, at = bar * 16 + s;
+            const bool longNote = attacks[a].second == 'L';
+            const int next = a + 1 < attacks.size() ? attacks[a + 1].first : (drone ? 32 : 16);
+            const int64_t t0 = int64_t(at) * k16;
+            const int64_t t1 = longNote ? int64_t(bar * 16 + next) * k16 - 30 : t0 + k16 / 2;
+            const float vel = drone ? .28f + .22f * float(inSec % 4) / 3 : longNote ? (s == 0 ? .85f : .76f) : .5f;
+            for (int p : power(chordAt16(at), longNote && e >= .9f))
+                notes_.push_back({ Guitar, p, t0, t1, vel });
+        }
+    }
 }
 
 // The rhythm sentences: pitched impulses in sixteenths, eighths and dotted eighths around the
@@ -803,7 +867,7 @@ void ChoraleComposer::writeSentences(Rng& r)
         if (!active(Blips, bar0) || len < 64) continue;
         const float e = energyAt(bar0);
 
-        const auto idea = makeIdea(32, .45 + .4 * e);
+        const auto idea = makeIdea(32, .55 + .4 * e);
         std::vector<int> rhythm = idea;                                     // bars 1-2: the idea
         auto again = idea;                                                  // bars 3-4: again, its end varied
         if (again.size() > 2) { int tail = 0; while (!again.empty() && tail < 8) { tail += std::abs(again.back()); again.pop_back(); } auto v = makeIdea(tail, .8); again.insert(again.end(), v.begin(), v.end()); }

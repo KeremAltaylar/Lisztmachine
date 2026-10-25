@@ -421,11 +421,11 @@ const SceneInfo& sceneInfo(const std::string& scene)
     };
     // The chorale: each voice its own track (and its own delay), the voices change sound as one.
     static const SceneInfo chorale {
-        "chorale", 9, { "soprano", "alto", "tenor", "bass", "sub", "drums", "micro", "blips", "piano" },
-        { 0, 0, 0, 0, 1, 1, 2, 2, 3 },
-        { { 0, .30f }, { 0, .30f }, { 0, .30f }, { 0, .26f }, { 0, .04f }, { .04f, .12f }, { .22f, .12f }, { .28f, .22f }, { .15f, .28f } },
-        { -1, 0, 0, 0, -1, -1, -1, -1, -1 },
-        { true, true, true, true, false, false, false, false, false }, // not the piano: pure broke its patches (an octave off)
+        "chorale", 10, { "soprano", "alto", "tenor", "bass", "sub", "drums", "micro", "blips", "piano", "guitar" },
+        { 0, 0, 0, 0, 1, 1, 2, 2, 3, 1 },
+        { { 0, .30f }, { 0, .30f }, { 0, .30f }, { 0, .26f }, { 0, .04f }, { .04f, .12f }, { .22f, .12f }, { .28f, .22f }, { .15f, .28f }, { .12f, .20f } },
+        { -1, 0, 0, 0, -1, -1, -1, -1, -1, -1 },
+        { true, true, true, true, false, false, false, false, false, true }, // not the piano: pure broke its patches (an octave off)
     };
     return scene == "chorale" ? chorale : berlin;
 }
