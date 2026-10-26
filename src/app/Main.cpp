@@ -34,6 +34,21 @@ public:
         o.osxLibrarySubFolder = "Application Support";
         props.setStorageParameters(o);
 
+        // the song: every scene the composer knows, the last one chosen first
+        scene = props.getUserSettings()->getValue("scene", "berlin").toStdString();
+        for (int i = 0; i < int(std::size(kScenes)); ++i)
+        {
+            sceneBox.addItem(kSceneTitles[i], i + 1);
+            if (scene == kScenes[i]) sceneBox.setSelectedId(i + 1, juce::dontSendNotification);
+        }
+        if (sceneBox.getSelectedId() == 0) { scene = "berlin"; sceneBox.setSelectedId(1, juce::dontSendNotification); }
+        sceneBox.onChange = [this] {
+            scene = kScenes[sceneBox.getSelectedId() - 1];
+            props.getUserSettings()->setValue("scene", juce::String(scene));
+            reload();
+            preview();
+        };
+
         auto saved = props.getUserSettings()->getXmlValue("audio");
         deviceManager.initialise(0, 4, saved.get(), true);
         deviceManager.addChangeListener(this);
@@ -70,12 +85,21 @@ public:
         seedBox.setColour(juce::TextEditor::focusedOutlineColourId, tok::lamp);
         click.setColour(juce::ToggleButton::textColourId, tok::dim);
         click.setColour(juce::ToggleButton::tickColourId, tok::lamp);
+        sceneBox.setColour(juce::ComboBox::backgroundColourId, tok::raised);
+        sceneBox.setColour(juce::ComboBox::textColourId, tok::ink);
+        sceneBox.setColour(juce::ComboBox::outlineColourId, tok::hairline);
+        sceneBox.setColour(juce::ComboBox::arrowColourId, tok::dim);
+        getLookAndFeel().setColour(juce::PopupMenu::backgroundColourId, tok::panel);
+        getLookAndFeel().setColour(juce::PopupMenu::textColourId, tok::ink);
+        getLookAndFeel().setColour(juce::PopupMenu::highlightedBackgroundColourId, tok::raised);
+        getLookAndFeel().setColour(juce::PopupMenu::highlightedTextColourId, tok::lamp);
+        addAndMakeVisible(sceneBox);
         addAndMakeVisible(seedBox);
         addAndMakeVisible(click);
 
         preview();
         setWantsKeyboardFocus(true);
-        setSize(900, 430);
+        setSize(1000, 450);
         startTimerHz(20);
     }
 
@@ -94,7 +118,7 @@ public:
 
         g.setColour(tok::faint);
         g.setFont(juce::FontOptions(11.0f).withStyle("Bold"));
-        g.drawText("LISZTMACHINE" + dot + "BERLIN SCENE", r.removeFromTop(16), juce::Justification::left);
+        g.drawText("LISZTMACHINE" + dot + juce::String(kSceneTitles[sceneBox.getSelectedId() - 1]).toUpperCase(), r.removeFromTop(16), juce::Justification::left);
         r.removeFromTop(tok::s2);
 
         if (error.isNotEmpty())
@@ -122,22 +146,26 @@ public:
         g.drawText(composer->describe(), r.removeFromTop(22), juce::Justification::left);
         r.removeFromTop(tok::s2);
 
-        // What each part is playing now: the palette rotates these over the concert.
+        // What each part is playing now: the palette rotates these over the concert. The part's name
+        // above, its sound below, up to ten parts across.
+        const auto& info = sceneInfo(scene);
         if (engine && playing)
         {
-            auto row = r.removeFromTop(20);
-            g.setFont(juce::FontOptions(13.0f));
-            for (int t = 0; t < kNumTracks; ++t)
+            auto row = r.removeFromTop(34);
+            for (int t = 0; t < info.numTracks; ++t)
             {
-                auto cell = row.removeFromLeft(row.getWidth() / (kNumTracks - t));
+                auto cell = row.removeFromLeft(row.getWidth() / (info.numTracks - t)).withTrimmedRight(tok::s2);
                 g.setColour(tok::faint);
-                g.drawText(juce::String(kTrackNames[t]).toUpperCase(), cell.removeFromLeft(44), juce::Justification::left);
+                g.setFont(juce::FontOptions(11.0f).withStyle("Bold"));
+                g.drawText(juce::String(info.trackNames[t]).toUpperCase(), cell.removeFromTop(15), juce::Justification::left);
                 g.setColour(tok::ink);
-                g.drawText(engine->currentPatch(t).fromFirstOccurrenceOf("/", false, false), cell, juce::Justification::left);
+                g.setFont(juce::FontOptions(13.0f));
+                auto patch = engine->currentPatch(t).fromFirstOccurrenceOf("/", false, false);
+                g.drawFittedText(patch.isEmpty() ? engine->currentPatch(t) : patch, cell, juce::Justification::left, 1, 0.8f);
             }
         }
         else
-            r.removeFromTop(20);
+            r.removeFromTop(34);
         r.removeFromTop(tok::s3);
 
         // The form: one block per section, its height the section's energy.
@@ -183,7 +211,7 @@ public:
         juce::FlexBox fb;
         // JUCE's FlexBox has no gap property, so each item carries the gap as a right margin.
         auto item = [](juce::Component& c, float w) { return juce::FlexItem(c).withWidth(w).withMargin({ 0, float(tok::s3), 0, 0 }); };
-        fb.items = { item(play, 110), item(fresh, 140), item(seedBox, 110), item(click, 150), item(audio, 130) };
+        fb.items = { item(sceneBox, 190), item(play, 100), item(fresh, 130), item(seedBox, 90), item(click, 150), item(audio, 110) };
         fb.performLayout(row);
     }
 
@@ -196,7 +224,7 @@ public:
 private:
     void preview()
     {
-        previewComposer = makeComposer("berlin", uint64_t(seed)); // ponytail: the app plays Berlin only until it gets a scene selector
+        previewComposer = makeComposer(scene, uint64_t(seed));
         composer = previewComposer.get();
         props.getUserSettings()->setValue("seed", juce::String(seed));
         repaint();
@@ -223,7 +251,8 @@ private:
         loadedBlock = dev ? dev->getCurrentBufferSizeSamples() : 512;
         engine = std::make_unique<Engine>();
         Palette palette;
-        error = palette.load(findPalette("berlin"));
+        error = palette.load(findPalette(scene), scene);
+        engine->scene = scene;
         if (error.isEmpty())
             error = dev ? engine->load(loadedRate, juce::jmax(512, loadedBlock), palette) : juce::String("no audio output device");
         if (error.isNotEmpty()) engine.reset();
@@ -281,10 +310,12 @@ private:
     double loadedRate = 0;
     int loadedBlock = 0;
     int64_t seed = 1;
+    std::string scene = "berlin";
     float meterPeak = 0;
 
     juce::TextButton play { "Play" }, fresh { "New concert" }, audio { "Audio..." };
     juce::TextEditor seedBox;
+    juce::ComboBox sceneBox;
     juce::ToggleButton click { "Click on out 3/4" };
 };
 
@@ -299,7 +330,7 @@ struct App : juce::JUCEApplication
         window->setUsingNativeTitleBar(true);
         window->setContentOwned(new MainComponent(), true);
         window->setResizable(true, false);
-        window->setResizeLimits(800, 410, 4000, 2000);
+        window->setResizeLimits(960, 450, 4000, 2000);
         window->centreWithSize(window->getWidth(), window->getHeight());
         window->setVisible(true);
     }

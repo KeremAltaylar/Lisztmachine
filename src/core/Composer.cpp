@@ -1,6 +1,7 @@
 #include "Composer.h"
 #include "Chorale.h"
 #include "Yours.h"
+#include "Genres.h"
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
@@ -438,6 +439,7 @@ const SceneInfo& sceneInfo(const std::string& scene)
         { 1, 0, 1, 1, 1, 0, 0, 0, 0 },
         true,
     };
+    if (auto* g = genreSceneInfo(scene)) return *g;
     return scene == "chorale" ? chorale : scene == "letallbeyours" ? yours : berlin;
 }
 
@@ -445,6 +447,7 @@ std::unique_ptr<Composer> makeComposer(const std::string& scene, uint64_t seed)
 {
     if (scene == "chorale") return std::make_unique<ChoraleComposer>(seed);
     if (scene == "letallbeyours") return std::make_unique<YoursComposer>(seed);
+    if (auto* g = GenreComposer::find(scene)) return std::make_unique<GenreComposer>(*g, seed);
     return std::make_unique<BerlinComposer>(seed);
 }
 

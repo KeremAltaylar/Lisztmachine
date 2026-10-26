@@ -1,0 +1,39 @@
+# Lisztmachine sound palette: Ecstatic Arpeggios (ecstatic arpeggios at 136-142: polymetric chord-tone cycles, gated chords, the kick only at the summit).
+# Tracks: pad kick snare hats perc bass sub arp chord fx.
+# Patches from the earlier palettes, re-measured held at C4 (basses C3) with pure tuning, 2026-10-26: beating 1-15 %
+# (Semihaunt left out: 39 %, EP 1 left out: 43-51 %). Gain: a held note to -22 dB RMS (pads and chords -27, they play 3-4 notes).
+# part   gain   bright  patch
+
+pad       6.6     599  Pads/Still
+pad       2.4    2052  Pads/Sunday
+kick     0.0      60  internal/kick
+snare    0.0    1500  internal/snare
+hats     0.0    9000  internal/hat
+perc     0.0    8000  internal/click
+bass     -8.4      99  Basses/Sub 2
+bass     -8.8     108  Basses/Digibass
+sub     -6.0      40  internal/sub
+arp      -6.8     263  Leads/Sine-Saw Acidish
+arp     -12.2     419  Leads/Classic Lead 1
+arp      -0.3    1522  Leads/Moogy Saw
+arp      -5.7    1612  Leads/Sharpish
+chord    -4.7    4145  Plucks/Saw Pluck
+chord    -0.1    6135  Polysynths/Notched Saws
+fx       -5.7     286  FX/Unsettler
+fx        4.0    4170  FX/Radio Noise
+
+# Echoes: beats, feedback, mix
+delay arp 0.75 0.40 0.22
+delay chord 0.75 0.30 0.15
+
+# Balance (to be measured in the mix)
+gain pad   -11.9
+gain kick   -7.1
+gain snare  -4.0
+gain hats    8.2
+gain perc   -6.0
+gain bass   -4.7
+gain sub    -7.9
+gain arp    -2.2
+gain chord  -2.8
+gain fx     -2.9

@@ -1,0 +1,36 @@
+# Lisztmachine sound palette: Footwork (footwork at 158-162: triplet kicks against sixteenth hats, sextuplet toms, chopped stabs).
+# Tracks: pad kick snare hats perc bass sub arp chord fx.
+# Patches from the earlier palettes, re-measured held at C4 (basses C3) with pure tuning, 2026-10-26: beating 1-15 %
+# (Semihaunt left out: 39 %, EP 1 left out: 43-51 %). Gain: a held note to -22 dB RMS (pads and chords -27, they play 3-4 notes).
+# part   gain   bright  patch
+
+pad      -1.0     582  Pads/Yeti Funeral
+pad      -3.9    2383  Pads/Subtle Comb Strings
+kick     0.0      60  internal/kick
+snare    0.0    1500  internal/snare
+hats     0.0    9000  internal/hat
+perc     0.0      60  internal/kick
+bass     -8.4      99  Basses/Sub 2
+bass    -12.2     760  Basses/Rubber Bass
+sub     -6.0      40  internal/sub
+arp     -12.2     419  Leads/Classic Lead 1
+arp      -5.7    1612  Leads/Sharpish
+chord    -4.7    4145  Plucks/Saw Pluck
+chord    -0.1    6135  Polysynths/Notched Saws
+fx       -5.7     286  FX/Unsettler
+
+# Echoes: beats, feedback, mix
+delay chord 0.75 0.35 0.18
+delay arp 1.0 0.30 0.15
+
+# Balance (to be measured in the mix)
+gain pad    -7.9
+gain kick   -9.2
+gain snare  -2.8
+gain hats   -7.0
+gain perc  -14.9
+gain bass   -4.7
+gain sub    -9.6
+gain arp    -6.4
+gain chord  -5.3
+gain fx     -7.5

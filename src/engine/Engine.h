@@ -50,10 +50,11 @@ std::vector<SoundChange> planSounds(const Composer& composer, const Palette& pal
 //          from 96 up a noise tick, 1.5 ms
 //   blip:  a sine at the note's pitch, 1 ms attack, 30-90 ms decay by velocity
 //   sub:   a held sine (and a little of its octave, for small speakers), 40 ms in, 400 ms out
+//   snare: a falling tone body and a burst of noise; from note 60 up a short rimshot
 class InternalSynth
 {
 public:
-    enum Kind { Click, Blip, Sub, Kick, Hat, Clap };
+    enum Kind { Click, Blip, Sub, Kick, Hat, Clap, Snare };
     void prepare(double sampleRate, Kind kind) { sr_ = sampleRate; kind_ = kind; for (auto& v : voices_) v.note = -1; }
     void render(const juce::MidiBuffer& midi, float* left, float* right, int numSamples);
     void allOff() { for (auto& v : voices_) v.note = -1; }

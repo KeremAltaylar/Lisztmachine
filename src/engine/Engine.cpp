@@ -352,7 +352,7 @@ juce::String Engine::load(double sampleRate, int maxBlock, const Palette& palett
         {
             const auto kind = first.endsWith("sub") ? InternalSynth::Sub : first.endsWith("blip") ? InternalSynth::Blip
                             : first.endsWith("kick") ? InternalSynth::Kick : first.endsWith("hat") ? InternalSynth::Hat
-                            : first.endsWith("clap") ? InternalSynth::Clap : InternalSynth::Click;
+                            : first.endsWith("clap") ? InternalSynth::Clap : first.endsWith("snare") ? InternalSynth::Snare : InternalSynth::Click;
             t.synth.prepare(sampleRate, kind);
             for (auto& s : t.slots) { s.plugin.reset(); s.midi.ensureSize(8192); s.state = Idle; s.entry = 0; s.gain = juce::Decibels::decibelsToGain(palette.parts[i].front().gainDb); }
             t.buffer.setSize(2, maxBlock);
@@ -893,7 +893,7 @@ void InternalSynth::start(int note, float velocity)
     v->note = note;
     v->phase = 0;
     v->held = kind_ == Sub;
-    v->noise = (kind_ == Click && note >= 96) || kind_ == Hat || kind_ == Clap;
+    v->noise = (kind_ == Click && note >= 96) || kind_ == Hat || kind_ == Clap || kind_ == Snare;
     v->age = 0;
     v->lastNoise = v->lastNoise2 = 0;
     const double hz = 440.0 * std::pow(2.0, ((kind_ == Click ? note + 36 : note) - 69) / 12.0);
@@ -903,9 +903,10 @@ void InternalSynth::start(int note, float velocity)
     if (kind_ == Click) tau = v->noise ? 0.0015 : 0.002 + 0.004 * juce::jlimit(0.0, 1.0, (96.0 - note) / 40.0);
     if (kind_ == Blip) tau = 0.03 + 0.06 * velocity;
     if (kind_ == Kick) tau = 0.16 + 0.2 * velocity;                         // the kick's body, ending on the note
+    if (kind_ == Snare) tau = note >= 60 ? 0.025 : 0.09 + 0.08 * velocity;  // the rim, or the snare's rattle
     if (kind_ == Hat) tau = note >= 46 ? 0.07 + 0.1 * velocity : 0.012 + 0.02 * velocity; // 46 open, else closed
     v->decay = std::exp(-1.0 / (tau * sr_));
-    const bool struck = kind_ == Click || kind_ == Kick || kind_ == Hat || kind_ == Clap;
+    const bool struck = kind_ == Click || kind_ == Kick || kind_ == Hat || kind_ == Clap || kind_ == Snare;
     v->attack = struck ? 1.0 : 1.0 / ((kind_ == Sub ? 0.04 : 0.001) * sr_);
     v->release = std::exp(-1.0 / (0.4 * sr_));
     v->env = struck ? v->gain : 0.0;
@@ -927,7 +928,7 @@ void InternalSynth::run(float* l, float* r, int from, int to)
         if (v.note < 0) continue;
         for (int n = from; n < to; ++n)
         {
-            if (kind_ == Click || kind_ == Kick || kind_ == Hat) v.env *= v.decay;
+            if (kind_ == Click || kind_ == Kick || kind_ == Hat || kind_ == Snare) v.env *= v.decay;
             else if (kind_ == Clap)
             {
                 // three hand claps 11 ms apart, then the room
@@ -942,6 +943,14 @@ void InternalSynth::run(float* l, float* r, int from, int to)
                 seed_ = seed_ * 1664525u + 1013904223u;
                 const float w = float(int32_t(seed_)) * (1.0f / 2147483648.0f);
                 if (kind_ == Hat) x = (w - 2 * v.lastNoise + v.lastNoise2) * 0.35f; // twice differenced: only the top
+                else if (kind_ == Snare)
+                {
+                    // the body: a tone falling an octave in 10 ms, gone in 40 (the rim: higher, at once)
+                    const double age = double(v.age) / sr_;
+                    v.phase += v.inc * std::exp(-age / 0.01);
+                    const float body = float(std::sin(v.phase) * std::exp(-age / (v.note >= 60 ? 0.008 : 0.04)) * v.gain / std::max(v.env, 1e-9));
+                    x = (w - v.lastNoise) * 0.45f + body * 0.8f;
+                }
                 else x = (w - v.lastNoise) * 0.7f; // differenced noise: the low end removed, a tick
                 v.lastNoise2 = v.lastNoise;
                 v.lastNoise = w;

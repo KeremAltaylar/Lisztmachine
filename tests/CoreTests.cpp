@@ -2,10 +2,12 @@
 #include "Composer.h"
 #include "Chorale.h"
 #include "Yours.h"
+#include "Genres.h"
 #include <cmath>
 #include <cstdlib>
 #include <algorithm>
 #include <cstdio>
+#include <cstring>
 #include <map>
 #include <set>
 
@@ -226,6 +228,54 @@ int main()
             if (c.active(Y::Kick, bar))
                 for (int b = 0; b < 4; ++b) { ++beats; missing += !onsets.count({ int(Y::Kick), int64_t(bar) * kBarTicks + b * kPPQ }); }
         CHECK(beats > 600 && missing <= beats / 60, "yours: %d of %d beats without a kick", missing, beats);
+    }
+    seed = 0;
+
+    // ---- the genre songs
+    for (auto* spec : GenreComposer::all())
+    {
+        using G = GenreComposer;
+        for (auto* p : { &spec->kick, &spec->snare, &spec->hats, &spec->perc, &spec->bass, &spec->chord })
+            for (auto& t : p->tier)
+                CHECK(std::strcmp(t.s, "euclid") == 0 || std::strlen(t.s) % size_t(t.perBar) == 0, "%s: pattern \"%s\" is not whole bars of %d", spec->scene, t.s, t.perBar);
+        for (seed = 1; seed <= 12; ++seed)
+        {
+            G c(*spec, seed), again(*spec, seed);
+            auto ev = generateAll(c);
+            auto ev2 = generateAll(again);
+            CHECK(ev.size() == ev2.size() && std::equal(ev.begin(), ev.end(), ev2.begin(), [](auto& a, auto& b) {
+                      return a.tick == b.tick && a.type == b.type && a.track == b.track && a.pitch == b.pitch && a.value == b.value;
+                  }), "%s: same seed must give the same piece", spec->scene);
+            const double minutes = c.totalBars() * 4 / c.bpm();
+            CHECK(minutes > 6.5 && minutes < 11, "%s length %.1f min", spec->scene, minutes);
+            std::map<std::pair<int, int>, int> held;
+            int notes[G::kGenreTracks] = {};
+            for (auto& x : ev)
+            {
+                const auto key = std::make_pair(int(x.track), int(x.pitch));
+                if (x.type == Event::NoteOn)
+                {
+                    CHECK(held[key] == 0, "%s double trigger track %d pitch %d at tick %lld", spec->scene, x.track, x.pitch, (long long) x.tick);
+                    CHECK(x.value > 0 && x.value <= 1, "%s velocity %f", spec->scene, x.value);
+                    const auto r = c.range(x.track);
+                    CHECK(x.pitch >= r[0] && x.pitch <= r[1], "%s track %d pitch %d out of range", spec->scene, x.track, x.pitch);
+                    if (x.track != G::Snare && x.track != G::Hats)
+                        CHECK(inMode(*spec->mode, c.tonicPc(), x.pitch), "%s track %d pitch %d outside the key", spec->scene, x.track, x.pitch);
+                    ++held[key];
+                    ++notes[x.track];
+                }
+                else if (x.type == Event::NoteOff) { CHECK(held[key] == 1, "%s note-off without note-on track %d pitch %d", spec->scene, x.track, x.pitch); --held[key]; }
+            }
+            for (auto& [k, n] : held) CHECK(n == 0, "%s stuck note track %d pitch %d", spec->scene, k.first, k.second);
+            // every track the form asks for actually plays
+            for (int t = 0; t < G::kGenreTracks; ++t)
+            {
+                bool used = false;
+                for (auto& s : c.sections()) used = used || (s.layers & (1 << t));
+                if (used && t != G::Snare) CHECK(notes[t] > 0, "%s: track %d never plays", spec->scene, t);
+            }
+        }
+        std::printf("      %s\n", G(*spec, 1).describe().c_str());
     }
     seed = 0;
 

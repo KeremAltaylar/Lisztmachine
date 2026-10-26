@@ -1,0 +1,37 @@
+# Lisztmachine sound palette: Deconstructed Club (deconstructed club at 128-136: shattered kicks, gaps, stutters, metal clicks, huge stabs).
+# Tracks: pad kick snare hats perc bass sub arp chord fx.
+# Patches from the earlier palettes, re-measured held at C4 (basses C3) with pure tuning, 2026-10-26: beating 1-15 %
+# (Semihaunt left out: 39 %, EP 1 left out: 43-51 %). Gain: a held note to -22 dB RMS (pads and chords -27, they play 3-4 notes).
+# part   gain   bright  patch
+
+pad      -1.0     582  Pads/Yeti Funeral
+pad      -2.4     999  Pads/Retro Choir
+kick     0.0      60  internal/kick
+snare    0.0    1500  internal/snare
+hats     0.0    9000  internal/hat
+perc     0.0    8000  internal/click
+bass    -12.2     760  Basses/Rubber Bass
+bass     -8.6    2372  Basses/Saw Lo-Fi
+sub     -6.0      40  internal/sub
+arp     -12.2     419  Leads/Classic Lead 1
+arp      -3.4    5045  Leads/Harsher
+chord    -2.0    1428  Polysynths/Serious Distortion
+chord    -0.1    6135  Polysynths/Notched Saws
+fx       -5.7     286  FX/Unsettler
+fx        4.0    4170  FX/Radio Noise
+
+# Echoes: beats, feedback, mix
+delay chord 0.75 0.40 0.22
+delay snare 0.5 0.35 0.15
+
+# Balance (to be measured in the mix)
+gain pad   -16.2
+gain kick   -8.7
+gain snare  -8.1
+gain hats   -6.2
+gain perc    2.8
+gain bass   -6.8
+gain sub   -10.9
+gain arp    -2.2
+gain chord  -2.8
+gain fx     -9.2

@@ -1,0 +1,36 @@
+# Lisztmachine sound palette: Gqom (gqom at 118-124: broken kicks in threes, triplet toms, dark stabs).
+# Tracks: pad kick snare hats perc bass sub arp chord fx.
+# Patches from the earlier palettes, re-measured held at C4 (basses C3) with pure tuning, 2026-10-26: beating 1-15 %
+# (Semihaunt left out: 39 %, EP 1 left out: 43-51 %). Gain: a held note to -22 dB RMS (pads and chords -27, they play 3-4 notes).
+# part   gain   bright  patch
+
+pad      -1.0     582  Pads/Yeti Funeral
+pad       6.6     599  Pads/Still
+kick     0.0      60  internal/kick
+snare    0.0    1500  internal/snare
+hats     0.0    9000  internal/hat
+perc     0.0      60  internal/kick
+bass     -8.4      99  Basses/Sub 2
+bass    -10.3     136  Basses/Rumble
+sub     -6.0      40  internal/sub
+arp      -0.3    1522  Leads/Moogy Saw
+arp      -3.4    5045  Leads/Harsher
+chord    -2.0    1428  Polysynths/Serious Distortion
+chord    -0.1    6135  Polysynths/Notched Saws
+fx       -5.7     286  FX/Unsettler
+
+# Echoes: beats, feedback, mix
+delay chord 1.5 0.40 0.20
+delay snare 0.75 0.30 0.12
+
+# Balance (to be measured in the mix)
+gain pad   -14.2
+gain kick   -6.0
+gain snare   1.3
+gain hats   -4.1
+gain perc  -13.1
+gain bass   -3.7
+gain sub    -9.3
+gain arp    -1.8
+gain chord  -1.3
+gain fx     -6.9

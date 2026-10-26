@@ -1,0 +1,31 @@
+# Lisztmachine sound palette: Clicks & Glitch (clicks and glitch at 120-128: sine clicks tuned to the chord, sine blips twenty against sixteen, data bursts).
+# Tracks: pad kick snare hats perc bass sub arp chord fx.
+# Patches from the earlier palettes, re-measured held at C4 (basses C3) with pure tuning, 2026-10-26: beating 1-15 %
+# (Semihaunt left out: 39 %, EP 1 left out: 43-51 %). Gain: a held note to -22 dB RMS (pads and chords -27, they play 3-4 notes).
+# part   gain   bright  patch
+
+pad       6.6     599  Pads/Still
+kick     0.0      60  internal/kick
+snare    0.0    1500  internal/snare
+hats     0.0    9000  internal/hat
+perc     0.0    8000  internal/click
+bass     -8.4      99  Basses/Sub 2
+sub     -6.0      40  internal/sub
+arp      0.0    3000  internal/blip
+chord    -8.7     396  Keys/Organ 2
+fx        4.0    4170  FX/Radio Noise
+
+# Echoes: beats, feedback, mix
+delay arp 0.75 0.30 0.15
+
+# Balance (to be measured in the mix)
+gain pad   -15.0
+gain kick   -7.7
+gain snare  -4.7
+gain hats   -4.8
+gain perc    2.3
+gain bass   -3.8
+gain sub   -10.8
+gain arp   -12.5
+gain chord  -4.4
+gain fx    -13.4

@@ -1,0 +1,37 @@
+# Lisztmachine sound palette: Dub Techno (dub techno at 120-124: minor-seventh stabs into long echoes, rimshots, offbeat hats).
+# Tracks: pad kick snare hats perc bass sub arp chord fx.
+# Patches from the earlier palettes, re-measured held at C4 (basses C3) with pure tuning, 2026-10-26: beating 1-15 %
+# (Semihaunt left out: 39 %, EP 1 left out: 43-51 %). Gain: a held note to -22 dB RMS (pads and chords -27, they play 3-4 notes).
+# part   gain   bright  patch
+
+pad       6.6     599  Pads/Still
+pad      -3.9    2383  Pads/Subtle Comb Strings
+kick     0.0      60  internal/kick
+snare    0.0    1500  internal/snare
+hats     0.0    9000  internal/hat
+perc     0.0    8000  internal/click
+bass     -8.4      99  Basses/Sub 2
+bass    -10.3     136  Basses/Rumble
+sub     -6.0      40  internal/sub
+arp      -5.8     622  Winds/Flute 1
+chord    -8.7     396  Keys/Organ 2
+chord    -4.7    4145  Plucks/Saw Pluck
+chord    -0.1    6135  Polysynths/Notched Saws
+fx        4.0    4170  FX/Radio Noise
+
+# Echoes: beats, feedback, mix
+delay chord 0.75 0.62 0.38
+delay snare 0.75 0.45 0.20
+delay arp 1.5 0.45 0.25
+
+# Balance (to be measured in the mix)
+gain pad    -6.9
+gain kick   -4.3
+gain snare   3.4
+gain hats   -6.9
+gain perc   -6.0
+gain bass    0.2
+gain sub    -9.1
+gain arp     0.5
+gain chord  -2.6
+gain fx    -11.7
