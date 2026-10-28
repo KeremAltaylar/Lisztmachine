@@ -6,10 +6,13 @@
 
 pad      -1.0     582  Pads/Yeti Funeral
 pad      -3.9    2383  Pads/Subtle Comb Strings
-kick     0.0      60  internal/kick808
-snare    0.0    1500  sample/gogodze
-hats     0.0    9000  internal/hat
-perc     0.0      60  sample/gogodze
+pulse    0.0      60  internal/none
+metal    5.4    2646  3rd/Emu/Drums/T8 Cowbell
+metal     12.7    1593  3rd/Cybersoda/Drums/Classic 808 Cowbell
+tick     0.0    6000  internal/click
+perc     -0.5    1652  3rd/Cybersoda/Drums/Perc 1
+perc     -0.9    4877  3rd/Emu/Drums/T8 Conga
+perc      -1.5     287  3rd/Vospi/Drums/Modular Drum
 sub     -6.0      40  internal/sub
 fx       -5.7     286  FX/Unsettler
 
@@ -24,27 +27,27 @@ delay chord 0.75 0.35 0.18
 delay arp 1.0 0.30 0.15
 
 # Balance (to be measured in the mix)
-gain pad   -10.4
-gain kick  -14.2
-gain snare  -3.2
-gain hats   -1.3
-gain perc   -3.2
-gain bass   -9.9
+gain pulse   0.0
+gain metal -21.2
+gain tick    0.8
+gain perc  -10.1
+gain pad    -9.8
+gain bass   -8.8
 gain sub    -8.1
-gain arp   -12.7
+gain arp   -11.7
 gain chord  -9.3
 gain fx     -7.5
 master 9.4
 drive bass  0.55 3500
 drive chord 0.50 4500
 drive arp   0.45 5000
-drive kick  0.35 6000
-drive snare 0.35 8000
 drive pad   0.20 5000
-drive perc  0.20 9000
-crush perc  8 2 0.5
-comp perc -22 4 5 80 0.5
-crush hats 10 2 0.3
-duck hats 0.25
+drive metal 0.30 4500
+drive perc  0.30 6000
+crush tick  8 3 0.3
+comp perc -22 4 5 80 0.4
+duck metal 0.15
+duck tick 0.2
 duck perc 0.25
-delay snare 0.75 0.5 0.3 throws
+delay metal 0.75 0.55 0.35 throws
+delay perc  1.0 0.5 0.3 throws

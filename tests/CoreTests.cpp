@@ -235,7 +235,7 @@ int main()
     for (auto* spec : GenreComposer::all())
     {
         using G = GenreComposer;
-        for (auto* p : { &spec->kick, &spec->snare, &spec->hats, &spec->perc, &spec->bass, &spec->chord })
+        for (auto* p : { &spec->pulse, &spec->metal, &spec->tick, &spec->perc, &spec->bass, &spec->chord })
             for (auto& t : p->tier)
                 CHECK(std::strcmp(t.s, "euclid") == 0 || std::strlen(t.s) % size_t(t.perBar) == 0, "%s: pattern \"%s\" is not whole bars of %d", spec->scene, t.s, t.perBar);
         for (seed = 1; seed <= 12; ++seed)
@@ -259,7 +259,7 @@ int main()
                     CHECK(x.value > 0 && x.value <= 1, "%s velocity %f", spec->scene, x.value);
                     const auto r = c.range(x.track);
                     CHECK(x.pitch >= r[0] && x.pitch <= r[1], "%s track %d pitch %d out of range", spec->scene, x.track, x.pitch);
-                    if (x.track != G::Snare && x.track != G::Hats)
+                    if (!(x.track == G::Tick && x.pitch >= 96)) // noise ticks have no pitch
                         CHECK(inMode(*spec->mode, c.tonicAt(int(x.tick / kBarTicks)), x.pitch), "%s track %d pitch %d outside the key", spec->scene, x.track, x.pitch);
                     ++held[key];
                     ++notes[x.track];
@@ -279,7 +279,7 @@ int main()
             {
                 bool used = false;
                 for (auto& s : c.sections()) used = used || (s.layers & (1 << t));
-                if (used && t != G::Snare) CHECK(notes[t] > 0, "%s: track %d never plays", spec->scene, t);
+                if (used && t != G::Metal) CHECK(notes[t] > 0, "%s: track %d never plays", spec->scene, t);
             }
         }
         std::printf("      %s\n", G(*spec, 1).describe().c_str());

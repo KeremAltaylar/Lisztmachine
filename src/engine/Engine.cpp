@@ -1,14 +1,12 @@
 #include "Engine.h"
-#include <juce_audio_formats/juce_audio_formats.h>
-#include <map>
 
 namespace liszt {
 
 namespace {
 
-juce::File firstExisting(std::initializer_list<const char*> paths)
+juce::File firstExisting(std::initializer_list<juce::String> paths)
 {
-    for (auto* p : paths)
+    for (auto& p : paths)
         if (juce::File f(p); f.exists()) return f;
     return {};
 }
@@ -30,12 +28,15 @@ juce::File findSurgePlugin()
                            "/Library/Audio/Plug-Ins/VST3/Surge XT.vst3" });
 }
 
+// "Category/Name" from the factory patches; "3rd/Author/Category/Name" from the third-party ones.
 juce::File findSurgePatch(const juce::String& categoryAndName)
 {
-    auto root = firstExisting({ "C:/Program Files/Common Files/VST3/Surge Synth Team/SurgeXTData/patches_factory",
-                                "C:/ProgramData/Surge XT/patches_factory",
-                                "/Library/Application Support/Surge XT/patches_factory" });
-    return root.getChildFile(categoryAndName + ".fxp");
+    const bool third = categoryAndName.startsWith("3rd/");
+    const juce::String set = third ? "patches_3rdparty" : "patches_factory";
+    auto root = firstExisting({ "C:/Program Files/Common Files/VST3/Surge Synth Team/SurgeXTData/" + set,
+                                "C:/ProgramData/Surge XT/" + set,
+                                "/Library/Application Support/Surge XT/" + set });
+    return root.getChildFile((third ? categoryAndName.substring(4) : categoryAndName) + ".fxp");
 }
 
 juce::File findSurgeEffects()
@@ -224,132 +225,6 @@ void PeakLimiter::process(float* l, float* r, int n)
     }
 }
 
-// ---------------------------------------------------------------- the sampled kit
-namespace {
-// drum -> loudness layers (softest first) -> alternate hits
-std::map<std::string, std::vector<std::vector<std::vector<float>>>> gKit;
-bool gKitLoaded = false;
-}
-
-juce::File findDrumKit()
-{
-    auto dir = juce::File::getSpecialLocation(juce::File::currentExecutableFile).getParentDirectory();
-    for (int up = 0; up < 4 && dir.exists(); ++up, dir = dir.getParentDirectory())
-        for (auto sub : { "Gogodze", "Resources/Gogodze" })
-            if (auto d = dir.getChildFile(sub); d.getChildFile("Samples").isDirectory()) return d;
-    return juce::File::getSpecialLocation(juce::File::userHomeDirectory).getChildFile("LisztmachineSounds/Gogodze");
-}
-
-bool DrumSampler::kitLoaded() { return gKitLoaded; }
-
-juce::String DrumSampler::loadKit()
-{
-    if (gKitLoaded) return {};
-    const auto kit = findDrumKit();
-    static const std::pair<const char*, const char*> drums[] = {
-        { "ks", "kick_mic" }, { "sc", "snare_mic" }, { "se", "snare_mic" }, { "ss", "snare_mic" },
-        { "hc", "oh_mic" }, { "ho", "oh_mic" }, { "tl", "front_mic" }, { "tm", "front_mic" }, { "th", "front_mic" },
-    };
-    juce::AudioFormatManager formats;
-    formats.registerBasicFormats();
-    for (auto& [name, mic] : drums)
-    {
-        auto& layers = gKit[name];
-        for (int vl = 1; vl <= 9; ++vl)
-        {
-            std::vector<std::vector<float>> hits;
-            for (int rr = 1; rr <= 4; ++rr)
-            {
-                const auto f = kit.getChildFile("Samples").getChildFile(mic).getChildFile(juce::String(name) + "_vl" + juce::String(vl) + "_rr" + juce::String(rr) + ".wav");
-                std::unique_ptr<juce::AudioFormatReader> r(formats.createReaderFor(f));
-                if (!r) continue;
-                std::vector<float> x(size_t(r->lengthInSamples));
-                float* ch[] = { x.data() };
-                r->read(ch, 1, 0, int(r->lengthInSamples));
-                // a 2 ms fade at the end, so a sample cut short of silence does not tick
-                const size_t fade = std::min<size_t>(x.size(), 88);
-                for (size_t i = 0; i < fade; ++i) x[x.size() - 1 - i] *= float(i) / float(fade);
-                hits.push_back(std::move(x));
-            }
-            if (!hits.empty()) layers.push_back(std::move(hits));
-        }
-        if (layers.empty()) { gKit.clear(); return "no drum kit at " + kit.getFullPathName() + " (run tools/fetch_drums.py)"; }
-    }
-    gKitLoaded = true;
-    return {};
-}
-
-void DrumSampler::prepare(double sr, Part part)
-{
-    rate_ = 44100.0 / sr;
-    part_ = part;
-    chokeStep_ = float(1.0 / (0.006 * sr)); // an open hat closes in 6 ms
-    allOff();
-}
-
-void DrumSampler::start(int note, float vel)
-{
-    const char* name = "ks";
-    switch (part_)
-    {
-        case KickPart: name = "ks"; break;
-        case SnarePart: name = note >= 60 ? "ss" : vel < .45f ? "se" : "sc"; break;
-        case HatsPart: name = note == 46 ? "ho" : "hc"; break;
-        case TomPart: name = note < 45 ? "tl" : note < 51 ? "tm" : "th"; break;
-    }
-    auto it = gKit.find(name);
-    if (it == gKit.end()) return;
-    const auto& layers = it->second;
-    const int layer = juce::jlimit(0, int(layers.size()) - 1, int(vel * float(layers.size())));
-    const auto& hits = layers[size_t(layer)];
-    const auto* sample = &hits[size_t(rr_++ % int(hits.size()))];
-    if (part_ == HatsPart) // the next hat chokes an open one
-        for (auto& v : voices_) if (v.sample && v.open) v.fadeStep = chokeStep_;
-    // a free voice, else the oldest (24 back it has long rung out)
-    int at = next_;
-    for (int k = 0; k < int(voices_.size()); ++k)
-        if (!voices_[size_t((next_ + k) % int(voices_.size()))].sample) { at = (next_ + k) % int(voices_.size()); break; }
-    auto& v = voices_[size_t(at)];
-    next_ = (at + 1) % int(voices_.size());
-    // within a layer the velocity still shapes the level a little
-    v = { sample, 0, 0.55f + 0.45f * vel, 1, 0, name[1] == 'o' };
-}
-
-void DrumSampler::run(float* l, float* r, int from, int to)
-{
-    for (auto& v : voices_)
-    {
-        if (!v.sample) continue;
-        const auto& x = *v.sample;
-        for (int n = from; n < to; ++n)
-        {
-            const size_t i = size_t(v.pos);
-            if (i + 1 >= x.size() || v.fade <= 0) { v.sample = nullptr; break; }
-            const double f = v.pos - double(i);
-            const float y = float(x[i] + (x[i + 1] - x[i]) * f) * v.gain * v.fade;
-            l[n] += y;
-            r[n] += y;
-            v.pos += rate_;
-            v.fade -= v.fadeStep;
-        }
-    }
-}
-
-void DrumSampler::render(const juce::MidiBuffer& midi, float* l, float* r, int numSamples)
-{
-    int at = 0;
-    for (const auto meta : midi)
-    {
-        const int pos = juce::jlimit(0, numSamples, meta.samplePosition);
-        run(l, r, at, pos);
-        at = pos;
-        const auto m = meta.getMessage();
-        if (m.isNoteOn()) start(m.getNoteNumber(), m.getFloatVelocity());
-        else if (m.isAllSoundOff()) allOff();
-    }
-    run(l, r, at, numSamples);
-}
-
 void Biquad::highpass(double sr, double hz)
 {
     const double w = juce::MathConstants<double>::twoPi * hz / sr, c = std::cos(w), alpha = std::sin(w) / (2 * 0.7071), a0 = 1 + alpha;
@@ -440,7 +315,8 @@ TrackMix mixFor(const std::string& name)
         { "pad", { .55f, 1.5f, 0, 150 } }, { "drone", { .5f, 1.5f, 0, 120 } }, { "chord", { .45f, 1.4f, 0, 120 } },
         { "stab", { .45f, 1.4f, 0, 180 } }, { "arp", { .3f, 1.2f, 0, 150 } },  { "acid", { .25f, 1.0f, 0, 90 } },
         { "seq", { .2f, 1.2f, 0, 120 } },  { "lead", { .2f, 1.1f, 0, 150 } },  { "snare", { 0, 1.0f, 0, 120 } },
-        { "clap", { 0, 1.2f, 0, 150 } },   { "hats", { 0, 1.0f, .25f, 300 } }, { "perc", { .1f, 1.3f, -.2f, 200 } },
+        { "clap", { 0, 1.2f, 0, 150 } },   { "pulse", { 0, 0, 0, 0 } },       { "metal", { .15f, 1.3f, -.15f, 200 } },
+        { "tick", { .1f, 1.0f, .25f, 400 } },   { "hats", { 0, 1.0f, .25f, 300 } }, { "perc", { .1f, 1.3f, -.2f, 200 } },
         { "fx", { .5f, 1.6f, 0, 200 } },
     };
     for (auto& [n, m] : table) if (name == n) return m;
@@ -448,8 +324,8 @@ TrackMix mixFor(const std::string& name)
 }
 } // namespace
 
-// The engine's own synths and its sampled kit: no Surge instance, one sound for the whole song.
-static bool isEngineSound(const juce::String& patch) { return patch.startsWith("internal/") || patch.startsWith("sample/"); }
+// The engine's own synths: no Surge instance, one sound for the whole song.
+static bool isEngineSound(const juce::String& patch) { return patch.startsWith("internal/"); }
 
 juce::String Palette::load(const juce::File& file, const std::string& sceneName)
 {
@@ -585,16 +461,6 @@ juce::String Engine::load(double sampleRate, int maxBlock, const Palette& palett
         int channels = 2;
         const auto& first = palette.parts[i].front().patch;
         t.internal = isEngineSound(first);
-        // "sample/kit" plays the sampled kit; "sample/kit+kick" layers the synth kick under it
-        t.sampled = first.startsWith("sample/");
-        t.synthLayer = first.endsWith("+kick");
-        if (t.sampled)
-        {
-            if (auto e = DrumSampler::loadKit(); e.isNotEmpty()) return e;
-            const juce::String name = palette.info->trackNames[i];
-            t.sampler.prepare(sampleRate, name == "kick" ? DrumSampler::KickPart : name == "hats" ? DrumSampler::HatsPart
-                                        : name == "perc" ? DrumSampler::TomPart : DrumSampler::SnarePart);
-        }
         t.trim = juce::Decibels::decibelsToGain(palette.trackGainDb[i]);
         t.echo.prepare(sampleRate);
         const auto m = mixFor(palette.info->trackNames[i]);
@@ -619,8 +485,8 @@ juce::String Engine::load(double sampleRate, int maxBlock, const Palette& palett
             const auto kind = first.endsWith("sub") ? InternalSynth::Sub : first.endsWith("blip") ? InternalSynth::Blip
                             : first.endsWith("kick") ? InternalSynth::Kick : first.endsWith("hat") ? InternalSynth::Hat
                             : first.endsWith("clap") ? InternalSynth::Clap : first.endsWith("snare") ? InternalSynth::Snare
-                            : first.endsWith("kick808") ? InternalSynth::Kick808 : first.endsWith("metal") ? InternalSynth::Metal
-                            : first.endsWith("zap") ? InternalSynth::Zap : InternalSynth::Click;
+                            : first.endsWith("metal") ? InternalSynth::Metal
+                            : first.endsWith("zap") ? InternalSynth::Zap : first.endsWith("none") ? InternalSynth::None : InternalSynth::Click;
             t.synth.prepare(sampleRate, kind);
             for (auto& s : t.slots) { s.plugin.reset(); s.midi.ensureSize(8192); s.state = Idle; s.entry = 0; s.gain = juce::Decibels::decibelsToGain(palette.parts[i].front().gainDb); }
             t.buffer.setSize(2, maxBlock);
@@ -653,7 +519,7 @@ juce::String Engine::load(double sampleRate, int maxBlock, const Palette& palett
     glue.prepare(sampleRate);
     glue.makeupDb = palette.masterDb;
     for (auto& f : reverbLowCut_) f.highpass(sampleRate, 180);
-    kickTrack_ = palette.info->trackOf("kick");
+    kickTrack_ = palette.info->trackOf("kick") >= 0 ? palette.info->trackOf("kick") : palette.info->trackOf("pulse");
     duckCurve_.assign(size_t(maxBlock), 0);
     kickHits_.reserve(64);
     return {};
@@ -929,7 +795,7 @@ void Engine::renderChunk(float* const* out, int numChannels, int offset, int len
     if (panic_.exchange(false))
         for (auto& t : tracks_)
         {
-            if (t.internal) { t.synth.allOff(); t.sampler.allOff(); continue; }
+            if (t.internal) { t.synth.allOff(); continue; }
             for (auto& s : t.slots)
             {
                 s.midi.addEvent(juce::MidiMessage::allNotesOff(1), 0);
@@ -1085,8 +951,7 @@ void Engine::renderChunk(float* const* out, int numChannels, int offset, int len
         {   // the engine's own instrument: one voice pool, its MIDI in the first slot's buffer
             auto& slot = t.slots[0];
             t.buffer.clear();
-            if (t.sampled) t.sampler.render(slot.midi, t.buffer.getWritePointer(0), t.buffer.getWritePointer(1), len);
-            if (!t.sampled || t.synthLayer) t.synth.render(slot.midi, t.buffer.getWritePointer(0), t.buffer.getWritePointer(1), len);
+            t.synth.render(slot.midi, t.buffer.getWritePointer(0), t.buffer.getWritePointer(1), len);
             slot.midi.clear();
             if (t.hasEcho) t.echo.process(t.buffer.getWritePointer(0), t.buffer.getWritePointer(1), len);
             for (int c = 0; c < 2; ++c) juce::FloatVectorOperations::multiply(t.buffer.getWritePointer(c), slot.gain, len);
@@ -1225,6 +1090,7 @@ void Engine::renderClick(float* const* out, int numChannels, int offset, int len
 // ---------------------------------------------------------------- the engine's own instrument
 void InternalSynth::start(int note, float velocity)
 {
+    if (kind_ == None) return; // the silent pulse: its notes only duck the mix
     Voice* v = &voices_[0];
     for (auto& x : voices_) if (x.note < 0) { v = &x; break; }       // a free voice, or steal the first
     v->note = note;
@@ -1242,7 +1108,6 @@ void InternalSynth::start(int note, float velocity)
     if (kind_ == Kick) tau = 0.16 + 0.2 * velocity;                         // the kick's body, ending on the note
     if (kind_ == Snare) tau = note >= 60 ? 0.025 : 0.09 + 0.08 * velocity;  // the rim, or the snare's rattle
     if (kind_ == Hat) tau = note >= 46 ? 0.07 + 0.1 * velocity : 0.012 + 0.02 * velocity; // 46 open, else closed
-    if (kind_ == Kick808) tau = 0.3 + 0.6 * velocity;   // the long 808 boom: the harder, the longer
     if (kind_ == Metal) tau = 0.05 + 0.25 * velocity;   // struck metal, tuned to the note
     if (kind_ == Zap) tau = 0.04 + 0.08 * velocity;     // a laser: a sine diving onto the note
     v->decay = std::exp(-1.0 / (tau * sr_));
@@ -1269,7 +1134,7 @@ void InternalSynth::run(float* l, float* r, int from, int to)
         if (v.note < 0) continue;
         for (int n = from; n < to; ++n)
         {
-            if (kind_ == Click || kind_ == Kick || kind_ == Hat || kind_ == Snare || kind_ >= Kick808) v.env *= v.decay;
+            if (kind_ == Click || kind_ == Kick || kind_ == Hat || kind_ == Snare || kind_ >= Metal) v.env *= v.decay;
             else if (kind_ == Clap)
             {
                 // three hand claps 11 ms apart, then the room
@@ -1298,17 +1163,11 @@ void InternalSynth::run(float* l, float* r, int from, int to)
             }
             else
                 x = float(std::sin(v.phase) + (kind_ == Sub ? 0.12 * std::sin(2 * v.phase) : 0.0));
-            if (kind_ >= Kick808)
+            if (kind_ >= Metal)
             {
                 const double age = double(v.age) / sr_;
                 double y;
-                if (kind_ == Kick808)
-                {
-                    // two octaves down onto the note in 40 ms, a little drive that the decay lets go of
-                    v.phase += v.inc * (1 + 3 * std::exp(-age / 0.04));
-                    y = std::tanh(2.5 * std::sin(v.phase) * v.env) * 0.5;
-                }
-                else if (kind_ == Metal)
+                if (kind_ == Metal)
                 {
                     // FM: two inharmonic modulators (1.41 and 3.73 times the note), their brightness gone first
                     v.phase += v.inc;

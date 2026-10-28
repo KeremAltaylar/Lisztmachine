@@ -15,7 +15,7 @@ os.makedirs(out, exist_ok=True)
 def window(scene):
     # the summit is the first section at the highest energy; the lift is halfway into it
     block = G[G.index(f'.scene = "{scene}"'):]
-    block = block[block.index(".form"):block.index(".kick")]
+    block = block[block.index(".form"):block.index(".pulse")]
     secs = [(n, int(b), float(e)) for n, b, e in re.findall(r'\{ "([^"]+)", (\d+), ([\d.]+)f,', block)]
     peak = max(e for _, _, e in secs)
     bar = 0

@@ -16,20 +16,26 @@ namespace liszt {
 // slowed in the calm, answered by its sequence a third up, turned upside down in the breakdowns,
 // doubled in octaves at the summit, where it comes home as it was first heard.
 //
-// Ten tracks for every genre: pad, kick, snare, hats, perc, bass, sub, arp, chord, fx.
+// Ten tracks for every genre: pad, pulse, metal, tick, perc, bass, sub, arp, chord, fx.
+//
+// No kick, snare or hi-hat: Kerem plays those live on his acoustic kit. The machine's drums are
+// electronic percussion only. The pulse is silent: its notes only duck the mix (a ghost kick, until
+// his real kick drives it); metal is tuned metallic percussion, tick the fine clicks (tuned, or
+// noise from note 96 up), perc everything else (zaps, congas, glitches, tuned drums).
 class GenreComposer : public Composer
 {
 public:
-    enum GTrack : uint8_t { Pad, Kick, Snare, Hats, Perc, Bass, Sub, Arp, Chord, Fx, kGenreTracks };
+    enum GTrack : uint8_t { Pad, Pulse, Metal, Tick, Perc, Bass, Sub, Arp, Chord, Fx, kGenreTracks };
 
     // A pattern: one character per step, perBar steps to the bar, as many bars as it is long.
     //   X x o g  a hit (accent, normal, soft, ghost) on the part's own pitch
-    //   1-9      drums: the part's n-th pitch · bass: the n-th scale degree above the root (5 = the fifth)
+    //   1-9      metal/perc: the n-th chord tone up · tick: 2 = a noise tick · bass: the n-th scale degree above the root (5 = the fifth)
     //   -        the note before holds on · .  rest
     // "euclid" (perc only): k hits spread evenly over perBar steps, more as the music drives.
     struct Pat { const char* s = ""; int perBar = 16; };
     struct Part { Pat tier[3]; };                  // energy below .4, below .75, above
-    // layers: P K S H C B U A D F (the tracks), and L: Kerem's drums lead here, the machine's thin out
+    // layers: P K S H C B U A D F (pad, pulse, metal, tick, perc, bass, sub, arp, chord, fx), and
+    // L: Kerem's drums lead here, the machine's percussion thins out
     struct Sec { const char* name; int bars; float energy; const char* layers; };
     struct Spec
     {
@@ -41,7 +47,7 @@ public:
         std::array<std::array<int, 4>, 3> progs;   // four chord roots (scale degrees): one is home, another the breakdowns'
         int preRoot = 6;                           // the last chord before the peak
         std::array<Sec, 10> form;                  // name nullptr ends it
-        Part kick, snare, hats, perc, bass, chord;
+        Part pulse, metal, tick, perc, bass, chord;
         std::array<int, 3> arpRate {};             // arpeggio steps per bar per tier (0 silent)
         int arpLenLo = 5, arpLenHi = 7;            // its cycle, in notes: phases against the bar
         float arpDensLo = .4f, arpDensHi = .8f, arpGate = .7f;
@@ -49,7 +55,7 @@ public:
         int ext = 2;                               // chords: 0 triads, 1 sevenths, 2 ninths
         bool hook = true;                          // the arp track plays the song's hook; false: the polymetric arpeggio
         float chop = 0, gap = 0, stutter = 0;      // chances per bar, scaled by energy
-        int stutterTrack = Snare, stutterDiv = 32;
+        int stutterTrack = Metal, stutterDiv = 32;
         float swing = 0;                           // the off sixteenths late, in sixteenths
         float chordSweep = .2f;                    // how far the chord's filter breathes
     };

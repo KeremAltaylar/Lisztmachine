@@ -37,10 +37,10 @@ const G::Spec kJungle {
     .form = { { { "Mist", 16, .15f, "PF" }, { "Signal", 16, .35f, "PAHF" }, { "First Break", 64, .65f, "PKSHBUA" },
                 { "Undertow", 32, .45f, "PBUAD" }, { "Second Break", 64, .85f, "PKSHBUAD" }, { "Void", 16, .30f, "PAF" },
                 { "Ascension", 80, 1.0f, "PKSHBUADF" }, { "Rain", 32, .50f, "PKSHAL" }, { "Tide", 16, .10f, "PF" } } },
-    // the break: a kick on one and the and-of-three, snares on two and four with ghosts between
-    .kick = part("X.........X.....", "X.X.......XX....X.X.......X.....", "X.X.......XX....X.X.......X..X.."),
-    .snare = part("........X.......", "....X..g.g..X..g....X..g.g....X.", "....X..x.x..X..x....X..g.x..X.gx"),
-    .hats = part("x.o.x.o.x.o.x.o.", "x.o.x.o.x.o.x.2.", "xgogxgogxgogxg2g"),
+    // the break's skeleton drives the pulse; the metal answers off the backbeat, the ticks run between
+    .pulse = part("X.........X.....", "X.X.......XX....X.X.......X.....", "X.X.......XX....X.X.......X..X.."),
+    .metal = part("..........1.....", "...1......2..3..", "...1..2...3..1.2..1...3.2...4..2"),
+    .tick = part("x.o.x.o.x.o.x.o.", "xgogxgo2xgogxg2g", "xoxgxoxgx2xgxoxg"),
     .perc = none(),
     // the reese: whole bars, the fifth at the end of the phrase
     .bass = part("x---------------", "x-----------5---", "x-------x---5-8-"),
@@ -55,10 +55,10 @@ const G::Spec kFootwork {
     .form = { { { "Ritual", 16, .15f, "PC" }, { "Call", 32, .35f, "PCHD" }, { "Footwork", 48, .60f, "PKSHCBUDL" },
                 { "Origami", 32, .45f, "PCADF" }, { "Battle", 64, .85f, "PKSHCBUAD" }, { "Breath", 16, .30f, "PAF" },
                 { "Black", 80, 1.0f, "PKSHCBUADF" }, { "Dust", 16, .15f, "PCF" } } },
-    // triplet eighths for the kick and the 808, sixteenths for the hats, sextuplets for the toms
-    .kick = part("X.....X.....", "X..x..X..x.x", "X..x.xX..x..X.xx.xX..x.x", 12),
-    .snare = part("", "....x.......x...", "....x.......x..g"),
-    .hats = part("x.x.x.x.x.x.x.x.", "xgxgxgxgxgxgxgxg", "xgxgxgx2xgxgxgxg"),
+    // triplet eighths for the pulse and the 808 bass, triplet metal, sextuplet ticks and percussion
+    .pulse = part("X.....X.....", "X..x..X..x.x", "X..x.xX..x..X.xx.xX..x.x", 12),
+    .metal = part("", "1..2..1.....", "1..2..1..3.2", 12),
+    .tick = part("x.x.x.x.x.x.x.x.x.x.x.x.", "xgxgxgxgxgx2xgxgxgxgxgx2", "xgxxgxxgx2xgxxgxxgx2xgxx", 24),
     .perc = part("1.......2.......3.......", "1.......2.....3.1.......", "1.2.3.......1.2.3...4.4.", 24),
     .bass = part("x-----......", "x-----..x-..", "x-----..5-..x--.x-..5---", 12),
     .chord = part("", "x..x..x.....", "x.xx.xx..x.x", 12),
@@ -73,10 +73,10 @@ const G::Spec kEcstatic {
     .form = { { { "Dawn", 16, .15f, "PA" }, { "Spiral", 32, .35f, "PA" }, { "Lattice", 48, .55f, "PADH" },
                 { "Suspension", 32, .40f, "PAFS" }, { "Ecstasy", 64, .80f, "PADHSBUL" }, { "Afterimage", 32, .45f, "PAS" },
                 { "Computation", 64, 1.0f, "PKSHBUADF" }, { "Halo", 32, .20f, "PAD" } } },
-    // no break here: the arpeggio is the rhythm; the kick only lands at the summit, the snare only rolls into it
-    .kick = part("", "", "X...X...X...X..."),
-    .snare = none(),
-    .hats = part("", "..g...g...g...g.", "g.g.g.g.g.g.g.g."),
+    // no break here: the arpeggio is the rhythm; the pulse only lands at the summit
+    .pulse = part("", "", "X...X...X...X..."),
+    .metal = part("", "", "......1.......2."),
+    .tick = part("", "..g...g...g...g.", "g.g.g.g.g.g.g.g."),
     .perc = none(),
     .bass = part("", "x-------x-------", "x-------5---8---"),
     // the chords gated pointillistically: the trance without its kick
@@ -92,9 +92,9 @@ const G::Spec kDub {
     .form = { { { "Fog", 16, .15f, "PD" }, { "Current", 32, .35f, "PKHD" }, { "Depth", 48, .55f, "PKSHBUDL" },
                 { "Haze", 32, .35f, "PDF" }, { "Pressure", 64, .80f, "PKSHBUDF" }, { "Echo Chamber", 32, .45f, "PDHA" },
                 { "Submersion", 64, 1.0f, "PKSHBUADF" }, { "Silt", 16, .15f, "PD" } } },
-    .kick = part("X...x...x...x...", "X...x...x...x...", "X...x...x...x..."),
-    .snare = part("", "......2.......2.", "......2....2..2."), // rimshots
-    .hats = part("..o...o...o...o.", "g.2.g.2.g.2.g.2.", "g.2gg.2gg.2gg.2g"),
+    .pulse = part("X...x...x...x...", "X...x...x...x...", "X...x...x...x..."),
+    .metal = part("", "......1.......1.", "......1....2..1."), // rimshots
+    .tick = part("..o...o...o...o.", "g.2.g.2.g.2.g.2.", "g.2gg.2gg.2gg.2g"),
     .perc = none(),
     .bass = part("x.......x.......", "..x...x...x...x.", "..x..xx...x..x5."),
     // the stab: a minor seventh, short, into a long echo; its filter breathes over minutes
@@ -110,9 +110,9 @@ const G::Spec kGlitch {
     .form = { { { "Data", 16, .15f, "PA" }, { "Signal", 32, .35f, "PACH" }, { "Matrix", 48, .55f, "PKCHAUDL" },
                 { "Void", 16, .30f, "PA" }, { "Formula", 64, .80f, "PKSHCBUAD" }, { "Test Pattern", 32, .45f, "PCHAD" },
                 { "Supercodex", 64, 1.0f, "PKSHCBUADF" }, { "Zero", 16, .10f, "PA" } } },
-    .kick = part("X...............", "X.......X..x....", "X..x....X..x..x."),
-    .snare = part("", "....X.......X...", "....X.......X..g"),
-    .hats = part("", "g.g.g.g.g.g.g.g.g.g.g.g.g.g.g.g.", "gxgggxgggxgggxgggxgggxgggxgggxgg", 32),
+    .pulse = part("X...............", "X.......X..x....", "X..x....X..x..x."),
+    .metal = part("", "..1.....3..1....", "..1..2..3..1..2."),
+    .tick = part("", "g.g.g.g.g.g.g.g.g.g.g.g.g.g.g.g.", "gxgggxgggxgggxgggxgggxgggxgggxgg", 32),
     .perc = part("euclid", "euclid", "euclid", 32), // sine clicks, tuned to the chord, spread evenly
     .bass = part("", "x-------........", "x---....x---...."),
     .chord = part("x---------------................", "x---------------................", "x-------x-------"),
@@ -127,10 +127,10 @@ const G::Spec kGqom {
     .form = { { { "Taxi Rank", 16, .15f, "PC" }, { "Gathering", 32, .35f, "PCH" }, { "Gqom", 48, .60f, "PKCHSU" },
                 { "Ghost", 32, .40f, "PCDF" }, { "Sgubhu", 64, .85f, "PKSHCBUD" }, { "Shadow", 16, .30f, "PF" },
                 { "Possessed", 64, 1.0f, "PKSHCBUADF" }, { "Embers", 32, .30f, "PKCL" } } },
-    // no four on the floor: the kick in threes against the bar, the toms in triplets
-    .kick = part("X..x..x.........", "X..x..x...x.....", "X..x..x...x.x...X..x..x...x..x.x"),
-    .snare = part("", "........x.......", "........x.....g."),
-    .hats = part("g.g.g.g.g.g.g.g.", "g.gxg.gxg.gxg.gx", "ggxgggxgggxgggx2"),
+    // no four on the floor: the pulse in threes against the bar, the percussion in triplets
+    .pulse = part("X..x..x.........", "X..x..x...x.....", "X..x..x...x.x...X..x..x...x..x.x"),
+    .metal = part("", "..........1.....", "..........1...2."),
+    .tick = part("g.g.g.g.g.g.g.g.", "g.gxg.gxg.gxg.gx", "ggxgggxgggxgggx2"),
     .perc = part("1.....2.....1.....3.....", "1..2..3..1..2.....3..2..", "1..2..3..1..2..3..2..1.3", 24),
     .bass = part("", "x---............", "x---......x-----"),
     .chord = part("x...............................", "x.........x.....", "x.....x...x....."),
@@ -144,14 +144,14 @@ const G::Spec kDeconstructed {
     .form = { { { "Shatter", 16, .20f, "PDF" }, { "Glass", 32, .40f, "PCKD" }, { "Fracture", 48, .65f, "KSCBDUL" },
                 { "Cathedral", 32, .40f, "PDAF" }, { "Violence", 48, .85f, "PKSHCBUAD" }, { "Silence", 16, .15f, "P" },
                 { "Rebirth", 64, 1.0f, "PKSHCBUADF" }, { "Wound", 32, .30f, "PDA" } } },
-    .kick = part("X.......X..x....", "X..x.....X.x..x.", "X..x.X...X.xx..xX....x..X..x.X.."),
-    .snare = part("", "....X.....g.X...", "....X..x..g.X.xX"),
-    .hats = part("", "x...x.x...x...x.", "x.xxx.x.x.xxx.xx"),
+    .pulse = part("X.......X..x....", "X..x.....X.x..x.", "X..x.X...X.xx..xX....x..X..x.X.."),
+    .metal = part("", "......1...2.1...", "...1..2...3.1.21"),
+    .tick = part("", "x...x.x...x...x.", "x.xxx.x.x.xxx.xx"),
     .perc = part("1.......3.......", "1..3..2...4..1..", "1.3.2.41.3.2.4.1"), // metal: clicks tuned to the chord
     .bass = part("x---------------", "x-------x---5---", "x--x--x-x---8-5-"),
     .chord = part("X---------------", "X.......X..X....", "X..X..X.X.X..X.."),
     .percLo = 60, .percHi = 90,
-    .chop = .30f, .gap = .25f, .stutter = .20f, .stutterTrack = G::Snare, .stutterDiv = 32,
+    .chop = .30f, .gap = .25f, .stutter = .20f, .stutterTrack = G::Metal, .stutterDiv = 32,
 };
 
 const G::Spec kHalftime {
@@ -161,14 +161,14 @@ const G::Spec kHalftime {
     .form = { { { "Smoke", 16, .15f, "PF" }, { "Weight", 32, .35f, "PHBU" }, { "Halftime", 64, .60f, "PKSHBUD" },
                 { "Hollow", 32, .40f, "PAF" }, { "Mass", 64, .85f, "PKSHBUAD" }, { "Breath", 16, .25f, "PA" },
                 { "Gravity", 64, 1.0f, "PKSHBUADF" }, { "Fall", 32, .30f, "PKSAL" } } },
-    // the snare on three: the tempo is 170, the body feels 85
-    .kick = part("X...............", "X.........x.....", "X.........x...x.X......x..x....."),
-    .snare = part("........X.......", "........X.......", "........X......g........X....g.g"),
-    .hats = part("x...x...x...x...", "x.x.x.x.x.x.x.x.", "x.xgx.x.x.xgx.x."),
+    // halftime: the tempo is 170, the body feels 85 (the live snare on three); the metal answers around it
+    .pulse = part("X...............", "X.........x.....", "X.........x...x.X......x..x....."),
+    .metal = part("..........1.....", "......1...2.....", "......1...2...3.......1...2..1.3"),
+    .tick = part("x...x...x...x...", "x.x.x.x.x.x.x.x.", "x.xgx.x.x.xgx.x."),
     .perc = none(),
     .bass = part("x---------------", "x-------..x-----", "x-----x-..x---5-"),
     .chord = part("", "x---------------................", "x---------------................"),
-    .chop = .10f, .stutter = .25f, .stutterTrack = G::Hats, .stutterDiv = 32,
+    .chop = .10f, .stutter = .25f, .stutterTrack = G::Tick, .stutterDiv = 32,
 };
 
 bool is(const char* a, const char* b) { return std::strcmp(a, b) == 0; }
@@ -194,7 +194,7 @@ const SceneInfo* genreSceneInfo(const std::string& scene)
     static const std::vector<SceneInfo> infos = [] {
         std::vector<SceneInfo> v;
         for (auto* s : G::all())
-            v.push_back({ s->scene, 10, { "pad", "kick", "snare", "hats", "perc", "bass", "sub", "arp", "chord", "fx" },
+            v.push_back({ s->scene, 10, { "pad", "pulse", "metal", "tick", "perc", "bass", "sub", "arp", "chord", "fx" },
                           { 0, 1, 2, 2, 2, 1, 1, 3, 0, 0 },
                           { { 0, .30f }, { 0, .02f }, { .05f, .12f }, { .03f, .08f }, { .10f, .15f }, { 0, .03f }, { 0, 0 }, { .20f, .20f }, { .20f, .25f }, { .10f, .35f } },
                           { -1, -1, -1, -1, -1, -1, -1, -1, -1, -1 },
@@ -445,9 +445,9 @@ std::array<int, 2> GenreComposer::range(int track) const
     switch (track)
     {
         case Pad: return { 36, 76 };
-        case Kick: return { 24, 35 };
-        case Snare: return { 50, 62 };
-        case Hats: return { 42, 46 };
+        case Pulse: return { 24, 35 };
+        case Metal: return { 48, 76 };
+        case Tick: return { 72, 100 };
         case Perc: return { spec_.percLo, spec_.percHi };
         case Bass: return { 40, 64 };
         case Sub: return { 22, 40 };
@@ -575,7 +575,8 @@ void GenreComposer::emitPart(int track, const Part& part, int bar, std::vector<E
     auto& sec = sectionAt(bar);
     const int si = sectionOfBar_[size_t(bar)], in = bar - sec.startBar;
     const bool lastBar = bar + 1 == sec.startBar + sec.bars;
-    const bool drum = track == Kick || track == Snare || track == Hats || track == Perc;
+    const bool drum = track == Pulse || track == Metal || track == Tick || track == Perc;
+    const bool tuned = track == Metal || track == Perc; // the fills walk down their chord tones
     // before the summit the drums, the bass and the chords hold their breath for half a bar
     const bool drop = lastBar && bar + 1 < totalBars() && sectionAt(bar + 1).restoreTheme;
     const bool rising = lastBar && bar + 1 < totalBars() && sectionAt(bar + 1).energy > sec.energy;
@@ -587,12 +588,11 @@ void GenreComposer::emitPart(int track, const Part& part, int bar, std::vector<E
     const bool fill16 = drum && (ph == 15 || rising) && !drop;
     const bool fill8 = drum && ph == 7 && !fill16 && !drop;
     const bool turn = drum && ph % 4 == 3 && !fill8 && !fill16 && !drop;
-    // A section the drums enter: the kick and hats first, the snare a quarter in, the toms at half.
-    const bool entering = si > 0 && !(sections_[size_t(si - 1)].layers & bit(Kick));
-    if (entering && ((track == Snare && in < sec.bars / 4) || (track == Perc && in < sec.bars / 2))) return;
-    // Where Kerem's drums lead, the machine keeps the low end and the fine detail and leaves him the rest.
+    // A section the percussion enters: the ticks first, the metal a quarter in, the perc at half.
+    const bool entering = si > 0 && !(sections_[size_t(si - 1)].layers & (bit(Metal) | bit(Tick) | bit(Perc)));
+    if (entering && ((track == Metal && in < sec.bars / 4) || (track == Perc && in < sec.bars / 2))) return;
+    // Where Kerem's drums lead, the machine's percussion steps back to half and leaves him the room.
     const bool live = drummerLeads_[size_t(si)];
-    if (live && track == Snare) return;
 
     auto hit = [&](int64_t t, int pitch, float vel, int64_t len) {
         out.push_back({ t, Event::NoteOn, uint8_t(track), uint8_t(pitch), std::clamp(vel, .05f, 1.0f) });
@@ -603,9 +603,9 @@ void GenreComposer::emitPart(int track, const Part& part, int bar, std::vector<E
         const int alt = c >= '1' && c <= '9' ? c - '1' : 0;
         switch (track)
         {
-            case Kick: return foldInto(24 + tonicAt(bar), 24, 35);
-            case Snare: return alt == 1 ? 62 : 50;  // 2: the rim
-            case Hats: return alt == 1 ? 46 : 42;   // 2: open
+            case Pulse: return foldInto(24 + tonicAt(bar), 24, 35);
+            case Metal: return ladderPitch(bar, alt, 48, 76);
+            case Tick: return alt == 1 ? 100 : ladderPitch(bar, 3 + step % 3, 72, 95); // 2: a noise tick, else tuned
             default: return ladderPitch(bar, c == 'e' ? step % 5 : alt, spec_.percLo, spec_.percHi);
         }
     };
@@ -613,7 +613,7 @@ void GenreComposer::emitPart(int track, const Part& part, int bar, std::vector<E
 
     // the fills, played over the pattern's last beats
     int fillFrom = 16; // the pattern stops at this sixteenth for the fill
-    if (fill16 && (track == Snare || track == Perc))
+    if (fill16 && tuned)
     {
         // two beats: sixteenths swelling, the last beat in thirty-seconds, toms falling under them
         fillFrom = 8;
@@ -625,24 +625,24 @@ void GenreComposer::emitPart(int track, const Part& part, int bar, std::vector<E
             {
                 const int64_t t = t0 + i * six + k * six / 2;
                 const float vel = .35f + .6f * float(i - 8) / 8;
-                if (track == Snare) hit(t, 50, vel, six / 2 - 10);
-                else hit(t, ladderPitch(bar, 4 - (i - 8) / 2, spec_.percLo, spec_.percHi), vel, six / 2 - 10);
+                const auto r = range(track);
+                hit(t, ladderPitch(bar, std::max(0, 5 - (i - 8) / 2 - k), r[0], r[1]), vel, six / 2 - 10);
                 last = t;
             }
         }
-        if (track == Snare) throwIt(last, 1.0f);
+        throwIt(last, 1.0f);
     }
-    else if (fill8 && (track == Snare || track == Perc))
+    else if (fill8 && tuned)
     {
         // one beat: four sixteenths, the last one thrown
         fillFrom = 12;
         for (int i = 12; i < 16; ++i)
         {
             const int64_t t = t0 + i * six;
-            if (track == Snare) hit(t, i == 15 ? 50 : 50, .4f + .15f * float(i - 12), six - 10);
-            else hit(t, ladderPitch(bar, 3 - (i - 12), spec_.percLo, spec_.percHi), .5f + .1f * float(i - 12), six - 10);
+            const auto r = range(track);
+            hit(t, ladderPitch(bar, 3 - (i - 12), r[0], r[1]), .45f + .12f * float(i - 12), six - 10);
         }
-        if (track == Snare) throwIt(t0 + 15 * six, .5f);
+        throwIt(t0 + 15 * six, .5f);
     }
 
     const Pat& pat = part.tier[size_t(tier(bar))];
@@ -653,7 +653,7 @@ void GenreComposer::emitPart(int track, const Part& part, int bar, std::vector<E
     const bool euclid = is(pat.s, "euclid");
     if (euclid && bar == sec.startBar) percRot_ = rng_.range(0, P - 1);
     const int k = euclid ? 2 + int(energyAt(bar) * P * .25f) : 0;
-    const int grow = in / 16; // the phrase count in this section: the hats grow with it
+    const int grow = in / 16; // the phrase count in this section: the ticks grow with it
 
     std::vector<bool> struck(size_t(P), false);
     for (int i = 0; i < P; ++i)
@@ -667,8 +667,7 @@ void GenreComposer::emitPart(int track, const Part& part, int bar, std::vector<E
         const int at = int((int64_t(bar) * P + src) % len);
         const char c = euclid ? (((i + percRot_) * k) % P < k ? 'e' : '.') : pat.s[at];
         if (c == '.' || c == '-') continue;
-        if (live && track == Kick && i * 16 / P != 0) continue; // the live kit has the rest
-        if (live && track == Hats && (i & 1)) continue;
+        if (live && track != Pulse && (i & 1)) continue; // half the percussion: the live kit has the room
         int holds = 0;
         if (!drum) while (holds + 1 < len && pat.s[(at + holds + 1) % len] == '-') ++holds;
         float vel = c == 'X' ? 1.0f : c == 'x' || c == 'e' ? .85f : c == 'o' ? .65f : c == 'g' ? .38f : .8f;
@@ -676,11 +675,11 @@ void GenreComposer::emitPart(int track, const Part& part, int bar, std::vector<E
         if (P == 16 && (i & 1)) t += int64_t(spec_.swing * six);
         if (drum)
         {
-            // the feel: every drum leans on the song's accents; the hats sit a hair behind the
-            // off-beats, the backbeat snare a hair behind the beat
+            // the feel: every part leans on the song's accents; the ticks sit a hair behind the
+            // off-beats, the metal a hair ahead of them (it pushes, the ticks drag)
             if (P == 16) vel *= accent_[size_t(i)];
-            if (track == Hats && P == 16 && (i & 1)) t += six / 12;
-            if (track == Snare && i * 16 / P % 8 == 4) t += six / 16;
+            if (track == Tick && P == 16 && (i & 1)) t += six / 12;
+            if (track == Metal && P == 16 && (i & 1)) t -= six / 24;
             struck[size_t(i)] = true;
             hit(t, drumPitch(c, i), vel, std::min<int64_t>(stepT / 2, kPPQ - 20)); // short: the swing must not reach the next hit
             continue;
@@ -717,14 +716,14 @@ void GenreComposer::emitPart(int track, const Part& part, int bar, std::vector<E
             if (struck[size_t(i)] || i >= fillFrom || beat == gapBeat_ || (beat == stutterBeat_ && track == spec_.stutterTrack)) return;
             if (drop && beat >= 2) return;
             struck[size_t(i)] = true;
-            int64_t t = t0 + i * six + ((i & 1) ? int64_t(spec_.swing * six) + (track == Hats ? six / 12 : 0) : 0);
+            int64_t t = t0 + i * six + ((i & 1) ? int64_t(spec_.swing * six) + (track == Tick ? six / 12 : 0) : 0);
             hit(t, pitch, vel, six / 2);
         };
-        if (track == Hats && grow >= 1 && tier(bar) > 0) add(14, 46, .55f);                  // the second phrase opens a hat
-        if (track == Hats && grow >= 2 && tier(bar) > 0) for (int i = 1; i < 16; i += 2) add(i, 42, .25f); // the third fills in ghosts
-        if (turn && track == Kick) add(15, drumPitch('x', 15), .6f);                         // a pickup into the next bar
-        if (turn && track == Snare && tier(bar) > 0) { add(13, 50, .3f); add(15, 50, .35f); } // ghosts at the turn
-        if (turn && track == Hats) add(10, 46, .6f);
+        if (track == Tick && grow >= 1 && tier(bar) > 0) add(14, 100, .55f);                  // the second phrase adds a noise tick
+        if (track == Tick && grow >= 2 && tier(bar) > 0) for (int i = 1; i < 16; i += 2) add(i, drumPitch('g', i), .25f); // the third fills in ghosts
+        if (turn && track == Pulse) add(15, drumPitch('x', 15), .6f);                         // a pickup into the next bar (it pumps the mix)
+        if (turn && track == Metal && tier(bar) > 0) { add(13, drumPitch('3', 13), .35f); add(15, drumPitch('2', 15), .4f); } // the metal turns
+        if (turn && track == Tick) add(10, 100, .6f);
     }
 
     if (stutterBeat_ >= 0 && track == spec_.stutterTrack && !(drop && stutterBeat_ >= 2) && stutterBeat_ * 4 < fillFrom)
@@ -734,7 +733,7 @@ void GenreComposer::emitPart(int track, const Part& part, int bar, std::vector<E
         const int64_t d = kBarTicks / spec_.stutterDiv;
         for (int j = 0; j < n; ++j)
             hit(t0 + stutterBeat_ * kPPQ + j * d, drumPitch(track == Perc ? 'e' : 'x', j), .3f + .6f * float(j) / float(n), d - 8);
-        if (track == Perc || track == Snare) throwIt(t0 + stutterBeat_ * kPPQ + (n - 1) * d, .5f);
+        if (track != Pulse) throwIt(t0 + stutterBeat_ * kPPQ + (n - 1) * d, .5f);
     }
 }
 
@@ -780,9 +779,9 @@ void GenreComposer::generateBar(int bar, std::vector<Event>& out)
 
     emitAutomation(bar, out);
     emitPad(bar, out);
-    emitPart(Kick, spec_.kick, bar, out);
-    emitPart(Snare, spec_.snare, bar, out);
-    emitPart(Hats, spec_.hats, bar, out);
+    emitPart(Pulse, spec_.pulse, bar, out);
+    emitPart(Metal, spec_.metal, bar, out);
+    emitPart(Tick, spec_.tick, bar, out);
     emitPart(Perc, spec_.perc, bar, out);
     emitPart(Bass, spec_.bass, bar, out);
     emitPart(Chord, spec_.chord, bar, out);

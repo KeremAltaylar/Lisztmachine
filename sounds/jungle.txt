@@ -7,10 +7,12 @@
 pad      -1.0     582  Pads/Yeti Funeral
 pad       6.6     599  Pads/Still
 pad       2.4    2052  Pads/Sunday
-kick     0.0      60  sample/gogodze
-snare    0.0    1500  sample/gogodze
-hats     0.0    9000  sample/gogodze
-perc     0.0      60  internal/kick
+pulse    0.0      60  internal/none
+metal    -1.0     997  3rd/Malfunction/Drums/Inharmonic Attack 2
+metal    -0.6    1063  3rd/Malfunction/Drums/Tuning Drums
+metal    -12.2    2646  3rd/Emu/Drums/T8 Cowbell
+tick     0.0    6000  internal/click
+perc     0.0    2000  internal/click
 sub     -6.0      40  internal/sub
 fx       -5.7     286  FX/Unsettler
 fx        4.0    4170  FX/Radio Noise
@@ -25,30 +27,29 @@ bass     -8.3     410  Basses/Distorted MW
 bass     -8.8     554  Basses/Evilous
 bass     -8.6    2467  Basses/Saw Lo-Fi
 delay arp 0.75 0.45 0.25
-delay snare 0.75 0.55 0.35 throws
 
 # Balance (to be measured in the mix)
-gain pad    -9.6
-gain kick   -5.3
-gain snare  -6.3
-gain hats   15.9
-gain perc   -6.0
-gain bass   -8.3
+gain pulse   0.0
+gain metal  -4.7
+gain tick    6.9
+gain perc    0.0
+gain pad    -9.4
+gain bass   -8.7
 gain sub    -6.4
 gain arp   -10.6
-gain chord  -8.8
+gain chord  -8.7
 gain fx    -10.0
 master 8.0
 drive bass  0.55 3500
 drive chord 0.50 4500
 drive arp   0.45 5000
-drive kick  0.25 9000
-drive snare 0.35 8000
 drive pad   0.20 5000
-drive perc  0.20 9000
-crush kick  12 2 0.6
-crush snare 12 2 0.6
-crush hats  10 2 0.5
-comp snare -20 4 8 80 0.5
-comp kick -18 4 10 90 0.4
-duck hats 0.25
+drive metal 0.30 4500
+drive perc  0.30 6000
+crush tick  8 3 0.3
+comp perc -22 4 5 80 0.4
+duck metal 0.15
+duck tick 0.2
+duck perc 0.25
+delay metal 0.75 0.55 0.35 throws
+delay perc  1.0 0.5 0.3 throws
