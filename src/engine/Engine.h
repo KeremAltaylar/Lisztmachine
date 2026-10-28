@@ -49,6 +49,35 @@ struct SoundChange { int bar, track, entry; };
 // sections and a few bars apart, never all at once. Deterministic per seed.
 std::vector<SoundChange> planSounds(const Composer& composer, const Palette& palette, uint64_t seed);
 
+// A sampled acoustic kit (Karoryfer's Gogodze Phu Vol II, CC0; tools/fetch_drums.py fetches it).
+// Each drum has several loudness layers and four alternate hits per layer: the velocity picks the
+// layer, the hits rotate, so no two in a row are the same. The track decides which drum a note is:
+//   kick: the kick · snare: from note 60 up the rim, a soft hit the edge, else the centre
+//   hats: note 46 open (choked by the next closed), else closed · perc: toms, low/mid/high by pitch
+// One-shots: a note-off does nothing. Loaded once and shared by every track that uses it.
+class DrumSampler
+{
+public:
+    enum Part { KickPart, SnarePart, HatsPart, TomPart };
+    // Message thread. Empty on success; an error if the kit is not on this machine.
+    static juce::String loadKit();
+    static bool kitLoaded();
+    void prepare(double sampleRate, Part part);
+    void render(const juce::MidiBuffer& midi, float* left, float* right, int numSamples);
+    void allOff() { for (auto& v : voices_) v.sample = nullptr; }
+
+private:
+    struct Voice { const std::vector<float>* sample = nullptr; double pos = 0; float gain = 0, fade = 1, fadeStep = 0; bool open = false; };
+    void start(int note, float velocity);
+    void run(float* l, float* r, int from, int to);
+    std::array<Voice, 24> voices_;
+    double rate_ = 1;    // the kit's 44.1 kHz in this sample rate's steps
+    Part part_ = KickPart;
+    int rr_ = 0, next_ = 0;
+    float chokeStep_ = 0;
+};
+juce::File findDrumKit(); // Gogodze/: inside the app, next to the executable, or ~/LisztmachineSounds
+
 // The engine's own instrument for impulses: no plugin, sample-exact, nothing to detune.
 //   click: under note 96 a sine impulse (pitch +36 semitones, up to 15 kHz) decaying in 2-6 ms;
 //          from 96 up a noise tick, 1.5 ms
@@ -248,6 +277,8 @@ private:
         std::atomic<size_t> nextChange { 0 };
         bool internal = false;      // the engine's own instrument, not Surge
         InternalSynth synth;
+        bool sampled = false, synthLayer = false; // the sampled kit; the synth kick under it
+        DrumSampler sampler;
         FeedbackDelay echo;
         bool hasEcho = false;
         float trim = 1;             // the track's balance gain

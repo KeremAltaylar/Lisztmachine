@@ -1,7 +1,8 @@
 name: mac
 
 # Builds the app on an Apple Silicon runner (same CPU family as the show's Mac mini M1),
-# runs the composer tests, installs Surge XT and renders a minute to prove the sound path.
+# runs the composer tests, installs Surge XT, fetches the sampled drum kit and renders a minute of
+# Berlin and of Jungle (the kit) to prove the sound path.
 on:
   push:
   workflow_dispatch:
@@ -33,10 +34,13 @@ jobs:
           mkdir -p render
           R="$(find build -name liszt_render -type f -perm -u+x | head -1)"
           "$R" --seed 1 --seconds 60 --out "$PWD/render/seed1-60s.wav"
+          python3 tools/fetch_drums.py
+          "$R" --scene jungle --seed 1 --seconds 60 --out "$PWD/render/jungle1-60s.wav"
 
       - name: Package the app
         run: |
           APP="$(find build -name Lisztmachine.app -type d | head -1)"
+          python3 tools/fetch_drums.py "$APP/Contents/Resources/Gogodze"
           codesign --force --deep -s - "$APP"
           ditto -c -k --keepParent "$APP" Lisztmachine-mac.zip
 

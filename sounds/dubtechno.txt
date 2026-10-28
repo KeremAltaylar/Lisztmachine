@@ -7,8 +7,8 @@
 pad       6.6     599  Pads/Still
 pad      -3.9    2383  Pads/Subtle Comb Strings
 kick     0.0      60  internal/kick
-snare    0.0    1500  internal/snare
-hats     0.0    9000  internal/hat
+snare    0.0    1500  sample/gogodze
+hats     0.0    9000  sample/gogodze
 perc     0.0    8000  internal/click
 sub     -6.0      40  internal/sub
 chord    -8.7     396  Keys/Organ 2
@@ -26,16 +26,16 @@ delay snare 0.75 0.45 0.20
 delay arp 1.5 0.45 0.25
 
 # Balance (to be measured in the mix)
-gain pad    -8.4
+gain pad    -8.6
 gain kick   -5.7
-gain snare   3.7
-gain hats   -6.9
+gain snare  12.8
+gain hats    6.1
 gain perc   -6.0
-gain bass   -5.4
+gain bass   -5.6
 gain sub    -8.1
-gain arp   -12.7
-gain chord  -2.5
-gain fx    -12.3
+gain arp   -11.0
+gain chord  -5.3
+gain fx    -11.7
 master 9.3
 drive bass  0.44 3500
 drive chord 0.40 4500

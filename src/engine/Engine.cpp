@@ -1,4 +1,6 @@
 #include "Engine.h"
+#include <juce_audio_formats/juce_audio_formats.h>
+#include <map>
 
 namespace liszt {
 
@@ -222,6 +224,132 @@ void PeakLimiter::process(float* l, float* r, int n)
     }
 }
 
+// ---------------------------------------------------------------- the sampled kit
+namespace {
+// drum -> loudness layers (softest first) -> alternate hits
+std::map<std::string, std::vector<std::vector<std::vector<float>>>> gKit;
+bool gKitLoaded = false;
+}
+
+juce::File findDrumKit()
+{
+    auto dir = juce::File::getSpecialLocation(juce::File::currentExecutableFile).getParentDirectory();
+    for (int up = 0; up < 4 && dir.exists(); ++up, dir = dir.getParentDirectory())
+        for (auto sub : { "Gogodze", "Resources/Gogodze" })
+            if (auto d = dir.getChildFile(sub); d.getChildFile("Samples").isDirectory()) return d;
+    return juce::File::getSpecialLocation(juce::File::userHomeDirectory).getChildFile("LisztmachineSounds/Gogodze");
+}
+
+bool DrumSampler::kitLoaded() { return gKitLoaded; }
+
+juce::String DrumSampler::loadKit()
+{
+    if (gKitLoaded) return {};
+    const auto kit = findDrumKit();
+    static const std::pair<const char*, const char*> drums[] = {
+        { "ks", "kick_mic" }, { "sc", "snare_mic" }, { "se", "snare_mic" }, { "ss", "snare_mic" },
+        { "hc", "oh_mic" }, { "ho", "oh_mic" }, { "tl", "front_mic" }, { "tm", "front_mic" }, { "th", "front_mic" },
+    };
+    juce::AudioFormatManager formats;
+    formats.registerBasicFormats();
+    for (auto& [name, mic] : drums)
+    {
+        auto& layers = gKit[name];
+        for (int vl = 1; vl <= 9; ++vl)
+        {
+            std::vector<std::vector<float>> hits;
+            for (int rr = 1; rr <= 4; ++rr)
+            {
+                const auto f = kit.getChildFile("Samples").getChildFile(mic).getChildFile(juce::String(name) + "_vl" + juce::String(vl) + "_rr" + juce::String(rr) + ".wav");
+                std::unique_ptr<juce::AudioFormatReader> r(formats.createReaderFor(f));
+                if (!r) continue;
+                std::vector<float> x(size_t(r->lengthInSamples));
+                float* ch[] = { x.data() };
+                r->read(ch, 1, 0, int(r->lengthInSamples));
+                // a 2 ms fade at the end, so a sample cut short of silence does not tick
+                const size_t fade = std::min<size_t>(x.size(), 88);
+                for (size_t i = 0; i < fade; ++i) x[x.size() - 1 - i] *= float(i) / float(fade);
+                hits.push_back(std::move(x));
+            }
+            if (!hits.empty()) layers.push_back(std::move(hits));
+        }
+        if (layers.empty()) { gKit.clear(); return "no drum kit at " + kit.getFullPathName() + " (run tools/fetch_drums.py)"; }
+    }
+    gKitLoaded = true;
+    return {};
+}
+
+void DrumSampler::prepare(double sr, Part part)
+{
+    rate_ = 44100.0 / sr;
+    part_ = part;
+    chokeStep_ = float(1.0 / (0.006 * sr)); // an open hat closes in 6 ms
+    allOff();
+}
+
+void DrumSampler::start(int note, float vel)
+{
+    const char* name = "ks";
+    switch (part_)
+    {
+        case KickPart: name = "ks"; break;
+        case SnarePart: name = note >= 60 ? "ss" : vel < .45f ? "se" : "sc"; break;
+        case HatsPart: name = note == 46 ? "ho" : "hc"; break;
+        case TomPart: name = note < 45 ? "tl" : note < 51 ? "tm" : "th"; break;
+    }
+    auto it = gKit.find(name);
+    if (it == gKit.end()) return;
+    const auto& layers = it->second;
+    const int layer = juce::jlimit(0, int(layers.size()) - 1, int(vel * float(layers.size())));
+    const auto& hits = layers[size_t(layer)];
+    const auto* sample = &hits[size_t(rr_++ % int(hits.size()))];
+    if (part_ == HatsPart) // the next hat chokes an open one
+        for (auto& v : voices_) if (v.sample && v.open) v.fadeStep = chokeStep_;
+    // a free voice, else the oldest (24 back it has long rung out)
+    int at = next_;
+    for (int k = 0; k < int(voices_.size()); ++k)
+        if (!voices_[size_t((next_ + k) % int(voices_.size()))].sample) { at = (next_ + k) % int(voices_.size()); break; }
+    auto& v = voices_[size_t(at)];
+    next_ = (at + 1) % int(voices_.size());
+    // within a layer the velocity still shapes the level a little
+    v = { sample, 0, 0.55f + 0.45f * vel, 1, 0, name[1] == 'o' };
+}
+
+void DrumSampler::run(float* l, float* r, int from, int to)
+{
+    for (auto& v : voices_)
+    {
+        if (!v.sample) continue;
+        const auto& x = *v.sample;
+        for (int n = from; n < to; ++n)
+        {
+            const size_t i = size_t(v.pos);
+            if (i + 1 >= x.size() || v.fade <= 0) { v.sample = nullptr; break; }
+            const double f = v.pos - double(i);
+            const float y = float(x[i] + (x[i + 1] - x[i]) * f) * v.gain * v.fade;
+            l[n] += y;
+            r[n] += y;
+            v.pos += rate_;
+            v.fade -= v.fadeStep;
+        }
+    }
+}
+
+void DrumSampler::render(const juce::MidiBuffer& midi, float* l, float* r, int numSamples)
+{
+    int at = 0;
+    for (const auto meta : midi)
+    {
+        const int pos = juce::jlimit(0, numSamples, meta.samplePosition);
+        run(l, r, at, pos);
+        at = pos;
+        const auto m = meta.getMessage();
+        if (m.isNoteOn()) start(m.getNoteNumber(), m.getFloatVelocity());
+        else if (m.isAllSoundOff()) allOff();
+    }
+    run(l, r, at, numSamples);
+}
+
 void Biquad::highpass(double sr, double hz)
 {
     const double w = juce::MathConstants<double>::twoPi * hz / sr, c = std::cos(w), alpha = std::sin(w) / (2 * 0.7071), a0 = 1 + alpha;
@@ -298,6 +426,9 @@ TrackMix mixFor(const std::string& name)
 }
 } // namespace
 
+// The engine's own synths and its sampled kit: no Surge instance, one sound for the whole song.
+static bool isEngineSound(const juce::String& patch) { return patch.startsWith("internal/") || patch.startsWith("sample/"); }
+
 juce::String Palette::load(const juce::File& file, const std::string& sceneName)
 {
     scene = sceneName;
@@ -336,7 +467,7 @@ juce::String Palette::load(const juce::File& file, const std::string& sceneName)
             return where + "expected 'part gain bright Category/Patch'";
         // The patch name is the rest of the line: it may contain spaces.
         auto patch = line.fromFirstOccurrenceOf(tokens[2], false, false).trim();
-        if (!patch.startsWith("internal/") && !findSurgePatch(patch).existsAsFile())
+        if (!isEngineSound(patch) && !findSurgePatch(patch).existsAsFile())
             return where + "no Surge patch '" + patch + "'";
         for (int t : targets) parts[t].push_back({ patch, tokens[1].getFloatValue(), tokens[2].getFloatValue() });
     }
@@ -374,7 +505,7 @@ std::vector<SoundChange> planSounds(const Composer& composer, const Palette& pal
                 if (plan[k].track == lead) plan.push_back({ plan[k].bar, t, std::min(plan[k].entry, int(palette.parts[t].size()) - 1) });
             continue;
         }
-        if (palette.parts[t].size() == 1 && palette.parts[t][0].patch.startsWith("internal/")) { plan.push_back({ 0, t, 0 }); continue; }
+        if (palette.parts[t].size() == 1 && isEngineSound(palette.parts[t][0].patch)) { plan.push_back({ 0, t, 0 }); continue; }
         const int n = int(palette.parts[t].size());
         int last = -1, beforeLast = -1;
         for (int s = 0; s < int(sections.size()); ++s)
@@ -424,7 +555,17 @@ juce::String Engine::load(double sampleRate, int maxBlock, const Palette& palett
         auto& t = tracks_[i];
         int channels = 2;
         const auto& first = palette.parts[i].front().patch;
-        t.internal = first.startsWith("internal/");
+        t.internal = isEngineSound(first);
+        // "sample/kit" plays the sampled kit; "sample/kit+kick" layers the synth kick under it
+        t.sampled = first.startsWith("sample/");
+        t.synthLayer = first.endsWith("+kick");
+        if (t.sampled)
+        {
+            if (auto e = DrumSampler::loadKit(); e.isNotEmpty()) return e;
+            const juce::String name = palette.info->trackNames[i];
+            t.sampler.prepare(sampleRate, name == "kick" ? DrumSampler::KickPart : name == "hats" ? DrumSampler::HatsPart
+                                        : name == "perc" ? DrumSampler::TomPart : DrumSampler::SnarePart);
+        }
         t.trim = juce::Decibels::decibelsToGain(palette.trackGainDb[i]);
         t.echo.prepare(sampleRate);
         const auto m = mixFor(palette.info->trackNames[i]);
@@ -753,7 +894,7 @@ void Engine::renderChunk(float* const* out, int numChannels, int offset, int len
     if (panic_.exchange(false))
         for (auto& t : tracks_)
         {
-            if (t.internal) { t.synth.allOff(); continue; }
+            if (t.internal) { t.synth.allOff(); t.sampler.allOff(); continue; }
             for (auto& s : t.slots)
             {
                 s.midi.addEvent(juce::MidiMessage::allNotesOff(1), 0);
@@ -906,7 +1047,8 @@ void Engine::renderChunk(float* const* out, int numChannels, int offset, int len
         {   // the engine's own instrument: one voice pool, its MIDI in the first slot's buffer
             auto& slot = t.slots[0];
             t.buffer.clear();
-            t.synth.render(slot.midi, t.buffer.getWritePointer(0), t.buffer.getWritePointer(1), len);
+            if (t.sampled) t.sampler.render(slot.midi, t.buffer.getWritePointer(0), t.buffer.getWritePointer(1), len);
+            if (!t.sampled || t.synthLayer) t.synth.render(slot.midi, t.buffer.getWritePointer(0), t.buffer.getWritePointer(1), len);
             slot.midi.clear();
             if (t.hasEcho) t.echo.process(t.buffer.getWritePointer(0), t.buffer.getWritePointer(1), len);
             for (int c = 0; c < 2; ++c) juce::FloatVectorOperations::multiply(t.buffer.getWritePointer(c), slot.gain, len);

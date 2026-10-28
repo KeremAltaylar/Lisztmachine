@@ -23,16 +23,16 @@ bass     -8.3     410  Basses/Distorted MW
 delay arp 0.75 0.30 0.15
 
 # Balance (to be measured in the mix)
-gain pad   -11.6
+gain pad   -16.9
 gain kick   -8.6
 gain snare  -2.6
 gain hats   -5.2
 gain perc    8.7
-gain bass   -7.1
+gain bass   -7.4
 gain sub    -9.5
 gain arp   -10.6
-gain chord -14.5
-gain fx    -13.8
+gain chord -14.9
+gain fx    -13.4
 master 9.1
 drive bass  0.39 3500
 drive chord 0.35 4500
