@@ -267,6 +267,11 @@ int main()
                 else if (x.type == Event::NoteOff) { CHECK(held[key] == 1, "%s note-off without note-on track %d pitch %d", spec->scene, x.track, x.pitch); --held[key]; }
             }
             for (auto& [k, n] : held) CHECK(n == 0, "%s stuck note track %d pitch %d", spec->scene, k.first, k.second);
+            // the summit plays the home progression, four bars a chord
+            for (auto& s : c.sections())
+                if (s.restoreTheme)
+                    for (int b = 0; b < s.bars; ++b)
+                        CHECK(c.rootAt(s.startBar + b) == c.homeProgression()[size_t((b / 4) % 4)], "%s: the summit leaves the home progression at bar %d", spec->scene, s.startBar + b);
             // every track the form asks for actually plays
             for (int t = 0; t < G::kGenreTracks; ++t)
             {

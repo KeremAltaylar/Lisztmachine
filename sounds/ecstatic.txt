@@ -27,14 +27,21 @@ delay arp 0.75 0.40 0.22
 delay chord 0.75 0.30 0.15
 
 # Balance (to be measured in the mix)
-gain pad   -11.9
-gain kick   -7.1
+gain pad    -8.8
+gain kick   -7.8
 gain snare  -4.0
 gain hats    8.2
 gain perc   -6.0
-gain bass   -4.7
-gain sub    -7.9
-gain arp    -2.2
-gain chord  -2.8
-gain fx     -2.9
+gain bass   -7.9
+gain sub    -6.8
+gain arp    -5.0
+gain chord  -5.3
+gain fx      5.2
 master 9.2
+drive bass  0.39 3500
+drive chord 0.35 4500
+drive arp   0.32 5000
+drive kick  0.17 9000
+drive snare 0.24 8000
+drive pad   0.14 5000
+drive perc  0.14 9000

@@ -10,28 +10,35 @@ kick     0.0      60  internal/kick
 snare    0.0    1500  internal/snare
 hats     0.0    9000  internal/hat
 perc     0.0      60  internal/kick
-bass     -8.4      99  Basses/Sub 2
-bass    -10.3     136  Basses/Rumble
 sub     -6.0      40  internal/sub
-arp      -0.3    1522  Leads/Moogy Saw
-arp      -3.4    5045  Leads/Harsher
-chord    -2.0    1428  Polysynths/Serious Distortion
-chord    -0.1    6135  Polysynths/Notched Saws
 fx       -5.7     286  FX/Unsettler
 
 # Echoes: beats, feedback, mix
+arp      -9.5     948  Leads/Untamed
+arp      -8.6    2470  Leads/Nastyfication
+chord    -2.0    1428  Polysynths/Serious Distortion
+chord    -9.2     382  Pads/Smooth Dist
+bass     -8.8     554  Basses/Evilous
+bass     -7.2     557  Basses/Distorted Bass
 delay chord 1.5 0.40 0.20
 delay snare 0.75 0.30 0.12
 
 # Balance (to be measured in the mix)
-gain pad   -14.2
-gain kick   -6.0
-gain snare   1.3
-gain hats   -4.1
-gain perc  -13.1
-gain bass   -3.7
-gain sub    -9.3
-gain arp    -1.8
-gain chord  -1.3
-gain fx     -6.9
+gain pad   -13.5
+gain kick   -8.8
+gain snare   0.7
+gain hats   -4.2
+gain perc  -11.0
+gain bass   -8.9
+gain sub    -7.9
+gain arp   -11.0
+gain chord   2.2
+gain fx     -4.4
 master 9.6
+drive bass  0.69 3500
+drive chord 0.62 4500
+drive arp   0.56 5000
+drive kick  0.31 9000
+drive snare 0.44 8000
+drive pad   0.25 5000
+drive perc  0.25 9000

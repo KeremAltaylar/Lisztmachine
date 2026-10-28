@@ -10,29 +10,37 @@ kick     0.0      60  internal/kick
 snare    0.0    1500  internal/snare
 hats     0.0    9000  internal/hat
 perc     0.0    8000  internal/click
-bass     -8.4      99  Basses/Sub 2
-bass    -10.3     136  Basses/Rumble
 sub     -6.0      40  internal/sub
-arp      -5.8     622  Winds/Flute 1
 chord    -8.7     396  Keys/Organ 2
 chord    -4.7    4145  Plucks/Saw Pluck
 chord    -0.1    6135  Polysynths/Notched Saws
 fx        4.0    4170  FX/Radio Noise
 
 # Echoes: beats, feedback, mix
+arp      -6.8     669  Leads/Resofest 2
+arp      -9.5     948  Leads/Untamed
+bass     -8.3     410  Basses/Distorted MW
+bass     -1.0     399  Basses/Metal Square
 delay chord 0.75 0.62 0.38
 delay snare 0.75 0.45 0.20
 delay arp 1.5 0.45 0.25
 
 # Balance (to be measured in the mix)
-gain pad    -6.9
-gain kick   -4.3
-gain snare   3.4
+gain pad    -8.4
+gain kick   -5.7
+gain snare   3.7
 gain hats   -6.9
 gain perc   -6.0
-gain bass    0.2
-gain sub    -9.1
-gain arp     0.5
-gain chord  -2.6
-gain fx    -11.7
+gain bass   -5.4
+gain sub    -8.1
+gain arp   -12.7
+gain chord  -2.5
+gain fx    -12.3
 master 9.3
+drive bass  0.44 3500
+drive chord 0.40 4500
+drive arp   0.36 5000
+drive kick  0.20 9000
+drive snare 0.28 8000
+drive pad   0.16 5000
+drive perc  0.16 9000

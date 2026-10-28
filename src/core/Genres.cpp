@@ -33,7 +33,7 @@ uint16_t layersOf(const char* s)
 const G::Spec kJungle {
     .scene = "jungle", .title = "Jungle",
     .bpmLo = 168, .bpmHi = 174, .mode = &kAeolian, .tonics = { 4, 5, 2, 7, 9 },
-    .roots = { 0, 5, 3, 6, 2 }, .rootW = { .40, .20, .15, .15, .10 }, .preRoot = 6,
+    .progs = { { { 0, 5, 2, 6 }, { 0, 3, 5, 4 }, { 0, 6, 5, 6 } } }, .preRoot = 6,
     .form = { { { "Mist", 16, .15f, "PF" }, { "Signal", 16, .35f, "PAHF" }, { "First Break", 64, .65f, "PKSHBUA" },
                 { "Undertow", 32, .45f, "PBUAD" }, { "Second Break", 64, .85f, "PKSHBUAD" }, { "Void", 16, .30f, "PAF" },
                 { "Ascension", 80, 1.0f, "PKSHBUADF" }, { "Rain", 32, .50f, "PKSHA" }, { "Tide", 16, .10f, "PF" } } },
@@ -45,15 +45,13 @@ const G::Spec kJungle {
     // the reese: whole bars, the fifth at the end of the phrase
     .bass = part("x---------------", "x-----------5---", "x-------x---5-8-"),
     .chord = part("", "x---------------................", "x---------------................"),
-    .arpRate = { 4, 8, 8 }, .arpLenLo = 5, .arpLenHi = 7, .arpDensLo = .30f, .arpDensHi = .60f, .arpGate = 1.8f,
-    .arpLo = 72, .arpHi = 96,
     .chop = .35f,
 };
 
 const G::Spec kFootwork {
     .scene = "footwork", .title = "Footwork",
     .bpmLo = 158, .bpmHi = 162, .mode = &kPhrygian, .tonics = { 2, 4, 5, 7, 9 },
-    .roots = { 0, 1, 5, 3, 6 }, .rootW = { .40, .22, .16, .12, .10 }, .preRoot = 1,
+    .progs = { { { 0, 1, 0, 6 }, { 0, 5, 1, 0 }, { 0, 3, 1, 6 } } }, .preRoot = 1,
     .form = { { { "Ritual", 16, .15f, "PC" }, { "Call", 32, .35f, "PCHD" }, { "Footwork", 48, .60f, "PKSHCBUD" },
                 { "Origami", 32, .45f, "PCADF" }, { "Battle", 64, .85f, "PKSHCBUAD" }, { "Breath", 16, .30f, "PAF" },
                 { "Black", 80, 1.0f, "PKSHCBUADF" }, { "Dust", 16, .15f, "PCF" } } },
@@ -64,15 +62,14 @@ const G::Spec kFootwork {
     .perc = part("1.......2.......3.......", "1.......2.....3.1.......", "1.2.3.......1.2.3...4.4.", 24),
     .bass = part("x-----......", "x-----..x-..", "x-----..5-..x--.x-..5---", 12),
     .chord = part("", "x..x..x.....", "x.xx.xx..x.x", 12),
-    .arpRate = { 0, 12, 24 }, .arpLenLo = 5, .arpLenHi = 7, .arpDensLo = .40f, .arpDensHi = .70f, .arpGate = .6f,
-    .arpLo = 60, .arpHi = 84, .percLo = 38, .percHi = 57,
+    .percLo = 38, .percHi = 57,
     .chop = .20f,
 };
 
 const G::Spec kEcstatic {
     .scene = "ecstatic", .title = "Ecstatic Arpeggios",
     .bpmLo = 136, .bpmHi = 142, .mode = &kAeolian, .tonics = { 9, 2, 4, 7, 0 },
-    .roots = { 0, 5, 2, 6, 3 }, .rootW = { .30, .25, .20, .15, .10 }, .preRoot = 6, // i VI III VII iv
+    .progs = { { { 0, 5, 2, 6 }, { 5, 6, 0, 0 }, { 0, 3, 5, 6 } } }, .preRoot = 6,
     .form = { { { "Dawn", 16, .15f, "PA" }, { "Spiral", 32, .35f, "PA" }, { "Lattice", 48, .55f, "PADH" },
                 { "Suspension", 32, .40f, "PAFS" }, { "Ecstasy", 64, .80f, "PADHSBU" }, { "Afterimage", 32, .45f, "PAS" },
                 { "Computation", 64, 1.0f, "PKSHBUADF" }, { "Halo", 32, .20f, "PAD" } } },
@@ -85,13 +82,13 @@ const G::Spec kEcstatic {
     // the chords gated pointillistically: the trance without its kick
     .chord = part("x-------........", "x.x.x..x.x.x..x.", "x.xx.xx.x.xx.xx."),
     .arpRate = { 16, 16, 32 }, .arpLenLo = 7, .arpLenHi = 11, .arpDensLo = .60f, .arpDensHi = 1.0f, .arpGate = .7f,
-    .arpLo = 60, .arpHi = 96,
+    .arpLo = 60, .arpHi = 96, .hook = false,
 };
 
 const G::Spec kDub {
     .scene = "dubtechno", .title = "Dub Techno",
     .bpmLo = 120, .bpmHi = 124, .mode = &kAeolian, .tonics = { 9, 2, 7, 0, 5 },
-    .roots = { 0, 3, 5, 6, 4 }, .rootW = { .50, .20, .15, .10, .05 }, .preRoot = 3, .regionCalm = 16, .regionDriven = 16,
+    .progs = { { { 0, 0, 3, 3 }, { 0, 5, 3, 0 }, { 0, 3, 0, 6 } } }, .preRoot = 3,
     .form = { { { "Fog", 16, .15f, "PD" }, { "Current", 32, .35f, "PKHD" }, { "Depth", 48, .55f, "PKSHBUD" },
                 { "Haze", 32, .35f, "PDF" }, { "Pressure", 64, .80f, "PKSHBUDF" }, { "Echo Chamber", 32, .45f, "PDHA" },
                 { "Submersion", 64, 1.0f, "PKSHBUADF" }, { "Silt", 16, .15f, "PD" } } },
@@ -102,32 +99,31 @@ const G::Spec kDub {
     .bass = part("x.......x.......", "..x...x...x...x.", "..x..xx...x..x5."),
     // the stab: a minor seventh, short, into a long echo; its filter breathes over minutes
     .chord = part("..x.............", "..x.....x.....x.", "..x..x....x..x.."),
-    .arpRate = { 0, 0, 8 }, .arpLenLo = 5, .arpLenHi = 5, .arpDensLo = .25f, .arpDensHi = .35f, .arpGate = .5f, .arpLo = 67, .arpHi = 88,
-    .chordSize = 4, .swing = .12f, .chordSweep = .55f,
+    .ext = 1, .swing = .12f, .chordSweep = .55f,
 };
 
 const G::Spec kGlitch {
     .scene = "glitch", .title = "Clicks & Glitch",
     .bpmLo = 120, .bpmHi = 128, .mode = &kAeolian, .tonics = { 0, 2, 5, 7, 9 },
-    .roots = { 0, 5, 3, 0, 6 }, .rootW = { .45, .20, .15, .10, .10 }, .preRoot = 5, .regionCalm = 16, .regionDriven = 16,
-    .form = { { { "Data", 16, .15f, "C" }, { "Signal", 32, .35f, "CHA" }, { "Matrix", 48, .55f, "KCHAU" },
-                { "Void", 16, .30f, "PA" }, { "Formula", 64, .80f, "KSHCBUA" }, { "Test Pattern", 32, .45f, "CHAD" },
-                { "Supercodex", 64, 1.0f, "PKSHCBUADF" }, { "Zero", 16, .10f, "C" } } },
-    .kick = part("X...............", "X.......X.......", "X..x....X..x..x."),
-    .snare = part("", "", "....X.......X..."),
+    .progs = { { { 0, 5, 3, 4 }, { 0, 2, 5, 6 }, { 5, 3, 0, 6 } } }, .preRoot = 5,
+    // after Aphex Twin: a melody over a slow progression, the clicks around it, the break in between
+    .form = { { { "Data", 16, .15f, "PA" }, { "Signal", 32, .35f, "PACH" }, { "Matrix", 48, .55f, "PKCHAUD" },
+                { "Void", 16, .30f, "PA" }, { "Formula", 64, .80f, "PKSHCBUAD" }, { "Test Pattern", 32, .45f, "PCHAD" },
+                { "Supercodex", 64, 1.0f, "PKSHCBUADF" }, { "Zero", 16, .10f, "PA" } } },
+    .kick = part("X...............", "X.......X..x....", "X..x....X..x..x."),
+    .snare = part("", "....X.......X...", "....X.......X..g"),
     .hats = part("", "g.g.g.g.g.g.g.g.g.g.g.g.g.g.g.g.", "gxgggxgggxgggxgggxgggxgggxgggxgg", 32),
     .perc = part("euclid", "euclid", "euclid", 32), // sine clicks, tuned to the chord, spread evenly
     .bass = part("", "x-------........", "x---....x---...."),
-    .chord = part("", "", "x---------------................"),
-    .arpRate = { 16, 20, 32 }, .arpLenLo = 9, .arpLenHi = 13, .arpDensLo = .30f, .arpDensHi = .70f, .arpGate = .5f, // twenty against sixteen
-    .arpLo = 84, .arpHi = 108, .percLo = 60, .percHi = 95,
-    .stutter = .30f, .stutterTrack = G::Perc, .stutterDiv = 64,
+    .chord = part("x---------------................", "x---------------................", "x-------x-------"),
+    .percLo = 72, .percHi = 95,
+    .stutter = .20f, .stutterTrack = G::Perc, .stutterDiv = 64,
 };
 
 const G::Spec kGqom {
     .scene = "gqom", .title = "Gqom",
     .bpmLo = 118, .bpmHi = 124, .mode = &kPhrygian, .tonics = { 4, 5, 2, 7, 9 },
-    .roots = { 0, 1, 5, 3, 6 }, .rootW = { .45, .20, .15, .10, .10 }, .preRoot = 1, .regionCalm = 16, .regionDriven = 16,
+    .progs = { { { 0, 1, 0, 1 }, { 0, 5, 6, 1 }, { 0, 1, 5, 6 } } }, .preRoot = 1,
     .form = { { { "Taxi Rank", 16, .15f, "PC" }, { "Gathering", 32, .35f, "PCH" }, { "Gqom", 48, .60f, "PKCHSU" },
                 { "Ghost", 32, .40f, "PCDF" }, { "Sgubhu", 64, .85f, "PKSHCBUD" }, { "Shadow", 16, .30f, "PF" },
                 { "Possessed", 64, 1.0f, "PKSHCBUADF" }, { "Embers", 32, .30f, "PKC" } } },
@@ -138,14 +134,13 @@ const G::Spec kGqom {
     .perc = part("1.....2.....1.....3.....", "1..2..3..1..2.....3..2..", "1..2..3..1..2..3..2..1.3", 24),
     .bass = part("", "x---............", "x---......x-----"),
     .chord = part("x...............................", "x.........x.....", "x.....x...x....."),
-    .arpRate = { 0, 8, 16 }, .arpLenLo = 5, .arpLenHi = 7, .arpDensLo = .30f, .arpDensHi = .50f, .arpGate = .5f, .arpLo = 48, .arpHi = 72,
     .percLo = 38, .percHi = 57, .swing = .08f,
 };
 
 const G::Spec kDeconstructed {
     .scene = "deconstructed", .title = "Deconstructed Club",
     .bpmLo = 128, .bpmHi = 136, .mode = &kPhrygian, .tonics = { 4, 5, 2, 7, 9 },
-    .roots = { 0, 1, 5, 3, 6 }, .rootW = { .35, .25, .15, .15, .10 }, .preRoot = 1,
+    .progs = { { { 0, 1, 5, 6 }, { 0, 3, 1, 0 }, { 0, 6, 5, 1 } } }, .preRoot = 1,
     .form = { { { "Shatter", 16, .20f, "PDF" }, { "Glass", 32, .40f, "PCKD" }, { "Fracture", 48, .65f, "KSCBDU" },
                 { "Cathedral", 32, .40f, "PDAF" }, { "Violence", 48, .85f, "PKSHCBUAD" }, { "Silence", 16, .15f, "P" },
                 { "Rebirth", 64, 1.0f, "PKSHCBUADF" }, { "Wound", 32, .30f, "PDA" } } },
@@ -155,7 +150,6 @@ const G::Spec kDeconstructed {
     .perc = part("1.......3.......", "1..3..2...4..1..", "1.3.2.41.3.2.4.1"), // metal: clicks tuned to the chord
     .bass = part("x---------------", "x-------x---5---", "x--x--x-x---8-5-"),
     .chord = part("X---------------", "X.......X..X....", "X..X..X.X.X..X.."),
-    .arpRate = { 0, 8, 16 }, .arpLenLo = 5, .arpLenHi = 9, .arpDensLo = .30f, .arpDensHi = .60f, .arpGate = .8f, .arpLo = 60, .arpHi = 90,
     .percLo = 60, .percHi = 90,
     .chop = .30f, .gap = .25f, .stutter = .20f, .stutterTrack = G::Snare, .stutterDiv = 32,
 };
@@ -163,7 +157,7 @@ const G::Spec kDeconstructed {
 const G::Spec kHalftime {
     .scene = "halftime", .title = "Halftime",
     .bpmLo = 168, .bpmHi = 174, .mode = &kAeolian, .tonics = { 4, 5, 2, 7, 9 },
-    .roots = { 0, 5, 3, 6, 4 }, .rootW = { .40, .20, .15, .15, .10 }, .preRoot = 6,
+    .progs = { { { 0, 5, 2, 6 }, { 0, 3, 5, 6 }, { 0, 5, 3, 4 } } }, .preRoot = 6,
     .form = { { { "Smoke", 16, .15f, "PF" }, { "Weight", 32, .35f, "PHBU" }, { "Halftime", 64, .60f, "PKSHBUD" },
                 { "Hollow", 32, .40f, "PAF" }, { "Mass", 64, .85f, "PKSHBUAD" }, { "Breath", 16, .25f, "PA" },
                 { "Gravity", 64, 1.0f, "PKSHBUADF" }, { "Fall", 32, .30f, "PKSA" } } },
@@ -174,7 +168,6 @@ const G::Spec kHalftime {
     .perc = none(),
     .bass = part("x---------------", "x-------..x-----", "x-----x-..x---5-"),
     .chord = part("", "x---------------................", "x---------------................"),
-    .arpRate = { 0, 4, 8 }, .arpLenLo = 5, .arpLenHi = 7, .arpDensLo = .30f, .arpDensHi = .50f, .arpGate = 1.8f, .arpLo = 72, .arpHi = 96,
     .chop = .10f, .stutter = .25f, .stutterTrack = G::Hats, .stutterDiv = 32,
 };
 
@@ -220,6 +213,7 @@ GenreComposer::GenreComposer(const Spec& spec, uint64_t seed) : Composer(seed), 
     planHarmony();
     makeArp();
     arpHome_ = arp_;
+    makeHook();
 }
 
 void GenreComposer::planForm()
@@ -248,23 +242,157 @@ void GenreComposer::planForm()
 
 void GenreComposer::planHarmony()
 {
-    // One root per region, longer when calm. Each section starts at home; the one before the summit
-    // ends on the chord that leads into it. The first and last sections stay home.
+    // One progression is home and keeps coming back; the breakdowns (a section quieter than the one
+    // before it) play another. A chord lasts four bars in the calm and at the summit, where the
+    // slowness is the weight, two while the music drives. The section before the summit lands on the
+    // chord that leads into it; the last section rests on the tonic.
+    const int h = rng_.range(0, 2);
+    int a = rng_.range(0, 1);
+    if (a >= h) ++a;
+    home_ = spec_.progs[size_t(h)];
+    away_ = spec_.progs[size_t(a)];
     rootOfBar_.assign(sectionOfBar_.size(), 0);
-    for (size_t si = 1; si + 1 < sections_.size(); ++si)
+    awayBar_.assign(sectionOfBar_.size(), false);
+    for (size_t si = 0; si + 1 < sections_.size(); ++si)
     {
         auto& sec = sections_[si];
+        const bool away = si > 0 && sec.energy < sections_[si - 1].energy;
         const bool beforePeak = sections_[si + 1].restoreTheme;
-        const int region = sec.energy < .5f ? spec_.regionCalm : spec_.regionDriven;
-        int prev = 0;
-        for (int r = 0; r * region < sec.bars; ++r)
+        const int per = sec.energy < .4f || sec.restoreTheme ? 4 : 2;
+        const auto& prog = away ? away_ : home_;
+        for (int b = 0; b < sec.bars; ++b)
         {
-            int root = 0;
-            if (r > 0) do root = spec_.roots[size_t(rng_.weighted(spec_.rootW))]; while (root == prev && root != 0);
-            if (beforePeak && (r + 1) * region >= sec.bars) root = spec_.preRoot;
-            for (int b = 0; b < region && r * region + b < sec.bars; ++b) rootOfBar_[size_t(sec.startBar + r * region + b)] = root;
-            prev = root;
+            const size_t at = size_t(sec.startBar + b);
+            rootOfBar_[at] = beforePeak && b >= sec.bars - 2 ? spec_.preRoot : prog[size_t((b / per) % 4)];
+            awayBar_[at] = away;
         }
+    }
+}
+
+std::vector<int> GenreComposer::chordTones(int bar, bool rootless) const
+{
+    // thirds stacked on the root inside the mode: the triad, its seventh, its ninth. Rootless
+    // (the bass has the root) it is third, fifth, seventh, ninth: the colour without the weight.
+    const auto& m = *spec_.mode;
+    const int r = rootAt(bar), n = 3 + spec_.ext;
+    std::vector<int> pcs;
+    for (int k = rootless && n > 3 ? 1 : 0; k < n; ++k) pcs.push_back((tonicPc_ + degreeSemis(m, r + 2 * k)) % 12);
+    return pcs;
+}
+
+std::vector<int> GenreComposer::voice(int bar, int n, int lo, int hi, bool rootless, std::vector<int>& prev) const
+{
+    // Every close position of the chord (each tone in turn at the bottom, at every octave that fits)
+    // and the one whose voices move least from the last chord. The first chord sits low in the range.
+    const auto pcs = chordTones(bar, rootless);
+    const int k = int(pcs.size());
+    std::vector<int> best;
+    int bestCost = 1 << 30;
+    for (int rot = 0; rot < k; ++rot)
+        for (int base = lo; base <= hi; ++base)
+        {
+            if ((base % 12 + 12) % 12 != pcs[size_t(rot)]) continue;
+            std::vector<int> v { base };
+            for (int i = 1; i < n; ++i)
+            {
+                int p = v.back() + 1;
+                while ((p % 12 + 12) % 12 != pcs[size_t((rot + i) % k)]) ++p;
+                v.push_back(p);
+            }
+            if (v.back() > hi) continue;
+            // the least motion, held near the middle of the range so the voicing does not creep up or down
+            int cost = std::abs(v[0] + v.back() - (lo + hi)) / 2;
+            if (prev.size() == v.size()) for (int i = 0; i < n; ++i) cost += 2 * std::abs(v[size_t(i)] - prev[size_t(i)]);
+            if (cost < bestCost) { bestCost = cost; best = v; }
+        }
+    prev = best;
+    return best;
+}
+
+void GenreComposer::makeHook()
+{
+    // The hook: two bars of sixteenths. The first bar asks (three to five notes, the downbeat always,
+    // the rest leaning on the off-beats a 3-3-2 groove gives), the second answers, half of it in the
+    // first bar's rhythm, and ends on a long chord tone. The line moves mostly by step with one leap;
+    // a note on the beat takes a chord tone, between beats a passing tone may sound.
+    static const int askAt[] = { 3, 6, 8, 10, 11, 12, 14 };
+    std::vector<int> onsets { 0 };
+    const int n1 = rng_.range(3, 5);
+    while (int(onsets.size()) < n1)
+    {
+        const int s = askAt[size_t(rng_.range(0, 6))];
+        if (std::find(onsets.begin(), onsets.end(), s) == onsets.end()) onsets.push_back(s);
+    }
+    std::sort(onsets.begin(), onsets.end());
+    const size_t first = onsets.size();
+    for (size_t i = 0; i < first; ++i)
+        if (onsets[i] < 12 && rng_.chance(.6)) onsets.push_back(16 + onsets[i]);
+    if (onsets.size() == first) onsets.push_back(16);
+    std::sort(onsets.begin(), onsets.end());
+
+    auto chordTone = [](int d) { const int m = ((d % 7) + 7) % 7; return m == 0 || m == 2 || m == 4 || m == 6; };
+    int deg = std::array<int, 3> { 0, 2, 4 }[size_t(rng_.range(0, 2))];
+    bool leapt = false;
+    hook_.clear();
+    for (size_t i = 0; i < onsets.size(); ++i)
+    {
+        const int s = onsets[i];
+        if (i > 0)
+        {
+            int step = rng_.chance(.5) ? 1 : 2;
+            if (!leapt && rng_.chance(.25)) { step = rng_.range(3, 4); leapt = true; }
+            deg += rng_.chance(deg > 4 ? .7 : deg < 0 ? .3 : .5) ? -step : step;
+            deg = std::clamp(deg, -2, 9);
+        }
+        const bool last = i + 1 == onsets.size();
+        if ((s % 4 == 0 || last) && !chordTone(deg)) deg += deg > 4 ? -1 : 1;
+        const int next = last ? 31 : onsets[i + 1];
+        const int len = last ? 32 - s : std::max(1, next - s - (rng_.chance(.25) ? 1 : 0));
+        hook_.push_back({ s, len, deg, s % 4 == 0 ? .95f : .78f });
+    }
+    hookHome_ = hook_;
+}
+
+void GenreComposer::emitHook(int bar, std::vector<Event>& out)
+{
+    if (!active(Arp, bar)) return;
+    auto& sec = sectionAt(bar);
+    const int in = bar - sec.startBar;
+    const float e = energyAt(bar);
+    if (sec.restoreTheme && in == 0) hook_ = hookHome_;
+    else if (in > 0 && in % 8 == 0 && rng_.chance(.25 + .3 * e)) // it wears a little, as a phrase does when it is played on
+    {
+        auto& n = hook_[size_t(rng_.range(1, int(hook_.size()) - 1))];
+        n.deg = std::clamp(n.deg + (rng_.chance(.5) ? 1 : -1) * 2, -2, 9);
+    }
+
+    // How this section develops it.
+    const bool calm = e < .35f, away = awayBar_[size_t(bar)], summit = sec.restoreTheme;
+    const int span = calm ? 4 : 2;            // slowed to half speed in the calm
+    const int cycle = in / span, within = in % span;
+    if (calm && cycle % 2 == 1) return;       // alone, with room around it
+    const int t0Cycle = (bar - within) * kBarTicks;
+    const int64_t six = kSixteenth * (calm ? 2 : 1);
+    const auto& m = *spec_.mode;
+    const int r = rootAt(bar), lo = spec_.arpLo, hi = spec_.arpHi;
+    const int rootP = pitchOf(bar, 0, lo + 5, lo + 16, 12 * (lo / 12)); // base on a C: it is a register, not a transposition
+    for (auto n : hook_)
+    {
+        const int64_t t = int64_t(t0Cycle) + n.step * six;
+        if (t < int64_t(bar) * kBarTicks || t >= int64_t(bar + 1) * kBarTicks) continue; // only this bar's notes
+        int deg = n.deg;
+        if (away) deg = 4 - deg;                             // the breakdowns turn it upside down
+        else if (!summit && n.step >= 16 && cycle % 2 == 1) deg += 2; // every other time, its answer a third up
+        const int64_t len = std::max<int64_t>(kSixteenth / 2, n.len * six - 12);
+        auto put = [&](int p, float vel) {
+            out.push_back({ t, Event::NoteOn, Arp, uint8_t(p), vel });
+            out.push_back({ t + len, Event::NoteOff, Arp, uint8_t(p), 0 });
+        };
+        int p = rootP + degreeSemis(m, r + deg) - degreeSemis(m, r);
+        while (p > hi) p -= 12;
+        while (p < lo) p += 12;
+        put(p, n.vel);
+        if (summit && cycle > 0 && p + 12 <= hi) put(p + 12, n.vel * .8f); // the summit doubles it an octave up
     }
 }
 
@@ -378,11 +506,12 @@ void GenreComposer::emitPad(int bar, std::vector<Event>& out)
     std::vector<int> want;
     if (active(Pad, bar))
     {
-        // root, fifth and octave; the third two octaves up once the music is driven
+        // the root and its fifth low, the colour of the chord (third, seventh, ninth) voiced above
+        // them, moving as little as it can from the last chord
         const auto& m = *spec_.mode;
         const int r = rootAt(bar), lo = pitchOf(bar, 0, 36, 47, 36);
-        want = { lo, lo + degreeSemis(m, r + 4) - degreeSemis(m, r), lo + 12 };
-        if (energyAt(bar) > .5f) want.push_back(lo + 24 + degreeSemis(m, r + 2) - degreeSemis(m, r));
+        want = { lo, lo + degreeSemis(m, r + 4) - degreeSemis(m, r) };
+        for (int p : voice(bar, 3, 55, 76, true, padVoices_)) want.push_back(p);
     }
     for (int p : padHeld_)
         if (std::find(want.begin(), want.end(), p) == want.end()) out.push_back({ t0, Event::NoteOff, Pad, uint8_t(p), 0 });
@@ -431,7 +560,7 @@ void GenreComposer::emitPart(int track, const Part& part, int bar, std::vector<E
     const int64_t stepT = kBarTicks / P;
     const bool euclid = is(pat.s, "euclid");
     if (euclid && bar == sec.startBar) percRot_ = rng_.range(0, P - 1);
-    const int k = euclid ? 3 + int(energyAt(bar) * P * .45f) : 0;
+    const int k = euclid ? 2 + int(energyAt(bar) * P * .25f) : 0;
 
     for (int i = 0; i < P; ++i)
     {
@@ -458,12 +587,8 @@ void GenreComposer::emitPart(int track, const Part& part, int bar, std::vector<E
             const int r = rootAt(bar), root = pitchOf(bar, 0, 40, 51, 36); // written an octave up: the bass patches sound an octave down
             hit(t, root + degreeSemis(m, r + deg) - degreeSemis(m, r), vel, noteLen);
         }
-        else // the chord: root, third, fifth (and seventh)
-        {
-            const auto& m = *spec_.mode;
-            const int r = rootAt(bar), root = pitchOf(bar, 0, 48, 59, 48);
-            for (int d = 0; d < spec_.chordSize; ++d) hit(t, root + degreeSemis(m, r + 2 * d) - degreeSemis(m, r), vel, noteLen);
-        }
+        else // the chord, voice-led: four voices of it (rootless when it has a ninth: the bass has the root)
+            for (int p : voice(bar, 4, 48, 74, spec_.ext == 2, chordVoices_)) hit(t, p, vel, noteLen);
     }
 
     if (stutterBeat_ >= 0 && track == spec_.stutterTrack && !(drop && stutterBeat_ >= 2) && !(fill && stutterBeat_ >= 2))
@@ -524,7 +649,8 @@ void GenreComposer::generateBar(int bar, std::vector<Event>& out)
     emitPart(Perc, spec_.perc, bar, out);
     emitPart(Bass, spec_.bass, bar, out);
     emitPart(Chord, spec_.chord, bar, out);
-    emitArp(bar, out);
+    if (spec_.hook) emitHook(bar, out);
+    else emitArp(bar, out);
     emitHeld(Sub, bar, out, subHeld_, active(Sub, bar) ? pitchOf(bar, 0, 24, 35, 24) : -1);
     emitHeld(Fx, bar, out, fxHeld_, active(Fx, bar) ? foldInto(48 + tonicPc_, 48, 59) : -1);
 }

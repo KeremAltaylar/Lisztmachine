@@ -233,6 +233,26 @@ void Biquad::highpass(double sr, double hz)
     z1 = z2 = 0;
 }
 
+void Drive::prepare(double sr, const DriveSpec& spec)
+{
+    k_ = 1 + 14 * spec.amount * spec.amount;
+    comp_ = 1 / std::sqrt(k_); // a mid-level note comes out about as loud as it went in
+    lpA_ = 1 - std::exp(-juce::MathConstants<float>::twoPi * spec.toneHz / float(sr));
+    for (int c = 0; c < 2; ++c) last_[c] = lp_[c] = dcIn_[c] = dcOut_[c] = 0;
+}
+
+float Drive::process(float x, int c)
+{
+    // twice the rate: the shaper sees the midpoint as well, the two are averaged back down
+    const float y = 0.5f * (shape(0.5f * (last_[c] + x)) + shape(x)) * comp_;
+    last_[c] = x;
+    lp_[c] += (y - lp_[c]) * lpA_;
+    const float out = lp_[c] - dcIn_[c] + 0.9995f * dcOut_[c];
+    dcIn_[c] = lp_[c];
+    dcOut_[c] = out;
+    return out;
+}
+
 void GlueBus::prepare(double sr)
 {
     attack_ = 1.0f - std::exp(-1.0f / float(0.010 * sr));
@@ -267,7 +287,7 @@ TrackMix mixFor(const std::string& name)
 {
     static const std::pair<const char*, TrackMix> table[] = {
         { "kick", { 0, 0, 0, 0 } },        { "sub", { .65f, 0, 0, 0 } },      { "bass", { .5f, 0, 0, 30 } },
-        { "pad", { .55f, 1.5f, 0, 150 } }, { "drone", { .5f, 1.5f, 0, 120 } }, { "chord", { .45f, 1.4f, 0, 180 } },
+        { "pad", { .55f, 1.5f, 0, 150 } }, { "drone", { .5f, 1.5f, 0, 120 } }, { "chord", { .45f, 1.4f, 0, 120 } },
         { "stab", { .45f, 1.4f, 0, 180 } }, { "arp", { .3f, 1.2f, 0, 150 } },  { "acid", { .25f, 1.0f, 0, 90 } },
         { "seq", { .2f, 1.2f, 0, 120 } },  { "lead", { .2f, 1.1f, 0, 150 } },  { "snare", { 0, 1.0f, 0, 120 } },
         { "clap", { 0, 1.2f, 0, 150 } },   { "hats", { 0, 1.0f, .25f, 300 } }, { "perc", { .1f, 1.3f, -.2f, 200 } },
@@ -285,6 +305,7 @@ juce::String Palette::load(const juce::File& file, const std::string& sceneName)
     for (auto& p : parts) p.clear();
     for (auto& g : trackGainDb) g = 0;
     masterDb = 0;
+    for (auto& d : drives) d = {};
     for (auto& d : delays) d = {};
     if (!file.existsAsFile()) return "no palette at " + file.getFullPathName();
 
@@ -298,11 +319,12 @@ juce::String Palette::load(const juce::File& file, const std::string& sceneName)
         tokens.removeEmptyStrings();
         const auto where = file.getFileName() + " line " + juce::String(n + 1) + ": ";
         if (tokens[0] == "master" && tokens.size() >= 2) { masterDb = tokens[1].getFloatValue(); continue; }
-        if (tokens[0] == "gain" || tokens[0] == "delay")
+        if (tokens[0] == "gain" || tokens[0] == "delay" || tokens[0] == "drive")
         {
             const int t = info->trackOf(tokens[1].toStdString());
             if (t < 0) return where + "no track '" + tokens[1] + "' in the " + juce::String(scene) + " scene";
             if (tokens[0] == "gain") trackGainDb[t] = tokens[2].getFloatValue();
+            else if (tokens[0] == "drive") drives[t] = { juce::jlimit(0.0f, 1.0f, tokens[2].getFloatValue()), tokens.size() >= 4 ? tokens[3].getFloatValue() : 6000.0f };
             else if (tokens.size() >= 5) delays[t] = { tokens[2].getFloatValue(), juce::jlimit(0.0f, 0.95f, tokens[3].getFloatValue()), tokens[4].getFloatValue() };
             else return where + "expected 'delay <track> beats feedback mix'";
             continue;
@@ -413,6 +435,7 @@ juce::String Engine::load(double sampleRate, int maxBlock, const Palette& palett
         t.lowCut = m.lowCutHz > 0;
         for (auto& f : t.hp) f.highpass(sampleRate, juce::jmax(10.0f, m.lowCutHz));
         t.mix.setSize(2, maxBlock);
+        t.drive.prepare(sampleRate, palette.drives[i]);
         // Each track a different delay (7 to 19 ms) so the widened tracks don't fuse into one image.
         t.wideAmount = juce::jmax(0.0f, m.width - 1) * 1.4f;
         t.wide.assign(size_t((0.007 + 0.003 * (i % 5)) * sampleRate), 0.0f);
@@ -832,6 +855,7 @@ void Engine::renderChunk(float* const* out, int numChannels, int offset, int len
             float l = L[n], r = R[n], g = gains_[size_t(n)] * t.trim;
             if (mixStage)
             {
+                if (t.drive.on()) { l = t.drive.process(l, 0); r = t.drive.process(r, 1); }
                 if (t.lowCut) { l = t.hp[0].process(l); r = t.hp[1].process(r); }
                 const float mid = (l + r) * 0.5f;
                 float side = (l - r) * 0.5f * juce::jmin(1.0f, t.width);

@@ -10,28 +10,35 @@ kick     0.0      60  internal/kick
 snare    0.0    1500  internal/snare
 hats     0.0    9000  internal/hat
 perc     0.0      60  internal/kick
-bass     -8.4      99  Basses/Sub 2
-bass    -12.2     760  Basses/Rubber Bass
 sub     -6.0      40  internal/sub
-arp     -12.2     419  Leads/Classic Lead 1
-arp      -5.7    1612  Leads/Sharpish
-chord    -4.7    4145  Plucks/Saw Pluck
-chord    -0.1    6135  Polysynths/Notched Saws
 fx       -5.7     286  FX/Unsettler
 
 # Echoes: beats, feedback, mix
+arp      -2.1    1944  Leads/Synth Guitar 2
+arp      -1.8    2174  Leads/Harsh
+chord    -2.8    1002  Polysynths/Uni Saw FB
+chord    -7.5    5468  Polysynths/Zizzly Saw
+bass     -8.3     410  Basses/Distorted MW
+bass     -1.0     399  Basses/Metal Square
 delay chord 0.75 0.35 0.18
 delay arp 1.0 0.30 0.15
 
 # Balance (to be measured in the mix)
-gain pad    -7.9
-gain kick   -9.2
-gain snare  -2.8
-gain hats   -7.0
-gain perc  -14.9
-gain bass   -4.7
-gain sub    -9.6
-gain arp    -6.4
-gain chord  -5.3
-gain fx     -7.5
+gain pad    -9.4
+gain kick  -10.9
+gain snare  -2.4
+gain hats   -6.7
+gain perc  -12.5
+gain bass   -9.1
+gain sub    -8.2
+gain arp   -12.7
+gain chord  -7.7
+gain fx     -5.3
 master 9.4
+drive bass  0.55 3500
+drive chord 0.50 4500
+drive arp   0.45 5000
+drive kick  0.25 9000
+drive snare 0.35 8000
+drive pad   0.20 5000
+drive perc  0.20 9000

@@ -26,6 +26,8 @@ struct PaletteEntry
 // A per-track echo, ping-pong between left and right: its time in beats, how much comes back,
 // and how much is heard.
 struct InsertDelay { float beats = 0, feedback = 0, mix = 0; };
+// A per-track drive, like an amp or a tape pushed hard: how hard (0..1) and where its top rolls off.
+struct DriveSpec { float amount = 0, toneHz = 6000; };
 struct Palette
 {
     std::string scene = "berlin";
@@ -34,6 +36,7 @@ struct Palette
     float trackGainDb[kMaxTracks] = {}; // "gain <track> dB": the balance between tracks
     float masterDb = 0;                 // "master dB": drive into the master's soft clipper
     InsertDelay delays[kMaxTracks];     // "delay <track> beats feedback mix"
+    DriveSpec drives[kMaxTracks];       // "drive <track> amount toneHz"
     // Lines: "part gain bright Category/Patch" (a Surge patch, or internal/click|blip|sub),
     // "voices ..." for every track of the voice group, "gain ...", "delay ...".
     juce::String load(const juce::File& file, const std::string& scene = "berlin"); // returns an error or empty
@@ -145,6 +148,22 @@ struct Biquad
 // glues the mix, then makeup gain into a tanh soft clipper with its ceiling at -1 dBFS, which
 // is where the loudness comes from. ponytail: no oversampling, so a hard drive aliases a little;
 // oversample the clipper if the hats ever sound gritty.
+// Gnarl without fizz: an asymmetric tanh (odd and even harmonics, like a valve) run at twice the
+// sample rate, then a gentle low-pass at the tone frequency, and a DC blocker for the asymmetry.
+// The level is held about where it was, so the balance between tracks stays.
+class Drive
+{
+public:
+    void prepare(double sampleRate, const DriveSpec& spec);
+    bool on() const { return k_ > 1; }
+    float process(float x, int channel);
+
+private:
+    float k_ = 1, comp_ = 1, lpA_ = 1, bias_ = 0.2f;
+    float last_[2] = {}, lp_[2] = {}, dcIn_[2] = {}, dcOut_[2] = {};
+    float shape(float x) const { return std::tanh(k_ * x + bias_) - std::tanh(bias_); }
+};
+
 class GlueBus
 {
 public:
@@ -237,6 +256,7 @@ private:
         float duck = 0, width = 1, panL = 1, panR = 1;
         bool lowCut = false;
         Biquad hp[2];
+        Drive drive;
         // The widener: the track's mid, delayed a few ms and high-passed, added as side. Mono
         // sum unchanged, low end stays centred.
         std::vector<float> wide;
