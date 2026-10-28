@@ -222,12 +222,69 @@ void PeakLimiter::process(float* l, float* r, int n)
     }
 }
 
+void Biquad::highpass(double sr, double hz)
+{
+    const double w = juce::MathConstants<double>::twoPi * hz / sr, c = std::cos(w), alpha = std::sin(w) / (2 * 0.7071), a0 = 1 + alpha;
+    b0 = float((1 + c) / 2 / a0);
+    b1 = float(-(1 + c) / a0);
+    b2 = b0;
+    a1 = float(-2 * c / a0);
+    a2 = float((1 - alpha) / a0);
+    z1 = z2 = 0;
+}
+
+void GlueBus::prepare(double sr)
+{
+    attack_ = 1.0f - std::exp(-1.0f / float(0.010 * sr));
+    release_ = 1.0f - std::exp(-1.0f / float(0.150 * sr));
+    reset();
+}
+
+void GlueBus::process(float* l, float* r, int n)
+{
+    constexpr float knee = 6, ceiling = 0.89f; // -1 dBFS
+    const float makeup = juce::Decibels::decibelsToGain(makeupDb);
+    for (int i = 0; i < n; ++i)
+    {
+        const float peak = juce::jmax(std::abs(l[i]), std::abs(r[i]));
+        env_ += (peak - env_) * (peak > env_ ? attack_ : release_);
+        const float over = juce::Decibels::gainToDecibels(env_, -120.0f) - thresholdDb;
+        const float cut = over <= -knee / 2 ? 0
+                        : over >= knee / 2   ? over * (1 - 1 / ratio)
+                                             : (1 - 1 / ratio) * (over + knee / 2) * (over + knee / 2) / (2 * knee);
+        maxReductionDb = juce::jmin(maxReductionDb, -cut);
+        const float g = juce::Decibels::decibelsToGain(-cut) * makeup;
+        l[i] = ceiling * std::tanh(l[i] * g / ceiling);
+        r[i] = ceiling * std::tanh(r[i] * g / ceiling);
+    }
+}
+
+// What a mixing engineer does to each kind of track: how deep the kick ducks it, how wide it
+// sits, where it is panned and where its low end is cut. Kick, bass and sub stay mono and full.
+namespace {
+struct TrackMix { float duck, width, pan, lowCutHz; };
+TrackMix mixFor(const std::string& name)
+{
+    static const std::pair<const char*, TrackMix> table[] = {
+        { "kick", { 0, 0, 0, 0 } },        { "sub", { .65f, 0, 0, 0 } },      { "bass", { .5f, 0, 0, 30 } },
+        { "pad", { .55f, 1.5f, 0, 150 } }, { "drone", { .5f, 1.5f, 0, 120 } }, { "chord", { .45f, 1.4f, 0, 180 } },
+        { "stab", { .45f, 1.4f, 0, 180 } }, { "arp", { .3f, 1.2f, 0, 150 } },  { "acid", { .25f, 1.0f, 0, 90 } },
+        { "seq", { .2f, 1.2f, 0, 120 } },  { "lead", { .2f, 1.1f, 0, 150 } },  { "snare", { 0, 1.0f, 0, 120 } },
+        { "clap", { 0, 1.2f, 0, 150 } },   { "hats", { 0, 1.0f, .25f, 300 } }, { "perc", { .1f, 1.3f, -.2f, 200 } },
+        { "fx", { .5f, 1.6f, 0, 200 } },
+    };
+    for (auto& [n, m] : table) if (name == n) return m;
+    return { 0, 1, 0, 0 }; // the chorale's voices and anything else: as they are
+}
+} // namespace
+
 juce::String Palette::load(const juce::File& file, const std::string& sceneName)
 {
     scene = sceneName;
     info = &sceneInfo(sceneName);
     for (auto& p : parts) p.clear();
     for (auto& g : trackGainDb) g = 0;
+    masterDb = 0;
     for (auto& d : delays) d = {};
     if (!file.existsAsFile()) return "no palette at " + file.getFullPathName();
 
@@ -240,6 +297,7 @@ juce::String Palette::load(const juce::File& file, const std::string& sceneName)
         auto tokens = juce::StringArray::fromTokens(line, " \t", "");
         tokens.removeEmptyStrings();
         const auto where = file.getFileName() + " line " + juce::String(n + 1) + ": ";
+        if (tokens[0] == "master" && tokens.size() >= 2) { masterDb = tokens[1].getFloatValue(); continue; }
         if (tokens[0] == "gain" || tokens[0] == "delay")
         {
             const int t = info->trackOf(tokens[1].toStdString());
@@ -347,6 +405,18 @@ juce::String Engine::load(double sampleRate, int maxBlock, const Palette& palett
         t.internal = first.startsWith("internal/");
         t.trim = juce::Decibels::decibelsToGain(palette.trackGainDb[i]);
         t.echo.prepare(sampleRate);
+        const auto m = mixFor(palette.info->trackNames[i]);
+        t.duck = m.duck;
+        t.width = m.width;
+        t.panL = std::sqrt(2.0f) * std::cos((m.pan + 1) * juce::MathConstants<float>::pi / 4);
+        t.panR = std::sqrt(2.0f) * std::sin((m.pan + 1) * juce::MathConstants<float>::pi / 4);
+        t.lowCut = m.lowCutHz > 0;
+        for (auto& f : t.hp) f.highpass(sampleRate, juce::jmax(10.0f, m.lowCutHz));
+        t.mix.setSize(2, maxBlock);
+        // Each track a different delay (7 to 19 ms) so the widened tracks don't fuse into one image.
+        t.wideAmount = juce::jmax(0.0f, m.width - 1) * 1.4f;
+        t.wide.assign(size_t((0.007 + 0.003 * (i % 5)) * sampleRate), 0.0f);
+        t.wideAt = 0;
         t.hasEcho = palette.delays[i].beats > 0 && palette.delays[i].mix > 0;
         if (t.internal)
         {
@@ -382,6 +452,12 @@ juce::String Engine::load(double sampleRate, int maxBlock, const Palette& palett
     reverbBus_.setSize(busChannels(*reverb_), maxBlock);
 
     limiter.prepare(sampleRate, -1.0f, 150.0f);
+    glue.prepare(sampleRate);
+    glue.makeupDb = palette.masterDb;
+    for (auto& f : reverbLowCut_) f.highpass(sampleRate, 180);
+    kickTrack_ = palette.info->trackOf("kick");
+    duckCurve_.assign(size_t(maxBlock), 0);
+    kickHits_.reserve(64);
     return {};
 }
 
@@ -546,6 +622,12 @@ void Engine::start(uint64_t seed, int startBar)
     changesMade = 0;
     missedChanges = 0;
     limiter.reset();
+    glue.reset();
+    // The duck lets go over about a quarter of a beat: back by the next one, even at 4/4.
+    duckDecay_ = std::exp(-1.0f / float(0.22 * 60.0 / composer_->bpm() * sampleRate_));
+    duckEnv_ = duckTarget_ = 0;
+    duckRamp_ = 0;
+    for (auto& t : tracks_) for (auto& f : t.hp) f.z1 = f.z2 = 0;
     bar = startBar;
     finished_ = false;
     panic_ = true;
@@ -688,7 +770,11 @@ void Engine::renderChunk(float* const* out, int numChannels, int offset, int len
             auto& live = t.slots[t.live.load()];
             switch (e.type)
             {
-                case Event::NoteOn:  live.midi.addEvent(juce::MidiMessage::noteOn(1, e.pitch, e.value), at); t.held[e.pitch] = e.value; break;
+                case Event::NoteOn:
+                    live.midi.addEvent(juce::MidiMessage::noteOn(1, e.pitch, e.value), at);
+                    t.held[e.pitch] = e.value;
+                    if (e.track == kickTrack_) kickHits_.push_back({ at, e.value });
+                    break;
                 case Event::NoteOff: live.midi.addEvent(juce::MidiMessage::noteOff(1, e.pitch), at); t.held[e.pitch] = 0; break;
                 case Event::Level:   t.gain.setTargetValue(e.value); break;
                 case Event::Filter:  t.filterTarget = e.value; break;
@@ -715,10 +801,70 @@ void Engine::renderChunk(float* const* out, int numChannels, int offset, int len
         noMidi_.clear();
     };
 
+    // The kick's duck, as a gain curve for this chunk: struck by the kick's own notes (exact to
+    // the sample, and there even when the kick track is soloed out), down in 2 ms, back over
+    // about a quarter beat.
+    {
+        const int attack = juce::jmax(1, int(0.002 * sampleRate_));
+        size_t k = 0;
+        for (int n = 0; n < len; ++n)
+        {
+            for (; k < kickHits_.size() && kickHits_[k].first <= n; ++k)
+            {
+                duckTarget_ = juce::jmax(duckEnv_, kickHits_[k].second);
+                duckRamp_ = attack;
+            }
+            if (duckRamp_ > 0) { duckEnv_ += (duckTarget_ - duckEnv_) / float(duckRamp_); --duckRamp_; }
+            else duckEnv_ *= duckDecay_;
+            duckCurve_[size_t(n)] = mixStage ? duckEnv_ : 0;
+        }
+        kickHits_.clear();
+    }
+
+    // One track's sound into the mix and the sends: its low cut, width, pan and duck, then its gain.
+    auto mixTrack = [&](int i, const float* L, const float* R) {
+        auto& t = tracks_[i];
+        const float* sends = palette_.info->sends[i];
+        float peak = 0;
+        double sq = 0;
+        for (int n = 0; n < len; ++n)
+        {
+            float l = L[n], r = R[n], g = gains_[size_t(n)] * t.trim;
+            if (mixStage)
+            {
+                if (t.lowCut) { l = t.hp[0].process(l); r = t.hp[1].process(r); }
+                const float mid = (l + r) * 0.5f;
+                float side = (l - r) * 0.5f * juce::jmin(1.0f, t.width);
+                if (t.wideAmount > 0)
+                {
+                    const float d = t.wide[size_t(t.wideAt)];
+                    t.wide[size_t(t.wideAt)] = mid;
+                    t.wideAt = (t.wideAt + 1) % int(t.wide.size());
+                    t.wideLp += (d - t.wideLp) * 0.04f; // ~300 Hz: below it the widened part is removed
+                    side += (d - t.wideLp) * t.wideAmount;
+                }
+                l = (mid + side) * t.panL;
+                r = (mid - side) * t.panR;
+                g *= 1 - t.duck * duckCurve_[size_t(n)];
+            }
+            const float x[2] = { l * g, r * g };
+            for (int c = 0; c < 2; ++c)
+            {
+                pa[c][n] += x[c];
+                delayIn.getWritePointer(c)[n] += x[c] * sends[0];
+                reverbIn.getWritePointer(c)[n] += x[c] * sends[1];
+                peak = juce::jmax(peak, std::abs(x[c]));
+                sq += double(x[c]) * x[c];
+            }
+        }
+        meters[i].peak = juce::jmax(meters[i].peak.load(), peak);
+        meters[i].sumSquares = meters[i].sumSquares.load() + sq;
+        meters[i].samples = meters[i].samples.load() + 2 * len;
+    };
+
     for (int i = 0; i < numTracks_; ++i)
     {
         auto& t = tracks_[i];
-        const float* sends = palette_.info->sends[i];
         // Glide the filter towards its target over about a quarter second.
         t.filterNow += (t.filterTarget - t.filterNow) * juce::jmin(1.0f, float(len / (0.25 * sampleRate_)));
         for (int n = 0; n < len; ++n) gains_[size_t(n)] = t.gain.getNextValue();
@@ -732,8 +878,6 @@ void Engine::renderChunk(float* const* out, int numChannels, int offset, int len
             continue;
         }
 
-        float peak = 0;
-        double sq = 0;
         if (t.internal)
         {   // the engine's own instrument: one voice pool, its MIDI in the first slot's buffer
             auto& slot = t.slots[0];
@@ -741,24 +885,12 @@ void Engine::renderChunk(float* const* out, int numChannels, int offset, int len
             t.synth.render(slot.midi, t.buffer.getWritePointer(0), t.buffer.getWritePointer(1), len);
             slot.midi.clear();
             if (t.hasEcho) t.echo.process(t.buffer.getWritePointer(0), t.buffer.getWritePointer(1), len);
-            for (int c = 0; c < 2; ++c)
-            {
-                const float* src = t.buffer.getReadPointer(c);
-                for (int n = 0; n < len; ++n)
-                {
-                    float x = src[n] * gains_[size_t(n)] * slot.gain * t.trim;
-                    pa[c][n] += x;
-                    delayIn.getWritePointer(c)[n] += x * sends[0];
-                    reverbIn.getWritePointer(c)[n] += x * sends[1];
-                    peak = juce::jmax(peak, std::abs(x));
-                    sq += double(x) * x;
-                }
-            }
-            meters[i].peak = juce::jmax(meters[i].peak.load(), peak);
-            meters[i].sumSquares = meters[i].sumSquares.load() + sq;
-            meters[i].samples = meters[i].samples.load() + 2 * len;
+            for (int c = 0; c < 2; ++c) juce::FloatVectorOperations::multiply(t.buffer.getWritePointer(c), slot.gain, len);
+            mixTrack(i, t.buffer.getReadPointer(0), t.buffer.getReadPointer(1));
             continue;
         }
+        t.mix.clear(0, 0, len);
+        t.mix.clear(1, 0, len);
         for (auto& slot : t.slots)
         {
             const int state = slot.state.load();
@@ -786,17 +918,9 @@ void Engine::renderChunk(float* const* out, int numChannels, int offset, int len
             for (int c = 0; c < 2; ++c)
             {
                 const float* src = view.getReadPointer(juce::jmin(c, view.getNumChannels() - 1));
-                for (int n = 0; n < len; ++n)
-                {
-                    float x = src[n] * gains_[size_t(n)] * slot.gain * t.trim;
-                    pa[c][n] += x;
-                    delayIn.getWritePointer(c)[n] += x * sends[0];
-                    reverbIn.getWritePointer(c)[n] += x * sends[1];
-                    slotPeak = juce::jmax(slotPeak, std::abs(src[n]));
-                    sq += double(x) * x;
-                }
+                juce::FloatVectorOperations::addWithMultiply(t.mix.getWritePointer(c), src, slot.gain, len);
+                for (int n = 0; n < len; ++n) slotPeak = juce::jmax(slotPeak, std::abs(src[n]));
             }
-            peak = juce::jmax(peak, slotPeak * slot.gain * t.trim);
             // A sound that has rung out for two seconds frees its instance for the next one;
             // one that never quite falls silent (a noise layer) is cut after 20 seconds.
             if (state == Tail)
@@ -810,9 +934,7 @@ void Engine::renderChunk(float* const* out, int numChannels, int offset, int len
                 }
             }
         }
-        meters[i].peak = juce::jmax(meters[i].peak.load(), peak);
-        meters[i].sumSquares = meters[i].sumSquares.load() + sq;
-        meters[i].samples = meters[i].samples.load() + 2 * len;
+        mixTrack(i, t.mix.getReadPointer(0), t.mix.getReadPointer(1));
     }
 
     // The shared buses: the delay returns to the mix and also feeds the reverb.
@@ -828,6 +950,12 @@ void Engine::renderChunk(float* const* out, int numChannels, int offset, int len
     if (effects && delay_ && reverb_)
     {
         runFx(*delay_, delayIn);
+        // The echoes and the reverb pump with the kick too, so the tail breathes instead of washing.
+        auto duckReturn = [&](juce::AudioBuffer<float>& b, float depth) {
+            for (int c = 0; c < 2; ++c)
+                for (int n = 0; n < len; ++n) b.getWritePointer(c)[n] *= 1 - depth * duckCurve_[size_t(n)];
+        };
+        duckReturn(delayIn, 0.35f);
         for (int c = 0; c < 2; ++c)
         {
             juce::FloatVectorOperations::add(pa[c], delayIn.getReadPointer(c), len);
@@ -835,10 +963,15 @@ void Engine::renderChunk(float* const* out, int numChannels, int offset, int len
         }
         meter(delayMeter, delayIn);
         runFx(*reverb_, reverbIn);
+        duckReturn(reverbIn, 0.5f);
+        if (mixStage)
+            for (int c = 0; c < 2; ++c)
+                for (int n = 0; n < len; ++n) reverbIn.getWritePointer(c)[n] = reverbLowCut_[c].process(reverbIn.getReadPointer(c)[n]);
         meter(reverbMeter, reverbIn);
         for (int c = 0; c < 2; ++c) juce::FloatVectorOperations::add(pa[c], reverbIn.getReadPointer(c), len);
     }
 
+    if (mixStage && numChannels > 1) glue.process(pa[0], pa[1], len);
     float pre = 0;
     for (int c = 0; c < 2; ++c)
         pre = juce::jmax(pre, juce::FloatVectorOperations::findMaximum(pa[c], len), -juce::FloatVectorOperations::findMinimum(pa[c], len));

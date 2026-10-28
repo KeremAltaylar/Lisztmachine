@@ -57,3 +57,4 @@ lead   -10.7   3387  Leads/Turbo Solo
 lead   -10.5   3669  Leads/Distortionworks
 lead   -11.1   3765  Leads/Nastyfication
 lead    -8.8   4138  Leads/Squelch
+master 6.8

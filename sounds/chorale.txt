@@ -78,3 +78,4 @@ delay tenor   1.5  0.38 0.20
 delay bass    2.0  0.30 0.15
 delay blips   0.75 0.35 0.20
 delay guitar  0.75 0.30 0.12
+master 6.8

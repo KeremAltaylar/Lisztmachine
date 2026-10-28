@@ -64,3 +64,4 @@ gain hats  -4.0
 gain clap   1.0
 gain sub   -7.0
 gain fx    -8.0
+master 9.0

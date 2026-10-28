@@ -247,6 +247,7 @@ static void writeShow(uint64_t seed, double blockRate, const std::vector<std::ar
 
 static juce::String paletteName = "berlin"; // --palette <name>: sounds/<name>.txt
 static float feedbackOverride = -1;            // --feedback 0..0.95: every track's echo
+static bool gRaw = false;                      // --raw: without the mix stage (ducking, low cuts, width, glue)
 
 static int renderConcert(uint64_t seed, double seconds, const juce::File& out, int solo, const juce::StringArray& patches, bool dry,
                          const juce::String& from, int bars)
@@ -265,6 +266,7 @@ static int renderConcert(uint64_t seed, double seconds, const juce::File& out, i
     if (solo >= 0) engine.enabledTracks = uint16_t(1 << solo);
     engine.feedbackOverride = feedbackOverride;
     engine.effects = !dry;
+    engine.mixStage = !gRaw;
     int startBar = 0;
     {
         auto planned = makeComposer(sceneName, seed);
@@ -341,7 +343,7 @@ static int renderConcert(uint64_t seed, double seconds, const juce::File& out, i
     std::cout << "rendered " << secs << " s in " << took << " s (" << secs / took << "x real time) -> "
               << out.getFullPathName() << "\n";
     std::cout << "master peak before limiter " << dbfs(engine.peakPre) << " dBFS, after " << dbfs(engine.peakPost) << " dBFS; limiter deepest "
-              << engine.limiter.maxReductionDb << " dB, clamped samples " << engine.limiter.clipped << "\n";
+              << engine.limiter.maxReductionDb << " dB, clamped samples " << engine.limiter.clipped << "; glue deepest " << engine.glue.maxReductionDb << " dB\n";
     auto show = [](const char* name, const Engine::Meter& m) {
         std::cout << "  " << name << ": peak " << dbfs(m.peak) << " dBFS, rms "
                   << dbfs(std::sqrt(m.sumSquares / juce::jmax<int64_t>(1, m.samples))) << " dBFS\n";
@@ -358,6 +360,7 @@ int main(int argc, char** argv)
 {
     juce::ScopedJuceInitialiser_GUI init;
     juce::StringArray args(argv + 1, argc - 1);
+    gRaw = args.contains("--raw");
     if (args[0] == "--probe") return probe(args[1], args[2], args[3]); // --probe <vst3> [names,to,match] [Category/Patch]
     if (args[0] == "--test-echo") // one impulse through a track's echo: where each repeat lands and how loud
     {

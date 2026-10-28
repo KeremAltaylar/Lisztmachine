@@ -35,3 +35,4 @@ gain sub   -10.9
 gain arp    -2.2
 gain chord  -2.8
 gain fx     -9.2
+master 9.6

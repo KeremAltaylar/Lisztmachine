@@ -32,6 +32,7 @@ struct Palette
     const SceneInfo* info = &sceneInfo("berlin");
     std::vector<PaletteEntry> parts[kMaxTracks];
     float trackGainDb[kMaxTracks] = {}; // "gain <track> dB": the balance between tracks
+    float masterDb = 0;                 // "master dB": drive into the master's soft clipper
     InsertDelay delays[kMaxTracks];     // "delay <track> beats feedback mix"
     // Lines: "part gain bright Category/Patch" (a Surge patch, or internal/click|blip|sub),
     // "voices ..." for every track of the voice group, "gain ...", "delay ...".
@@ -132,6 +133,31 @@ private:
     float threshold_ = 0.89f, attack_ = 0.07f, release_ = 0.9998f, gain_ = 1;
 };
 
+// RBJ 12 dB/octave high-pass: clears the low end of everything that is not kick or bass.
+struct Biquad
+{
+    float b0 = 1, b1 = 0, b2 = 0, a1 = 0, a2 = 0, z1 = 0, z2 = 0;
+    void highpass(double sampleRate, double hz);
+    float process(float x) { const float y = b0 * x + z1; z1 = b1 * x - a1 * y + z2; z2 = b2 * x - a2 * y; return y; }
+};
+
+// The master bus before the limiter: a gentle stereo-linked compressor (2:1, soft knee) that
+// glues the mix, then makeup gain into a tanh soft clipper with its ceiling at -1 dBFS, which
+// is where the loudness comes from. ponytail: no oversampling, so a hard drive aliases a little;
+// oversample the clipper if the hats ever sound gritty.
+class GlueBus
+{
+public:
+    void prepare(double sampleRate);
+    void reset() { env_ = 0; }
+    void process(float* left, float* right, int numSamples);
+    float thresholdDb = -18, ratio = 2, makeupDb = 0;
+    float maxReductionDb = 0; // the compressor's deepest reduction so far
+
+private:
+    float env_ = 0, attack_ = 0, release_ = 0;
+};
+
 class Engine
 {
 public:
@@ -172,6 +198,8 @@ public:
     std::atomic<int> changesMade { 0 }, missedChanges { 0 };
     float clickLevel = 0.5f;
     PeakLimiter limiter;
+    GlueBus glue;
+    bool mixStage = true;          // false: no ducking, low cuts, width or glue (the renderer's --raw)
     uint16_t enabledTracks = 0xFFFF; // bit per track; the renderer's --solo
 
 private:
@@ -204,6 +232,17 @@ private:
         FeedbackDelay echo;
         bool hasEcho = false;
         float trim = 1;             // the track's balance gain
+        // The mix stage: how deep the kick ducks it, its stereo width (0 mono, 1 as played),
+        // its pan gains and its low cut.
+        float duck = 0, width = 1, panL = 1, panR = 1;
+        bool lowCut = false;
+        Biquad hp[2];
+        // The widener: the track's mid, delayed a few ms and high-passed, added as side. Mono
+        // sum unchanged, low end stays centred.
+        std::vector<float> wide;
+        int wideAt = 0;
+        float wideAmount = 0, wideLp = 0;
+        juce::AudioBuffer<float> mix; // the track's slots summed, before the mix stage
     };
     juce::String loadInto(Slot& slot, int track, int entry);
     void changeSound(int track, int at);
@@ -221,6 +260,7 @@ private:
     std::vector<SoundChange> plan_;
     std::unique_ptr<juce::AudioPluginInstance> delay_, reverb_;
     juce::AudioBuffer<float> delayBus_, reverbBus_;
+    Biquad reverbLowCut_[2]; // the reverb's lows smear the kick and the bass, and spread them wide
     juce::MidiBuffer noMidi_;
     float delaySeconds_[2] = { 0, 0 }; // left, right: shown with their bar division
 
@@ -232,6 +272,12 @@ private:
     int64_t pos_ = 0, endSample_ = 0;
     double samplesPerTick_ = 1;
     std::atomic<bool> playing_ { false }, finished_ { false }, panic_ { false };
+
+    int kickTrack_ = -1;           // its notes duck the others
+    float duckEnv_ = 0, duckTarget_ = 0, duckDecay_ = 1;
+    int duckRamp_ = 0;
+    std::vector<float> duckCurve_;
+    std::vector<std::pair<int, float>> kickHits_; // this chunk's kicks: sample, velocity
 
     double clickPhase_ = 0, clickFreq_ = 0, clickEnv_ = 0;
 };
