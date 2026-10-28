@@ -6,7 +6,7 @@
 
 pad       6.6     599  Pads/Still
 kick     0.0      60  internal/kick
-snare    0.0    1500  internal/snare
+snare    0.0    1500  internal/zap
 hats     0.0    9000  internal/hat
 perc     0.0    8000  internal/click
 sub     -6.0      40  internal/sub
@@ -23,15 +23,15 @@ bass     -8.3     410  Basses/Distorted MW
 delay arp 0.75 0.30 0.15
 
 # Balance (to be measured in the mix)
-gain pad   -16.9
-gain kick   -8.6
-gain snare  -2.6
-gain hats   -5.2
-gain perc    8.7
+gain pad   -17.0
+gain kick   -7.6
+gain snare  -8.3
+gain hats   -2.2
+gain perc    9.9
 gain bass   -7.4
-gain sub    -9.5
-gain arp   -10.6
-gain chord -14.9
+gain sub    -9.7
+gain arp   -10.7
+gain chord -15.1
 gain fx    -13.4
 master 9.1
 drive bass  0.39 3500
@@ -41,3 +41,7 @@ drive kick  0.17 9000
 drive snare 0.24 8000
 drive pad   0.14 5000
 drive perc  0.14 9000
+crush hats  6 4 0.5
+crush perc  8 2 0.3
+duck hats 0.2
+delay perc 0.75 0.5 0.35 throws

@@ -8,7 +8,7 @@ pad      -1.0     582  Pads/Yeti Funeral
 pad       6.6     599  Pads/Still
 kick     0.0      60  sample/gogodze+kick
 snare    0.0    1500  sample/gogodze
-hats     0.0    9000  sample/gogodze
+hats     0.0    9000  internal/hat
 perc     0.0      60  sample/gogodze
 sub     -6.0      40  internal/sub
 fx       -5.7     286  FX/Unsettler
@@ -21,18 +21,18 @@ chord    -9.2     382  Pads/Smooth Dist
 bass     -8.8     554  Basses/Evilous
 bass     -7.2     557  Basses/Distorted Bass
 delay chord 1.5 0.40 0.20
-delay snare 0.75 0.30 0.12
+delay snare 1.0 0.55 0.35 throws
 
 # Balance (to be measured in the mix)
-gain pad   -14.9
-gain kick  -10.4
-gain snare  -0.4
-gain hats   10.8
-gain perc   -1.8
-gain bass   -8.8
-gain sub    -7.9
-gain arp   -11.0
-gain chord   1.4
+gain pad   -15.2
+gain kick   -9.5
+gain snare  -0.1
+gain hats    0.5
+gain perc   -5.0
+gain bass   -9.0
+gain sub    -8.1
+gain arp   -11.1
+gain chord   0.9
 gain fx     -6.9
 master 9.6
 drive bass  0.69 3500
@@ -42,3 +42,9 @@ drive kick  0.31 9000
 drive snare 0.44 8000
 drive pad   0.25 5000
 drive perc  0.25 9000
+comp kick -20 4 10 90 0.5
+crush perc  10 2 0.4
+comp perc -24 5 4 70 0.6
+crush snare 8 2 0.4
+duck hats 0.3
+duck perc 0.2

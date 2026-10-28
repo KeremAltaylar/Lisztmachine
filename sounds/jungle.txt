@@ -25,18 +25,18 @@ bass     -8.3     410  Basses/Distorted MW
 bass     -8.8     554  Basses/Evilous
 bass     -8.6    2467  Basses/Saw Lo-Fi
 delay arp 0.75 0.45 0.25
-delay snare 1.5 0.20 0.06
+delay snare 0.75 0.55 0.35 throws
 
 # Balance (to be measured in the mix)
 gain pad    -9.6
-gain kick   -5.4
-gain snare  -5.4
-gain hats   13.2
+gain kick   -5.3
+gain snare  -6.3
+gain hats   15.9
 gain perc   -6.0
-gain bass   -8.2
-gain sub    -6.3
-gain arp   -10.5
-gain chord  -8.7
+gain bass   -8.3
+gain sub    -6.4
+gain arp   -10.6
+gain chord  -8.8
 gain fx    -10.0
 master 8.0
 drive bass  0.55 3500
@@ -46,3 +46,9 @@ drive kick  0.25 9000
 drive snare 0.35 8000
 drive pad   0.20 5000
 drive perc  0.20 9000
+crush kick  12 2 0.6
+crush snare 12 2 0.6
+crush hats  10 2 0.5
+comp snare -20 4 8 80 0.5
+comp kick -18 4 10 90 0.4
+duck hats 0.25

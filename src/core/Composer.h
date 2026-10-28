@@ -42,12 +42,12 @@ const SceneInfo& sceneInfo(const std::string& scene);
 
 struct Event
 {
-    enum Type : uint8_t { NoteOff, NoteOn, Level, Filter }; // order = dispatch order at equal ticks
+    enum Type : uint8_t { NoteOff, NoteOn, Level, Filter, Throw }; // order = dispatch order at equal ticks
     int64_t tick;
     Type type;
     uint8_t track;
     uint8_t pitch;
-    float value; // NoteOn: velocity 0..1 · Level: gain 0..1 · Filter: cutoff offset -1..1
+    float value; // NoteOn: velocity 0..1 · Level: gain 0..1 · Filter: cutoff offset -1..1 · Throw: beats into the echo
 
     bool operator<(const Event& o) const
     {

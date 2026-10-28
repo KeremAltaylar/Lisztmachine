@@ -25,7 +25,12 @@ struct PaletteEntry
 };
 // A per-track echo, ping-pong between left and right: its time in beats, how much comes back,
 // and how much is heard.
-struct InsertDelay { float beats = 0, feedback = 0, mix = 0; };
+// `throws`: only the hits the composer throws go into the echo, not the whole track.
+struct InsertDelay { float beats = 0, feedback = 0, mix = 0; bool throws = false; };
+// The drums' processing, each with its own mix (0 = dry): a crusher (bits, and samples held so the
+// rate drops), a compressor for punch (a slow attack lets the transient through), how deep the kick ducks it.
+struct CrushSpec { float bits = 16, hold = 1, mix = 0; };
+struct CompSpec { float thresholdDb = 0, ratio = 1, attackMs = 10, releaseMs = 120, mix = 0; };
 // A per-track drive, like an amp or a tape pushed hard: how hard (0..1) and where its top rolls off.
 struct DriveSpec { float amount = 0, toneHz = 6000; };
 struct Palette
@@ -37,6 +42,9 @@ struct Palette
     float masterDb = 0;                 // "master dB": drive into the master's soft clipper
     InsertDelay delays[kMaxTracks];     // "delay <track> beats feedback mix"
     DriveSpec drives[kMaxTracks];       // "drive <track> amount toneHz"
+    CrushSpec crushes[kMaxTracks];      // "crush <track> bits hold mix"
+    CompSpec comps[kMaxTracks];         // "comp <track> thresholdDb ratio attackMs releaseMs mix"
+    float duckDepth[kMaxTracks];        // "duck <track> depth": over the mix stage's own; -1 keeps it
     // Lines: "part gain bright Category/Patch" (a Surge patch, or internal/click|blip|sub),
     // "voices ..." for every track of the voice group, "gain ...", "delay ...".
     juce::String load(const juce::File& file, const std::string& scene = "berlin"); // returns an error or empty
@@ -87,13 +95,13 @@ juce::File findDrumKit(); // Gogodze/: inside the app, next to the executable, o
 class InternalSynth
 {
 public:
-    enum Kind { Click, Blip, Sub, Kick, Hat, Clap, Snare };
+    enum Kind { Click, Blip, Sub, Kick, Hat, Clap, Snare, Kick808, Metal, Zap };
     void prepare(double sampleRate, Kind kind) { sr_ = sampleRate; kind_ = kind; for (auto& v : voices_) v.note = -1; }
     void render(const juce::MidiBuffer& midi, float* left, float* right, int numSamples);
     void allOff() { for (auto& v : voices_) v.note = -1; }
 
 private:
-    struct Voice { int note = -1; double phase = 0, inc = 0, env = 0, gain = 0, decay = 0, attack = 0, release = 0; float panL = 0.7f, panR = 0.7f; bool noise = false, held = false; float lastNoise = 0, lastNoise2 = 0; int64_t age = 0; };
+    struct Voice { int note = -1; double phase = 0, phase2 = 0, phase3 = 0, inc = 0, env = 0, gain = 0, decay = 0, attack = 0, release = 0; float panL = 0.7f, panR = 0.7f; bool noise = false, held = false; float lastNoise = 0, lastNoise2 = 0; int64_t age = 0; };
     void start(int note, float velocity);
     void stopNote(int note);
     void run(float* l, float* r, int from, int to);
@@ -110,13 +118,17 @@ class FeedbackDelay
 {
 public:
     void prepare(double sampleRate);
-    void set(double seconds, float feedback, float mix);
+    void set(double seconds, float feedback, float mix, bool throwsOnly = false);
     void process(float* left, float* right, int numSamples);
+    void throwFor(int at, int samples) { throwAt_ = at; throwLeft_ = samples; } // in this block, from sample `at`
 
 private:
     std::vector<float> l_, r_;
     int w_ = 0, d_ = 1;
     float fb_ = 0, mix_ = 0, lpL_ = 0, lpR_ = 0, hpL_ = 0, hpR_ = 0, lpA_ = 0.4f, hpA_ = 0.02f;
+    bool throwsOnly_ = false;
+    float send_ = 1, sendStep_ = 0.01f;
+    int throwAt_ = -1, throwLeft_ = 0;
 };
 
 // The shared buses. Delay times are set from the tempo when a concert starts.
@@ -191,6 +203,38 @@ private:
     float k_ = 1, comp_ = 1, lpA_ = 1, bias_ = 0.2f;
     float last_[2] = {}, lp_[2] = {}, dcIn_[2] = {}, dcOut_[2] = {};
     float shape(float x) const { return std::tanh(k_ * x + bias_) - std::tanh(bias_); }
+};
+
+class Crusher
+{
+public:
+    void prepare(const CrushSpec& s) { spec_ = s; levels_ = std::pow(2.0f, s.bits - 1); count_ = 0; }
+    bool on() const { return spec_.mix > 0; }
+    void process(float& l, float& r)
+    {
+        if (count_++ % std::max(1, int(spec_.hold)) == 0) { hl_ = std::round(l * levels_) / levels_; hr_ = std::round(r * levels_) / levels_; }
+        l += (hl_ - l) * spec_.mix;
+        r += (hr_ - r) * spec_.mix;
+    }
+
+private:
+    CrushSpec spec_;
+    float levels_ = 32768, hl_ = 0, hr_ = 0;
+    int64_t count_ = 0;
+};
+
+// A stereo-linked compressor with a parallel mix: the squashed copy under the dry one ("New York").
+class Compressor
+{
+public:
+    void prepare(double sampleRate, const CompSpec& s);
+    bool on() const { return spec_.mix > 0; }
+    void process(float& l, float& r);
+    float maxReductionDb = 0;
+
+private:
+    CompSpec spec_;
+    float env_ = 0, attack_ = 0, release_ = 0, makeup_ = 1;
 };
 
 class GlueBus
@@ -288,6 +332,8 @@ private:
         bool lowCut = false;
         Biquad hp[2];
         Drive drive;
+        Crusher crush;
+        Compressor comp;
         // The widener: the track's mid, delayed a few ms and high-passed, added as side. Mono
         // sum unchanged, low end stays centred.
         std::vector<float> wide;

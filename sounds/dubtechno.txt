@@ -22,18 +22,18 @@ arp      -9.5     948  Leads/Untamed
 bass     -8.3     410  Basses/Distorted MW
 bass     -1.0     399  Basses/Metal Square
 delay chord 0.75 0.62 0.38
-delay snare 0.75 0.45 0.20
+delay snare 0.75 0.65 0.5 throws
 delay arp 1.5 0.45 0.25
 
 # Balance (to be measured in the mix)
-gain pad    -8.6
-gain kick   -5.7
-gain snare  12.8
-gain hats    6.1
+gain pad    -8.4
+gain kick   -5.5
+gain snare  -0.2
+gain hats   10.7
 gain perc   -6.0
 gain bass   -5.6
 gain sub    -8.1
-gain arp   -11.0
+gain arp   -11.1
 gain chord  -5.3
 gain fx    -11.7
 master 9.3
@@ -44,3 +44,6 @@ drive kick  0.20 9000
 drive snare 0.28 8000
 drive pad   0.16 5000
 drive perc  0.16 9000
+crush hats  10 2 0.4
+duck hats 0.3
+comp snare -22 4 5 120 0.4

@@ -29,7 +29,8 @@ public:
     // "euclid" (perc only): k hits spread evenly over perBar steps, more as the music drives.
     struct Pat { const char* s = ""; int perBar = 16; };
     struct Part { Pat tier[3]; };                  // energy below .4, below .75, above
-    struct Sec { const char* name; int bars; float energy; const char* layers; }; // layers: P K S H C B U A D F
+    // layers: P K S H C B U A D F (the tracks), and L: Kerem's drums lead here, the machine's thin out
+    struct Sec { const char* name; int bars; float energy; const char* layers; };
     struct Spec
     {
         const char* scene;
@@ -100,6 +101,8 @@ private:
     int64_t arpStep_ = 0;
     // this bar's breaks: the beat each beat plays (chop), the beat left silent (gap), the beat stuttered
     std::array<int, 4> chopMap_ {};
+    std::vector<bool> drummerLeads_;                // per section: the live drums lead (L)
+    std::array<float, 16> accent_ {};               // the song's groove: how hard each sixteenth of the bar leans
     int gapBeat_ = -1, stutterBeat_ = -1;
 };
 

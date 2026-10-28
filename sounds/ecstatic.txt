@@ -9,7 +9,7 @@ pad       2.4    2052  Pads/Sunday
 kick     0.0      60  sample/gogodze+kick
 snare    0.0    1500  internal/snare
 hats     0.0    9000  sample/gogodze
-perc     0.0    8000  internal/click
+perc     0.0    8000  internal/metal
 bass     -8.4      99  Basses/Sub 2
 bass     -8.8     108  Basses/Digibass
 sub     -6.0      40  internal/sub
@@ -27,14 +27,14 @@ delay arp 0.75 0.40 0.22
 delay chord 0.75 0.30 0.15
 
 # Balance (to be measured in the mix)
-gain pad    -8.8
+gain pad    -8.7
 gain kick   -8.4
-gain snare  -4.0
-gain hats   22.6
+gain snare   4.9
+gain hats   21.5
 gain perc   -6.0
 gain bass   -7.9
 gain sub    -6.8
-gain arp    -5.0
+gain arp    -4.9
 gain chord  -6.1
 gain fx     -2.9
 master 9.2
@@ -45,3 +45,6 @@ drive kick  0.17 9000
 drive snare 0.24 8000
 drive pad   0.14 5000
 drive perc  0.14 9000
+comp kick -20 4 10 90 0.4
+crush hats  10 2 0.3
+duck hats 0.3

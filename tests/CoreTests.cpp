@@ -267,6 +267,8 @@ int main()
                 else if (x.type == Event::NoteOff) { CHECK(held[key] == 1, "%s note-off without note-on track %d pitch %d", spec->scene, x.track, x.pitch); --held[key]; }
             }
             for (auto& [k, n] : held) CHECK(n == 0, "%s stuck note track %d pitch %d", spec->scene, k.first, k.second);
+            // the fills throw their last hit into the echo
+            CHECK(std::count_if(ev.begin(), ev.end(), [](auto& x) { return x.type == Event::Throw && x.value > 0; }) > 10, "%s: no echo throws", spec->scene);
             // the summit plays the home progression, four bars a chord
             for (auto& s : c.sections())
                 if (s.restoreTheme)

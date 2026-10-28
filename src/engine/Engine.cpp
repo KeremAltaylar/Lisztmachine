@@ -381,6 +381,28 @@ float Drive::process(float x, int c)
     return out;
 }
 
+void Compressor::prepare(double sr, const CompSpec& s)
+{
+    spec_ = s;
+    attack_ = 1.0f - std::exp(-1.0f / float(s.attackMs * 0.001 * sr));
+    release_ = 1.0f - std::exp(-1.0f / float(s.releaseMs * 0.001 * sr));
+    // the squashed copy brought back to about the level it had: half the reduction at the threshold, given back
+    makeup_ = juce::Decibels::decibelsToGain(-s.thresholdDb * (1 - 1 / std::max(1.0f, s.ratio)) * 0.5f);
+    env_ = 0;
+}
+
+void Compressor::process(float& l, float& r)
+{
+    const float peak = juce::jmax(std::abs(l), std::abs(r));
+    env_ += (peak - env_) * (peak > env_ ? attack_ : release_);
+    const float over = juce::Decibels::gainToDecibels(env_, -120.0f) - spec_.thresholdDb;
+    const float cut = over > 0 ? over * (1 - 1 / spec_.ratio) : 0;
+    maxReductionDb = juce::jmin(maxReductionDb, -cut);
+    const float g = juce::Decibels::decibelsToGain(-cut) * makeup_;
+    l += (l * g - l) * spec_.mix;
+    r += (r * g - r) * spec_.mix;
+}
+
 void GlueBus::prepare(double sr)
 {
     attack_ = 1.0f - std::exp(-1.0f / float(0.010 * sr));
@@ -437,6 +459,9 @@ juce::String Palette::load(const juce::File& file, const std::string& sceneName)
     for (auto& g : trackGainDb) g = 0;
     masterDb = 0;
     for (auto& d : drives) d = {};
+    for (auto& c : crushes) c = {};
+    for (auto& c : comps) c = {};
+    for (auto& d : duckDepth) d = -1;
     for (auto& d : delays) d = {};
     if (!file.existsAsFile()) return "no palette at " + file.getFullPathName();
 
@@ -450,14 +475,18 @@ juce::String Palette::load(const juce::File& file, const std::string& sceneName)
         tokens.removeEmptyStrings();
         const auto where = file.getFileName() + " line " + juce::String(n + 1) + ": ";
         if (tokens[0] == "master" && tokens.size() >= 2) { masterDb = tokens[1].getFloatValue(); continue; }
-        if (tokens[0] == "gain" || tokens[0] == "delay" || tokens[0] == "drive")
+        if (tokens[0] == "gain" || tokens[0] == "delay" || tokens[0] == "drive" || tokens[0] == "crush" || tokens[0] == "comp" || tokens[0] == "duck")
         {
             const int t = info->trackOf(tokens[1].toStdString());
             if (t < 0) return where + "no track '" + tokens[1] + "' in the " + juce::String(scene) + " scene";
             if (tokens[0] == "gain") trackGainDb[t] = tokens[2].getFloatValue();
+            else if (tokens[0] == "crush" && tokens.size() >= 5) crushes[t] = { tokens[2].getFloatValue(), tokens[3].getFloatValue(), juce::jlimit(0.0f, 1.0f, tokens[4].getFloatValue()) };
+            else if (tokens[0] == "comp" && tokens.size() >= 7) comps[t] = { tokens[2].getFloatValue(), juce::jmax(1.0f, tokens[3].getFloatValue()), tokens[4].getFloatValue(), tokens[5].getFloatValue(), juce::jlimit(0.0f, 1.0f, tokens[6].getFloatValue()) };
+            else if (tokens[0] == "duck") duckDepth[t] = juce::jlimit(0.0f, 1.0f, tokens[2].getFloatValue());
             else if (tokens[0] == "drive") drives[t] = { juce::jlimit(0.0f, 1.0f, tokens[2].getFloatValue()), tokens.size() >= 4 ? tokens[3].getFloatValue() : 6000.0f };
-            else if (tokens.size() >= 5) delays[t] = { tokens[2].getFloatValue(), juce::jlimit(0.0f, 0.95f, tokens[3].getFloatValue()), tokens[4].getFloatValue() };
-            else return where + "expected 'delay <track> beats feedback mix'";
+            else if (tokens[0] == "delay" && tokens.size() >= 5) delays[t] = { tokens[2].getFloatValue(), juce::jlimit(0.0f, 0.95f, tokens[3].getFloatValue()), tokens[4].getFloatValue(), tokens[5] == "throws" };
+            else if (tokens[0] == "delay") return where + "expected 'delay <track> beats feedback mix [throws]'";
+            else return where + "too few values";
             continue;
         }
         std::vector<int> targets;
@@ -577,6 +606,9 @@ juce::String Engine::load(double sampleRate, int maxBlock, const Palette& palett
         for (auto& f : t.hp) f.highpass(sampleRate, juce::jmax(10.0f, m.lowCutHz));
         t.mix.setSize(2, maxBlock);
         t.drive.prepare(sampleRate, palette.drives[i]);
+        t.crush.prepare(palette.crushes[i]);
+        t.comp.prepare(sampleRate, palette.comps[i]);
+        if (palette.duckDepth[i] >= 0) t.duck = palette.duckDepth[i];
         // Each track a different delay (7 to 19 ms) so the widened tracks don't fuse into one image.
         t.wideAmount = juce::jmax(0.0f, m.width - 1) * 1.4f;
         t.wide.assign(size_t((0.007 + 0.003 * (i % 5)) * sampleRate), 0.0f);
@@ -586,7 +618,9 @@ juce::String Engine::load(double sampleRate, int maxBlock, const Palette& palett
         {
             const auto kind = first.endsWith("sub") ? InternalSynth::Sub : first.endsWith("blip") ? InternalSynth::Blip
                             : first.endsWith("kick") ? InternalSynth::Kick : first.endsWith("hat") ? InternalSynth::Hat
-                            : first.endsWith("clap") ? InternalSynth::Clap : first.endsWith("snare") ? InternalSynth::Snare : InternalSynth::Click;
+                            : first.endsWith("clap") ? InternalSynth::Clap : first.endsWith("snare") ? InternalSynth::Snare
+                            : first.endsWith("kick808") ? InternalSynth::Kick808 : first.endsWith("metal") ? InternalSynth::Metal
+                            : first.endsWith("zap") ? InternalSynth::Zap : InternalSynth::Click;
             t.synth.prepare(sampleRate, kind);
             for (auto& s : t.slots) { s.plugin.reset(); s.midi.ensureSize(8192); s.state = Idle; s.entry = 0; s.gain = juce::Decibels::decibelsToGain(palette.parts[i].front().gainDb); }
             t.buffer.setSize(2, maxBlock);
@@ -718,6 +752,7 @@ void Engine::start(uint64_t seed, int startBar)
             {
                 case Event::Level:   level[e.track] = e.value; break;
                 case Event::Filter:  filter[e.track] = e.value; break;
+                default: break;
                 case Event::NoteOn:  held[e.track][e.pitch] = e.value; break;
                 case Event::NoteOff: held[e.track][e.pitch] = 0; break;
             }
@@ -763,7 +798,7 @@ void Engine::start(uint64_t seed, int startBar)
     {
         auto& t = tracks_[i];
         const auto& d = palette_.delays[i];
-        if (t.hasEcho) t.echo.set(d.beats * 60.0 / composer_->bpm(), feedbackOverride >= 0 ? feedbackOverride : d.feedback, d.mix);
+        if (t.hasEcho) t.echo.set(d.beats * 60.0 / composer_->bpm(), feedbackOverride >= 0 ? feedbackOverride : d.feedback, d.mix, d.throws);
         if (t.internal) t.synth.allOff();
         t.gain.reset(sampleRate_, barSeconds); // level changes glide across a whole bar
         t.gain.setCurrentAndTargetValue(level[i]);
@@ -942,6 +977,7 @@ void Engine::renderChunk(float* const* out, int numChannels, int offset, int len
                 case Event::NoteOff: live.midi.addEvent(juce::MidiMessage::noteOff(1, e.pitch), at); t.held[e.pitch] = 0; break;
                 case Event::Level:   t.gain.setTargetValue(e.value); break;
                 case Event::Filter:  t.filterTarget = e.value; break;
+                case Event::Throw:   if (t.hasEcho) t.echo.throwFor(at, int(e.value * kPPQ * samplesPerTick_)); break;
             }
         }
         for (int i = 0; i < numTracks_; ++i) changesDue(i, end - 1);
@@ -997,6 +1033,8 @@ void Engine::renderChunk(float* const* out, int numChannels, int offset, int len
             if (mixStage)
             {
                 if (t.drive.on()) { l = t.drive.process(l, 0); r = t.drive.process(r, 1); }
+                if (t.crush.on()) t.crush.process(l, r);
+                if (t.comp.on()) t.comp.process(l, r);
                 if (t.lowCut) { l = t.hp[0].process(l); r = t.hp[1].process(r); }
                 const float mid = (l + r) * 0.5f;
                 float side = (l - r) * 0.5f * juce::jmin(1.0f, t.width);
@@ -1204,8 +1242,12 @@ void InternalSynth::start(int note, float velocity)
     if (kind_ == Kick) tau = 0.16 + 0.2 * velocity;                         // the kick's body, ending on the note
     if (kind_ == Snare) tau = note >= 60 ? 0.025 : 0.09 + 0.08 * velocity;  // the rim, or the snare's rattle
     if (kind_ == Hat) tau = note >= 46 ? 0.07 + 0.1 * velocity : 0.012 + 0.02 * velocity; // 46 open, else closed
+    if (kind_ == Kick808) tau = 0.3 + 0.6 * velocity;   // the long 808 boom: the harder, the longer
+    if (kind_ == Metal) tau = 0.05 + 0.25 * velocity;   // struck metal, tuned to the note
+    if (kind_ == Zap) tau = 0.04 + 0.08 * velocity;     // a laser: a sine diving onto the note
     v->decay = std::exp(-1.0 / (tau * sr_));
-    const bool struck = kind_ == Click || kind_ == Kick || kind_ == Hat || kind_ == Clap || kind_ == Snare;
+    v->phase2 = v->phase3 = 0;
+    const bool struck = kind_ != Sub && kind_ != Blip;
     v->attack = struck ? 1.0 : 1.0 / ((kind_ == Sub ? 0.04 : 0.001) * sr_);
     v->release = std::exp(-1.0 / (0.4 * sr_));
     v->env = struck ? v->gain : 0.0;
@@ -1227,7 +1269,7 @@ void InternalSynth::run(float* l, float* r, int from, int to)
         if (v.note < 0) continue;
         for (int n = from; n < to; ++n)
         {
-            if (kind_ == Click || kind_ == Kick || kind_ == Hat || kind_ == Snare) v.env *= v.decay;
+            if (kind_ == Click || kind_ == Kick || kind_ == Hat || kind_ == Snare || kind_ >= Kick808) v.env *= v.decay;
             else if (kind_ == Clap)
             {
                 // three hand claps 11 ms apart, then the room
@@ -1256,6 +1298,38 @@ void InternalSynth::run(float* l, float* r, int from, int to)
             }
             else
                 x = float(std::sin(v.phase) + (kind_ == Sub ? 0.12 * std::sin(2 * v.phase) : 0.0));
+            if (kind_ >= Kick808)
+            {
+                const double age = double(v.age) / sr_;
+                double y;
+                if (kind_ == Kick808)
+                {
+                    // two octaves down onto the note in 40 ms, a little drive that the decay lets go of
+                    v.phase += v.inc * (1 + 3 * std::exp(-age / 0.04));
+                    y = std::tanh(2.5 * std::sin(v.phase) * v.env) * 0.5;
+                }
+                else if (kind_ == Metal)
+                {
+                    // FM: two inharmonic modulators (1.41 and 3.73 times the note), their brightness gone first
+                    v.phase += v.inc;
+                    v.phase2 += v.inc * 1.4142;
+                    v.phase3 += v.inc * 3.7321;
+                    const double index = 4.0 * std::exp(-age / 0.03);
+                    y = std::sin(v.phase + index * std::sin(v.phase2) + 0.6 * index * std::sin(v.phase3)) * v.env;
+                }
+                else
+                {
+                    v.phase += v.inc * (1 + 15 * std::exp(-age / 0.012));
+                    y = std::sin(v.phase) * v.env;
+                }
+                v.phase = std::fmod(v.phase, juce::MathConstants<double>::twoPi);
+                v.phase2 = std::fmod(v.phase2, juce::MathConstants<double>::twoPi);
+                v.phase3 = std::fmod(v.phase3, juce::MathConstants<double>::twoPi);
+                ++v.age;
+                l[n] += float(y) * v.panL;
+                r[n] += float(y) * v.panR;
+                continue;
+            }
             if (kind_ == Kick)
             {
                 // the pitch falls from two octaves above the note in a few milliseconds, then saturates a little
@@ -1307,8 +1381,11 @@ void FeedbackDelay::prepare(double sr)
     lpL_ = lpR_ = hpL_ = hpR_ = 0;
 }
 
-void FeedbackDelay::set(double seconds, float feedback, float mix)
+void FeedbackDelay::set(double seconds, float feedback, float mix, bool throwsOnly)
 {
+    throwsOnly_ = throwsOnly;
+    send_ = throwsOnly ? 0.0f : 1.0f;
+    sendStep_ = 1.0f / 96.0f; // the send opens and closes over 2 ms: no click on a throw
     d_ = juce::jlimit(1, int(l_.size()) - 1, int(std::lround(seconds * (double(l_.size() - 8) / 4.5))));
     fb_ = juce::jlimit(0.0f, 0.95f, feedback);
     mix_ = juce::jlimit(0.0f, 1.0f, mix);
@@ -1325,13 +1402,20 @@ void FeedbackDelay::process(float* left, float* right, int n)
         lpL_ += (er - lpL_) * lpA_;  lpR_ += (el - lpR_) * lpA_;
         hpL_ += (lpL_ - hpL_) * hpA_; hpR_ += (lpR_ - hpR_) * hpA_;
         const float backL = lpL_ - hpL_, backR = lpR_ - hpR_;
-        const float in = 0.5f * (left[i] + right[i]);
+        if (throwsOnly_)
+        {
+            const bool open = throwLeft_ > 0 && i >= throwAt_;
+            if (open && --throwLeft_ == 0) throwAt_ = -1;
+            send_ = juce::jlimit(0.0f, 1.0f, send_ + (open ? sendStep_ : -sendStep_));
+        }
+        const float in = 0.5f * (left[i] + right[i]) * send_;
         l_[size_t(w_)] = in + backL * fb_;   // ping-pong: left feeds right feeds left
         r_[size_t(w_)] = backR * fb_;
         left[i] += el * mix_;
         right[i] += er * mix_;
         w_ = (w_ + 1) % size;
     }
+    if (throwAt_ >= 0) throwAt_ = 0; // a throw still open carries into the next block from its start
 }
 
 } // namespace liszt
