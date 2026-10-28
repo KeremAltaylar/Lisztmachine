@@ -260,7 +260,7 @@ int main()
                     const auto r = c.range(x.track);
                     CHECK(x.pitch >= r[0] && x.pitch <= r[1], "%s track %d pitch %d out of range", spec->scene, x.track, x.pitch);
                     if (x.track != G::Snare && x.track != G::Hats)
-                        CHECK(inMode(*spec->mode, c.tonicPc(), x.pitch), "%s track %d pitch %d outside the key", spec->scene, x.track, x.pitch);
+                        CHECK(inMode(*spec->mode, c.tonicAt(int(x.tick / kBarTicks)), x.pitch), "%s track %d pitch %d outside the key", spec->scene, x.track, x.pitch);
                     ++held[key];
                     ++notes[x.track];
                 }

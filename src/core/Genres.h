@@ -63,6 +63,8 @@ public:
 
     const Spec& spec() const { return spec_; }
     int tonicPc() const { return tonicPc_; }
+    // halfway through the summit the song lifts a whole tone and stays there
+    int tonicAt(int bar) const { return (tonicPc_ + (bar >= liftBar_ ? 2 : 0)) % 12; }
     int rootAt(int bar) const { return rootOfBar_[size_t(bar)]; }
     const std::array<int, 4>& homeProgression() const { return home_; }
     bool active(int track, int bar) const;
@@ -87,7 +89,7 @@ private:
     int tier(int bar) const;
 
     const Spec& spec_;
-    int tonicPc_ = 0;
+    int tonicPc_ = 0, liftBar_ = 1 << 30;
     std::vector<int> rootOfBar_;
     std::vector<int> arp_, arpHome_;                // ladder indices
     std::vector<int> arpRank_;

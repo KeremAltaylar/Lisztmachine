@@ -265,10 +265,13 @@ void GenreComposer::planHarmony()
         const bool beforePeak = sections_[si + 1].restoreTheme;
         const int per = sec.energy < .4f || sec.restoreTheme ? 4 : 2;
         const auto& prog = away ? away_ : home_;
+        if (sec.restoreTheme) liftBar_ = sec.startBar + sec.bars / 2;
         for (int b = 0; b < sec.bars; ++b)
         {
             const size_t at = size_t(sec.startBar + b);
-            rootOfBar_[at] = beforePeak && b >= sec.bars - 2 ? spec_.preRoot : prog[size_t((b / per) % 4)];
+            // into the summit the chords quicken to one a bar, then land on the chord that leads in
+            const bool quicken = beforePeak && b >= sec.bars - 6;
+            rootOfBar_[at] = beforePeak && b >= sec.bars - 2 ? spec_.preRoot : quicken ? prog[size_t(b % 4)] : prog[size_t((b / per) % 4)];
             awayBar_[at] = away;
         }
     }
@@ -281,7 +284,7 @@ std::vector<int> GenreComposer::chordTones(int bar, bool rootless) const
     const auto& m = *spec_.mode;
     const int r = rootAt(bar), n = 3 + spec_.ext;
     std::vector<int> pcs;
-    for (int k = rootless && n > 3 ? 1 : 0; k < n; ++k) pcs.push_back((tonicPc_ + degreeSemis(m, r + 2 * k)) % 12);
+    for (int k = rootless && n > 3 ? 1 : 0; k < n; ++k) pcs.push_back((tonicAt(bar) + degreeSemis(m, r + 2 * k)) % 12);
     return pcs;
 }
 
@@ -381,10 +384,21 @@ void GenreComposer::emitHook(int bar, std::vector<Event>& out)
     const auto& m = *spec_.mode;
     const int r = rootAt(bar), lo = spec_.arpLo, hi = spec_.arpHi;
     const int rootP = pitchOf(bar, 0, lo + 5, lo + 16, 12 * (lo / 12)); // base on a C: it is a register, not a transposition
+    // In eight bars: the question, its answer, the question, and a close (the answer cut to one
+    // long note on the chord's root): a period, as a song has.
+    const bool close = !calm && !away && cycle % 4 == 3;
+    bool closed = false;
     for (auto n : hook_)
     {
         const int64_t t = int64_t(t0Cycle) + n.step * six;
         if (t < int64_t(bar) * kBarTicks || t >= int64_t(bar + 1) * kBarTicks) continue; // only this bar's notes
+        if (close && n.step >= 16)
+        {
+            if (closed) continue;
+            closed = true;
+            n.deg = 0;
+            n.len = 32 - n.step;
+        }
         int deg = n.deg;
         if (away) deg = 4 - deg;                             // the breakdowns turn it upside down
         else if (!summit && n.step >= 16 && cycle % 2 == 1) deg += 2; // every other time, its answer a third up
@@ -462,12 +476,12 @@ float GenreComposer::levelAt(int track, int bar) const
 
 int GenreComposer::pitchOf(int bar, int deg, int lo, int hi, int base) const
 {
-    return foldInto(base + tonicPc_ + degreeSemis(*spec_.mode, rootAt(bar) + deg), lo, hi);
+    return foldInto(base + tonicAt(bar) + degreeSemis(*spec_.mode, rootAt(bar) + deg), lo, hi);
 }
 
 int GenreComposer::ladderPitch(int bar, int idx, int lo, int hi) const
 {
-    int p = 12 * (lo / 12) + tonicPc_ + degreeSemis(*spec_.mode, rootAt(bar) + kLadder[idx % 7]);
+    int p = 12 * (lo / 12) + tonicAt(bar) + degreeSemis(*spec_.mode, rootAt(bar) + kLadder[idx % 7]);
     while (p < lo) p += 12;
     while (p > hi) p -= 12;
     return p;
@@ -518,10 +532,34 @@ void GenreComposer::emitPad(int bar, std::vector<Event>& out)
         want = { lo, lo + degreeSemis(m, r + 4) - degreeSemis(m, r) };
         for (int p : voice(bar, 3, 55, 76, true, padVoices_)) want.push_back(p);
     }
+    // On a new chord its third arrives late: the voice holds the fourth over the bar line and falls
+    // to the third on beat three (a suspension), once the music has some motion.
+    int suspended = -1, sus = -1;
+    if (!want.empty() && bar > 0 && rootAt(bar) != rootAt(bar - 1) && energyAt(bar) > .3f)
+    {
+        const int third = (tonicAt(bar) + degreeSemis(*spec_.mode, rootAt(bar) + 2)) % 12;
+        for (size_t i = 2; i < want.size(); ++i)
+            if (want[i] % 12 == third)
+            {
+                const int up = want[i] + degreeSemis(*spec_.mode, rootAt(bar) + 3) - degreeSemis(*spec_.mode, rootAt(bar) + 2);
+                const auto has = [](const std::vector<int>& v, int p) { return std::find(v.begin(), v.end(), p) != v.end(); };
+                if (!has(padHeld_, want[i]) && !has(padHeld_, up) && !has(want, up) && up <= 76) { suspended = want[i]; sus = up; }
+                break;
+            }
+    }
     for (int p : padHeld_)
         if (std::find(want.begin(), want.end(), p) == want.end()) out.push_back({ t0, Event::NoteOff, Pad, uint8_t(p), 0 });
     for (int p : want)
-        if (std::find(padHeld_.begin(), padHeld_.end(), p) == padHeld_.end()) out.push_back({ t0, Event::NoteOn, Pad, uint8_t(p), .75f });
+    {
+        if (std::find(padHeld_.begin(), padHeld_.end(), p) != padHeld_.end()) continue;
+        if (p == suspended)
+        {
+            out.push_back({ t0, Event::NoteOn, Pad, uint8_t(sus), .75f });
+            out.push_back({ t0 + 2 * kPPQ, Event::NoteOff, Pad, uint8_t(sus), 0 });
+            out.push_back({ t0 + 2 * kPPQ, Event::NoteOn, Pad, uint8_t(p), .7f });
+        }
+        else out.push_back({ t0, Event::NoteOn, Pad, uint8_t(p), .75f });
+    }
     padHeld_ = want;
     if (bar + 1 == totalBars())
     {
@@ -565,7 +603,7 @@ void GenreComposer::emitPart(int track, const Part& part, int bar, std::vector<E
         const int alt = c >= '1' && c <= '9' ? c - '1' : 0;
         switch (track)
         {
-            case Kick: return foldInto(24 + tonicPc_, 24, 35);
+            case Kick: return foldInto(24 + tonicAt(bar), 24, 35);
             case Snare: return alt == 1 ? 62 : 50;  // 2: the rim
             case Hats: return alt == 1 ? 46 : 42;   // 2: open
             default: return ladderPitch(bar, c == 'e' ? step % 5 : alt, spec_.percLo, spec_.percHi);
@@ -659,6 +697,18 @@ void GenreComposer::emitPart(int track, const Part& part, int bar, std::vector<E
             for (int p : voice(bar, 4, 48, 74, spec_.ext == 2, chordVoices_)) hit(t, p, vel, noteLen);
     }
 
+    // The bass walks into a new chord: on the last eighth of the bar, when the pattern rests there,
+    // the scale step next to the coming root, from the side it is coming from.
+    if (track == Bass && P == 16 && bar + 1 < totalBars() && active(Bass, bar + 1) && rootAt(bar + 1) != rootAt(bar) && !drop
+        && pat.s[(int64_t(bar) * P + 14) % len] == '.' && pat.s[(int64_t(bar) * P + 15) % len] == '.' && energyAt(bar) > .3f)
+    {
+        const auto& m = *spec_.mode;
+        const int next = pitchOf(bar + 1, 0, 40, 51, 36), now = pitchOf(bar, 0, 40, 51, 36);
+        const int r1 = rootAt(bar + 1), step = next > now ? -1 : 1;
+        const int p = next + degreeSemis(m, r1 + step) - degreeSemis(m, r1);
+        if (p >= 40 && p <= 64 && tonicAt(bar + 1) == tonicAt(bar)) hit(t0 + 14 * six, p, .7f, 2 * six - 20);
+    }
+
     // What grows and what turns, on the sixteenth grid only (the triplet parts keep their own).
     if (drum && P == 16 && !live)
     {
@@ -739,7 +789,7 @@ void GenreComposer::generateBar(int bar, std::vector<Event>& out)
     if (spec_.hook) emitHook(bar, out);
     else emitArp(bar, out);
     emitHeld(Sub, bar, out, subHeld_, active(Sub, bar) ? pitchOf(bar, 0, 24, 35, 24) : -1);
-    emitHeld(Fx, bar, out, fxHeld_, active(Fx, bar) ? foldInto(48 + tonicPc_, 48, 59) : -1);
+    emitHeld(Fx, bar, out, fxHeld_, active(Fx, bar) ? foldInto(48 + tonicAt(bar), 48, 59) : -1);
 }
 
 std::string GenreComposer::describe() const
