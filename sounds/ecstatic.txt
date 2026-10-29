@@ -33,10 +33,10 @@ gain pulse   0.0
 gain metal   -7.2
 gain tick    15.5
 gain perc    -4.0
-gain pad     -9.2
-gain bass    -2.1
+gain pad     -8.5
+gain bass    -1.9
 gain sub     -12.1
-gain arp     -1.7
+gain arp     -1.5
 gain chord   -12.2
 gain fx     -2.9
 master 9.2

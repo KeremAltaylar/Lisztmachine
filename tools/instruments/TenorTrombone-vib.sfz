@@ -1,0 +1,15 @@
+// Brass/Tenor Trombone vib: generated from the VSCO 2 CE (CC0) file names; C-1 convention: their A#0 is MIDI 34
+<control> default_path=Brass/Tenor Trombone/vib/
+<global> ampeg_release=0.4
+<region> sample=tenortbn_vib_F1_v1_1.wav lokey=0 hikey=42 pitch_keycenter=41 lovel=1 hivel=127
+<region> sample=tenortbn_vib_G#1_v1_1.wav lokey=43 hikey=45 pitch_keycenter=44 lovel=1 hivel=127
+<region> sample=tenortbn_vib_A#1_v1_1.wav lokey=46 hikey=47 pitch_keycenter=46 lovel=1 hivel=127
+<region> sample=tenortbn_vib_C2_v1_1.wav lokey=48 hikey=49 pitch_keycenter=48 lovel=1 hivel=127
+<region> sample=tenortbn_vib_D#2_v1_1.wav lokey=50 hikey=52 pitch_keycenter=51 lovel=1 hivel=127
+<region> sample=tenortbn_vib_F2_v1_1.wav lokey=53 hikey=54 pitch_keycenter=53 lovel=1 hivel=127
+<region> sample=tenortbn_vib_G#2_v1_1.wav lokey=55 hikey=57 pitch_keycenter=56 lovel=1 hivel=127 seq_length=2 seq_position=1
+<region> sample=tenortbn_vib_G#2_v1_2.wav lokey=55 hikey=57 pitch_keycenter=56 lovel=1 hivel=127 seq_length=2 seq_position=2
+<region> sample=tenortbn_vib_A#2_v1_1.wav lokey=58 hikey=59 pitch_keycenter=58 lovel=1 hivel=127
+<region> sample=tenortbn_vib_C3_v1_1.wav lokey=60 hikey=61 pitch_keycenter=60 lovel=1 hivel=127
+<region> sample=tenortbn_vib_D3_v1_1.wav lokey=62 hikey=62 pitch_keycenter=62 lovel=1 hivel=127
+<region> sample=tenortbn_vib_D#3_v1_1.wav lokey=63 hikey=127 pitch_keycenter=63 lovel=1 hivel=127

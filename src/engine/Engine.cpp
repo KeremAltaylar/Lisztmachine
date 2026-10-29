@@ -1,4 +1,5 @@
 #include "Engine.h"
+#include <sfizz.hpp>
 
 namespace liszt {
 
@@ -97,6 +98,109 @@ juce::String loadDexedVoice(juce::AudioPluginInstance& dexed, const juce::String
     juce::StringArray names;
     for (int i = 0; i < dexed.getNumPrograms(); ++i) names.add(dexed.getProgramName(i).trim());
     return "no Dexed voice '" + name + "' (has: " + names.joinIntoString(", ") + ")";
+}
+
+bool isSfzSound(const juce::String& patch) { return patch.startsWith("sfz/"); }
+
+juce::File findSfz(const juce::String& patch)
+{
+    const auto rel = patch.fromFirstOccurrenceOf("sfz/", false, false);
+    const auto home = juce::File::getSpecialLocation(juce::File::userHomeDirectory);
+    for (auto root : { home.getChildFile("liszt-instruments/lib"), home.getChildFile("liszt-instruments"),
+                       home.getChildFile("Music/Lisztmachine/instruments") })
+        if (auto f = root.getChildFile(rel); f.existsAsFile()) return f;
+    return home.getChildFile("liszt-instruments/lib").getChildFile(rel);
+}
+
+static std::atomic<bool> offlineRendering { false };
+void setOfflineRendering(bool offline) { offlineRendering = offline; }
+
+namespace {
+struct ExpressionParameter : juce::AudioPluginInstance::HostedParameter
+{
+    std::atomic<float> value { 0.7f };
+    float getValue() const override { return value; }
+    void setValue(float v) override { value = v; }
+    float getDefaultValue() const override { return 0.7f; }
+    juce::String getName(int n) const override { return juce::String("Expression").substring(0, n); }
+    juce::String getLabel() const override { return {}; }
+    float getValueForText(const juce::String& t) const override { return t.getFloatValue(); }
+    juce::String getParameterID() const override { return "expression"; }
+};
+
+// sfizz behind the plugin interface, so the engine's slots, crossfades and sound changes treat it
+// like any other instrument.
+class SfzInstrument : public juce::AudioPluginInstance
+{
+public:
+    SfzInstrument() : juce::AudioPluginInstance(BusesProperties().withOutput("Out", juce::AudioChannelSet::stereo(), true))
+    {
+        auto p = std::make_unique<ExpressionParameter>();
+        expression_ = p.get();
+        addHostedParameter(std::move(p));
+    }
+    bool load(const juce::File& f)
+    {
+        synth_.setNumVoices(48);
+        if (!synth_.loadSfzFile(f.getFullPathName().toStdString())) return false;
+        name_ = f.getFileNameWithoutExtension();
+        return synth_.getNumRegions() > 0;
+    }
+    const juce::String getName() const override { return "sfizz " + name_; }
+    void prepareToPlay(double sr, int block) override
+    {
+        synth_.setSampleRate(float(sr));
+        synth_.setSamplesPerBlock(block);
+        if (offlineRendering) synth_.enableFreeWheeling();
+    }
+    void releaseResources() override {}
+    void processBlock(juce::AudioBuffer<float>& buf, juce::MidiBuffer& midi) override
+    {
+        const int cc = juce::jlimit(0, 127, int(expression_->getValue() * 127));
+        if (cc != lastCc_) { synth_.cc(0, 1, cc); synth_.cc(0, 11, cc); lastCc_ = cc; }
+        for (const auto meta : midi)
+        {
+            const auto m = meta.getMessage();
+            const int at = juce::jlimit(0, buf.getNumSamples() - 1, meta.samplePosition);
+            if (m.isNoteOn()) synth_.noteOn(at, m.getNoteNumber(), juce::jmax(1, int(m.getVelocity())));
+            else if (m.isNoteOff()) synth_.noteOff(at, m.getNoteNumber(), 0);
+            else if (m.isAllNotesOff() || m.isAllSoundOff()) synth_.allSoundOff();
+            else if (m.isController()) synth_.cc(at, m.getControllerNumber(), m.getControllerValue());
+        }
+        float* out[2] = { buf.getWritePointer(0), buf.getWritePointer(juce::jmin(1, buf.getNumChannels() - 1)) };
+        synth_.renderBlock(out, size_t(buf.getNumSamples()), 1);
+        for (int c = 2; c < buf.getNumChannels(); ++c) buf.clear(c, 0, buf.getNumSamples());
+    }
+    void reset() override { synth_.allSoundOff(); }
+    double getTailLengthSeconds() const override { return 2.0; }
+    bool acceptsMidi() const override { return true; }
+    bool producesMidi() const override { return false; }
+    juce::AudioProcessorEditor* createEditor() override { return nullptr; }
+    bool hasEditor() const override { return false; }
+    int getNumPrograms() override { return 1; }
+    int getCurrentProgram() override { return 0; }
+    void setCurrentProgram(int) override {}
+    const juce::String getProgramName(int) override { return name_; }
+    void changeProgramName(int, const juce::String&) override {}
+    void getStateInformation(juce::MemoryBlock&) override {}
+    void setStateInformation(const void*, int) override {}
+    void fillInPluginDescription(juce::PluginDescription& d) const override { d.name = getName(); d.pluginFormatName = "sfizz"; d.isInstrument = true; }
+
+private:
+    sfz::Sfizz synth_;
+    ExpressionParameter* expression_ = nullptr;
+    juce::String name_;
+    int lastCc_ = -1;
+};
+} // namespace
+
+std::unique_ptr<juce::AudioPluginInstance> createSfz(double sampleRate, int maxBlock, const juce::File& sfz, juce::String& error)
+{
+    auto p = std::make_unique<SfzInstrument>();
+    if (!sfz.existsAsFile()) { error = "no sfz file " + sfz.getFullPathName(); return nullptr; }
+    if (!p->load(sfz)) { error = "sfizz could not load " + sfz.getFullPathName(); return nullptr; }
+    p->prepareToPlay(sampleRate, maxBlock);
+    return p;
 }
 
 juce::String setParameterText(juce::AudioPluginInstance& plugin, const juce::String& name, const juce::String& value)
@@ -490,7 +594,12 @@ juce::String Palette::load(const juce::File& file, const std::string& sceneName)
             return where + "expected 'part gain bright Category/Patch'";
         // The patch name is the rest of the line: it may contain spaces.
         auto patch = line.fromFirstOccurrenceOf(tokens[2], false, false).trim();
-        if (!isEngineSound(patch) && !isDexedSound(patch) && !findSurgePatch(patch).existsAsFile())
+        if (isSfzSound(patch) && !findSfz(patch).existsAsFile()) // not installed here: the track plays its other sounds
+        {
+            DBG(where + "no sampled instrument '" + patch + "', skipped");
+            continue;
+        }
+        if (!isEngineSound(patch) && !isDexedSound(patch) && !isSfzSound(patch) && !findSurgePatch(patch).existsAsFile())
             return where + "no Surge patch '" + patch + "'";
         for (int t : targets) parts[t].push_back({ patch, tokens[1].getFloatValue(), tokens[2].getFloatValue() });
     }
@@ -689,9 +798,21 @@ juce::String Engine::loadInto(Slot& slot, int track, int entry)
 {
     const auto& e = palette_.parts[track][size_t(entry)];
     if (tracks_[track].internal) { slot.entry = entry; return {}; }
-    // A track may rotate between Surge and Dexed: the slot's instance is swapped for the other synth.
-    const bool dexed = isDexedSound(e.patch);
-    if (dexed != slot.dexed || !slot.plugin)
+    // A track may rotate between Surge, Dexed and sampled instruments: the slot's instance is swapped.
+    const bool dexed = isDexedSound(e.patch), sampled = isSfzSound(e.patch);
+    if (sampled)
+    {
+        if (slot.sfz != e.patch || !slot.plugin)
+        {
+            juce::String err;
+            auto p = createSfz(sampleRate_, maxBlock_, findSfz(e.patch), err);
+            if (!p) return err;
+            slot.plugin = std::move(p);
+            slot.sfz = e.patch;
+            slot.dexed = false;
+        }
+    }
+    else if (dexed != slot.dexed || slot.sfz.isNotEmpty() || !slot.plugin)
     {
         juce::String err;
         auto p = dexed ? createDexed(sampleRate_, maxBlock_, err) : createSurge(sampleRate_, maxBlock_, err);
@@ -699,8 +820,10 @@ juce::String Engine::loadInto(Slot& slot, int track, int entry)
         p->prepareToPlay(sampleRate_, maxBlock_);
         slot.plugin = std::move(p);
         slot.dexed = dexed;
+        slot.sfz = {};
     }
-    if (dexed) { if (auto err = loadDexedVoice(*slot.plugin, e.patch); err.isNotEmpty()) return err; }
+    if (sampled) {}
+    else if (dexed) { if (auto err = loadDexedVoice(*slot.plugin, e.patch); err.isNotEmpty()) return err; }
     else
     {
         if (auto err = loadSurgePatch(*slot.plugin, findSurgePatch(e.patch)); err.isNotEmpty()) return err;
@@ -709,7 +832,8 @@ juce::String Engine::loadInto(Slot& slot, int track, int entry)
     slot.plugin->reset();
     slot.cutoff = nullptr;
     for (auto* p : slot.plugin->getParameters())
-        if (p->getName(64) == (dexed ? "Cutoff" : "A Filter 1 Cutoff")) { slot.cutoff = p; slot.cutoffBase = p->getValue(); }
+        // Dexed's filter closes far harder than Surge's (a voice fell 21 dB in a summit): it is left alone
+        if (!dexed && p->getName(64) == (sampled ? "Expression" : "A Filter 1 Cutoff")) { slot.cutoff = p; slot.cutoffBase = p->getValue(); }
     slot.gain = juce::Decibels::decibelsToGain(e.gainDb);
     slot.entry = entry;
     slot.quiet = 0;

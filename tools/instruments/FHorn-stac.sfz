@@ -1,0 +1,57 @@
+// Brass/F Horn stac: generated from the VSCO 2 CE (CC0) file names; C-1 convention: their A#0 is MIDI 34
+<control> default_path=Brass/F Horn/stac/
+<global> ampeg_release=0.4
+<region> sample=MOHorn_stac_A0_v1_rr1.wav lokey=0 hikey=34 pitch_keycenter=33 lovel=1 hivel=127 seq_length=2 seq_position=1
+<region> sample=MOHorn_stac_A0_v1_rr2.wav lokey=0 hikey=34 pitch_keycenter=33 lovel=1 hivel=127 seq_length=2 seq_position=2
+<region> sample=MOHorn_stac_C1_v1_rr1.wav lokey=35 hikey=37 pitch_keycenter=36 lovel=1 hivel=63 seq_length=2 seq_position=1
+<region> sample=MOHorn_stac_C1_v1_rr2.wav lokey=35 hikey=37 pitch_keycenter=36 lovel=1 hivel=63 seq_length=2 seq_position=2
+<region> sample=MOHorn_stac_C1_v2_rr1.wav lokey=35 hikey=37 pitch_keycenter=36 lovel=64 hivel=127 seq_length=2 seq_position=1
+<region> sample=MOHorn_stac_C1_v2_rr2.wav lokey=35 hikey=37 pitch_keycenter=36 lovel=64 hivel=127 seq_length=2 seq_position=2
+<region> sample=MOHorn_stac_D#1_v1_rr1.wav lokey=38 hikey=41 pitch_keycenter=39 lovel=1 hivel=63 seq_length=2 seq_position=1
+<region> sample=MOHorn_stac_D#1_v1_rr2.wav lokey=38 hikey=41 pitch_keycenter=39 lovel=1 hivel=63 seq_length=2 seq_position=2
+<region> sample=MOHorn_stac_D#1_v2_rr1.wav lokey=38 hikey=41 pitch_keycenter=39 lovel=64 hivel=127 seq_length=2 seq_position=1
+<region> sample=MOHorn_stac_D#1_v2_rr2.wav lokey=38 hikey=41 pitch_keycenter=39 lovel=64 hivel=127 seq_length=2 seq_position=2
+<region> sample=MOHorn_stac_G1_v1_rr1.wav lokey=42 hikey=44 pitch_keycenter=43 lovel=1 hivel=63 seq_length=2 seq_position=1
+<region> sample=MOHorn_stac_G1_v1_rr2.wav lokey=42 hikey=44 pitch_keycenter=43 lovel=1 hivel=63 seq_length=2 seq_position=2
+<region> sample=MOHorn_stac_G1_v2_rr1.wav lokey=42 hikey=44 pitch_keycenter=43 lovel=64 hivel=127 seq_length=2 seq_position=1
+<region> sample=MOHorn_stac_G1_v2_rr2.wav lokey=42 hikey=44 pitch_keycenter=43 lovel=64 hivel=127 seq_length=2 seq_position=2
+<region> sample=MOHorn_stac_A#1_v1_rr1.wav lokey=45 hikey=48 pitch_keycenter=46 lovel=1 hivel=42
+<region> sample=MOHorn_stac_A#1_v2_rr1.wav lokey=45 hikey=48 pitch_keycenter=46 lovel=43 hivel=84 seq_length=2 seq_position=1
+<region> sample=MOHorn_stac_A#1_v2_rr2.wav lokey=45 hikey=48 pitch_keycenter=46 lovel=43 hivel=84 seq_length=2 seq_position=2
+<region> sample=MOHorn_stac_A#1_v3_rr1.wav lokey=45 hikey=48 pitch_keycenter=46 lovel=85 hivel=127 seq_length=2 seq_position=1
+<region> sample=MOHorn_stac_A#1_v3_rr2.wav lokey=45 hikey=48 pitch_keycenter=46 lovel=85 hivel=127 seq_length=2 seq_position=2
+<region> sample=MOHorn_stac_D2_v1_rr1.wav lokey=49 hikey=51 pitch_keycenter=50 lovel=1 hivel=42 seq_length=2 seq_position=1
+<region> sample=MOHorn_stac_D2_v1_rr2.wav lokey=49 hikey=51 pitch_keycenter=50 lovel=1 hivel=42 seq_length=2 seq_position=2
+<region> sample=MOHorn_stac_D2_v2_rr1.wav lokey=49 hikey=51 pitch_keycenter=50 lovel=43 hivel=84 seq_length=2 seq_position=1
+<region> sample=MOHorn_stac_D2_v2_rr2.wav lokey=49 hikey=51 pitch_keycenter=50 lovel=43 hivel=84 seq_length=2 seq_position=2
+<region> sample=MOHorn_stac_D2_v3_rr1.wav lokey=49 hikey=51 pitch_keycenter=50 lovel=85 hivel=127 seq_length=2 seq_position=1
+<region> sample=MOHorn_stac_D2_v3_rr2.wav lokey=49 hikey=51 pitch_keycenter=50 lovel=85 hivel=127 seq_length=2 seq_position=2
+<region> sample=MOHorn_stac_F2_v1_rr1.wav lokey=52 hikey=55 pitch_keycenter=53 lovel=1 hivel=42 seq_length=2 seq_position=1
+<region> sample=MOHorn_stac_F2_v1_rr2.wav lokey=52 hikey=55 pitch_keycenter=53 lovel=1 hivel=42 seq_length=2 seq_position=2
+<region> sample=MOHorn_stac_F2_v2_rr1.wav lokey=52 hikey=55 pitch_keycenter=53 lovel=43 hivel=84 seq_length=2 seq_position=1
+<region> sample=MOHorn_stac_F2_v2_rr2.wav lokey=52 hikey=55 pitch_keycenter=53 lovel=43 hivel=84 seq_length=2 seq_position=2
+<region> sample=MOHorn_stac_F2_v3_rr1.wav lokey=52 hikey=55 pitch_keycenter=53 lovel=85 hivel=127 seq_length=2 seq_position=1
+<region> sample=MOHorn_stac_F2_v3_rr2.wav lokey=52 hikey=55 pitch_keycenter=53 lovel=85 hivel=127 seq_length=2 seq_position=2
+<region> sample=MOHorn_stac_A2_v1_rr1.wav lokey=56 hikey=58 pitch_keycenter=57 lovel=1 hivel=42 seq_length=2 seq_position=1
+<region> sample=MOHorn_stac_A2_v1_rr2.wav lokey=56 hikey=58 pitch_keycenter=57 lovel=1 hivel=42 seq_length=2 seq_position=2
+<region> sample=MOHorn_stac_A2_v2_rr1.wav lokey=56 hikey=58 pitch_keycenter=57 lovel=43 hivel=84 seq_length=2 seq_position=1
+<region> sample=MOHorn_stac_A2_v2_rr2.wav lokey=56 hikey=58 pitch_keycenter=57 lovel=43 hivel=84 seq_length=2 seq_position=2
+<region> sample=MOHorn_stac_A2_v3_rr1.wav lokey=56 hikey=58 pitch_keycenter=57 lovel=85 hivel=127 seq_length=2 seq_position=1
+<region> sample=MOHorn_stac_A2_v3_rr2.wav lokey=56 hikey=58 pitch_keycenter=57 lovel=85 hivel=127 seq_length=2 seq_position=2
+<region> sample=MOHorn_stac_C3_v1_rr1.wav lokey=59 hikey=67 pitch_keycenter=60 lovel=1 hivel=42 seq_length=2 seq_position=1
+<region> sample=MOHorn_stac_C3_v1_rr2.wav lokey=59 hikey=67 pitch_keycenter=60 lovel=1 hivel=42 seq_length=2 seq_position=2
+<region> sample=MOHorn_stac_C3_v2_rr1.wav lokey=59 hikey=67 pitch_keycenter=60 lovel=43 hivel=84 seq_length=2 seq_position=1
+<region> sample=MOHorn_stac_C3_v2_rr2.wav lokey=59 hikey=67 pitch_keycenter=60 lovel=43 hivel=84 seq_length=2 seq_position=2
+<region> sample=MOHorn_stac_C3_v3_rr1.wav lokey=59 hikey=67 pitch_keycenter=60 lovel=85 hivel=127 seq_length=2 seq_position=1
+<region> sample=MOHorn_stac_C3_v3_rr2.wav lokey=59 hikey=67 pitch_keycenter=60 lovel=85 hivel=127 seq_length=2 seq_position=2
+<region> sample=MOHorn_stac_D4_v1_rr1.wav lokey=68 hikey=75 pitch_keycenter=74 lovel=1 hivel=42 seq_length=2 seq_position=1
+<region> sample=MOHorn_stac_D4_v1_rr2.wav lokey=68 hikey=75 pitch_keycenter=74 lovel=1 hivel=42 seq_length=2 seq_position=2
+<region> sample=MOHorn_stac_D4_v2_rr1.wav lokey=68 hikey=75 pitch_keycenter=74 lovel=43 hivel=84 seq_length=2 seq_position=1
+<region> sample=MOHorn_stac_D4_v2_rr2.wav lokey=68 hikey=75 pitch_keycenter=74 lovel=43 hivel=84 seq_length=2 seq_position=2
+<region> sample=MOHorn_stac_D4_v3_rr1.wav lokey=68 hikey=75 pitch_keycenter=74 lovel=85 hivel=127 seq_length=2 seq_position=1
+<region> sample=MOHorn_stac_D4_v3_rr2.wav lokey=68 hikey=75 pitch_keycenter=74 lovel=85 hivel=127 seq_length=2 seq_position=2
+<region> sample=MOHorn_stac_F4_v1_rr1.wav lokey=76 hikey=127 pitch_keycenter=77 lovel=1 hivel=42 seq_length=2 seq_position=1
+<region> sample=MOHorn_stac_F4_v1_rr2.wav lokey=76 hikey=127 pitch_keycenter=77 lovel=1 hivel=42 seq_length=2 seq_position=2
+<region> sample=MOHorn_stac_F4_v2_rr1.wav lokey=76 hikey=127 pitch_keycenter=77 lovel=43 hivel=84 seq_length=2 seq_position=1
+<region> sample=MOHorn_stac_F4_v2_rr2.wav lokey=76 hikey=127 pitch_keycenter=77 lovel=43 hivel=84 seq_length=2 seq_position=2
+<region> sample=MOHorn_stac_F4_v3_rr1.wav lokey=76 hikey=127 pitch_keycenter=77 lovel=85 hivel=127

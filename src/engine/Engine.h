@@ -148,6 +148,14 @@ std::unique_ptr<juce::AudioPluginInstance> createSurge(double sampleRate, int ma
 std::unique_ptr<juce::AudioPluginInstance> createDexed(double sampleRate, int maxBlock, juce::String& error);
 juce::String loadDexedVoice(juce::AudioPluginInstance& dexed, const juce::String& patch);
 bool isDexedSound(const juce::String& patch);
+// Sampled instruments: "sfz/<library folder>/<file>.sfz" in a palette, played by sfizz, found under
+// the instruments folder (C:/Users/kerem/liszt-instruments, or ~/Music/Lisztmachine/instruments on
+// the Mac). Its one parameter, "Expression", is the mod wheel and expression pedal: the dynamics
+// crossfade the libraries are built on, moved by the song's filter automation.
+bool isSfzSound(const juce::String& patch);
+juce::File findSfz(const juce::String& patch);
+std::unique_ptr<juce::AudioPluginInstance> createSfz(double sampleRate, int maxBlock, const juce::File& sfz, juce::String& error);
+void setOfflineRendering(bool offline); // the renderer: sfizz waits for its disk streaming instead of dropping out
 
 // Lookahead peak limiter. The signal is delayed 1.5 ms so the gain is already down when
 // a peak arrives; below the threshold it is exactly unity. (juce::dsp::Limiter was measured
@@ -316,6 +324,7 @@ private:
         float cutoffBase = 0.5f, gain = 1;
         int entry = -1;
         bool dexed = false;            // the instance is Dexed, not Surge
+        juce::String sfz;              // the instance is sfizz playing this file
         std::atomic<int> state { Idle };
         int64_t quiet = 0, tailed = 0; // samples of silence, and in all, while ringing out
         int64_t releaseAt = -1;        // the old sound lets go of its held notes here: a crossfade

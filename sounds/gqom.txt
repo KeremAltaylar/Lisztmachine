@@ -32,14 +32,14 @@ delay chord 1.5 0.40 0.20
 
 # Balance (to be measured in the mix)
 gain pulse   0.0
-gain metal   -6.0
+gain metal   -6.7
 gain tick    10.0
 gain perc    -9.7
 gain pad     -9.3
 gain bass    -4.5
 gain sub     -14.6
 gain arp     -8.0
-gain chord   -4.0
+gain chord   -3.9
 gain fx     -6.9
 master 9.6
 amp bass  0.79 1800 0.75
@@ -62,7 +62,7 @@ metal    14.7     783  3rd/Malfunction/Drums/Gong
 perc     -6.1     287  3rd/Vospi/Drums/Modular Drum
 harm     -3.2     740  3rd/Giana Brotherz/Pads/Deep Choir
 harm    -10.6    3541  3rd/Bluelight/Vox/Gregorian Rant Poly
-gain harm    -6.9
+gain harm    -6.8
 amp harm  0.40 2200 0.35
 drive sub  0.55 2500
 duck sub 0.30

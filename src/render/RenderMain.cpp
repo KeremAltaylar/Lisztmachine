@@ -110,11 +110,13 @@ static int audition(const juce::String& patch, int note, bool pure)
     const double sr = 48000;
     const int block = 256;
     juce::String err;
-    const bool dexed = isDexedSound(patch);
-    auto surge = dexed ? createDexed(sr, block, err) : createSurge(sr, block, err);
+    const bool dexed = isDexedSound(patch), sampled = isSfzSound(patch);
+    setOfflineRendering(true);
+    auto surge = sampled ? createSfz(sr, block, findSfz(patch), err) : dexed ? createDexed(sr, block, err) : createSurge(sr, block, err);
     if (!surge) { std::cerr << err << "\n"; return 1; }
-    if (auto e = dexed ? loadDexedVoice(*surge, patch) : loadSurgePatch(*surge, findSurgePatch(patch)); e.isNotEmpty()) { std::cerr << e << "\n"; return 1; }
-    if (pure && !dexed) purify(*surge);
+    if (!sampled)
+        if (auto e = dexed ? loadDexedVoice(*surge, patch) : loadSurgePatch(*surge, findSurgePatch(patch)); e.isNotEmpty()) { std::cerr << e << "\n"; return 1; }
+    if (pure && !dexed && !sampled) purify(*surge);
     surge->prepareToPlay(sr, block);
 
     const int holdBlocks = int(3.0 * sr / block), tailBlocks = int(2.0 * sr / block);
@@ -360,6 +362,7 @@ static int renderConcert(uint64_t seed, double seconds, const juce::File& out, i
 int main(int argc, char** argv)
 {
     juce::ScopedJuceInitialiser_GUI init;
+    setOfflineRendering(true); // a render is not live: sfizz may wait for its disk streaming
     juce::StringArray args(argv + 1, argc - 1);
     gRaw = args.contains("--raw");
     if (args[0] == "--probe") return probe(args[1], args[2], args[3]); // --probe <vst3> [names,to,match] [Category/Patch]

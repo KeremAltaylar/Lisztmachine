@@ -34,7 +34,7 @@ delay chord 0.75 0.40 0.22
 
 # Balance (to be measured in the mix)
 gain pulse   0.0
-gain metal   -14.7
+gain metal   -14.3
 gain tick    4.3
 gain perc    -16.7
 gain pad     -15.7

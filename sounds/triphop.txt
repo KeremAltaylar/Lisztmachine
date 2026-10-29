@@ -17,18 +17,18 @@ bass     -4.9     217  3rd/Luna/Basses/Screamy Bass
 bass     -6.2     559  3rd/Altenberg/Basses/Ancient FM
 bass     -9.8     871  3rd/Zoozither/Basses/Rip Fat
 bass    -12.8     263  3rd/Nick Moritz/Basses/Black Betty
-metal    -3.8    1063  3rd/Malfunction/Drums/Tuning Drums
-metal    0.8    2537  3rd/Malfunction/Drums/Jerry
-metal    2.7     812  3rd/Malfunction/Drums/Inharmonic Attack 1
+metal    -6.2    1063  3rd/Malfunction/Drums/Tuning Drums
+metal    -1.1    2537  3rd/Malfunction/Drums/Jerry
+metal    0.8     812  3rd/Malfunction/Drums/Inharmonic Attack 1
 tick     0.0    6000  internal/click
-perc     -5.8     287  3rd/Vospi/Drums/Modular Drum
-perc     -2.0    1652  3rd/Cybersoda/Drums/Perc 1
-perc     -3.2    4877  3rd/Emu/Drums/T8 Conga
+perc     -4.4     287  3rd/Vospi/Drums/Modular Drum
+perc     -0.6    1652  3rd/Cybersoda/Drums/Perc 1
+perc     -1.8    4877  3rd/Emu/Drums/T8 Conga
 harm      5.6    1136  3rd/Giana Brotherz/Pads/Dub Choir
 harm    -10.6    3541  3rd/Bluelight/Vox/Gregorian Rant Poly
 
 # Dexed (the free DX7, plugins/Dexed.vst3): voices of its cartridge, by name
-chord    -7.7     861  dexed/TRW
+pad      -7.7     861  dexed/TRW
 arp      -0.3    2773  dexed/LAURIE
 
 # Echoes: beats, feedback, mix
@@ -36,14 +36,14 @@ delay arp 1.5 0.45 0.25
 
 # Balance (to be measured in the mix)
 gain pulse   0.0
-gain metal   0.5
+gain metal   2.5
 gain tick    12.1
-gain perc    -6.4
-gain pad     -4.6
-gain bass    5.3
+gain perc    -1.3
+gain pad     -4.1
+gain bass    5.2
 gain sub     -11.3
 gain arp     -8.8
-gain chord   -4.7
+gain chord   -14.0
 gain fx     -6.0
 master 8.5
 amp bass  0.63 1800 0.75
@@ -62,7 +62,7 @@ delay perc  1.0 0.5 0.3 throws
 
 # 2026-10-29: the 808, the choir, deep metal, darker synths
 sub      0.0      60  internal/808
-gain harm    -4.8
+gain harm    -6.5
 amp harm  0.32 2200 0.35
 drive sub  0.55 2500
 duck sub 0.30
@@ -84,3 +84,18 @@ duck body 0.2
 duck mallet 0.15
 delay mallet 0.75 0.4 0.25
 delay impact 1.5 0.55 0.4 throws
+
+# Sampled instruments (CC0: Karoryfer, D. Smolken, VSCO 2 CE; jSteelDrum: Unlicense), played by sfizz
+bass     14.0     321  sfz/DSmolken.double_bass.v1.001/dsmolken_double_bass/d_smolken_rubner_bass_pizz.sfz
+bass     12.2     407  sfz/Karoryfer.Growlybass.v1.002/Growlybass/growlybass_dirty.sfz
+chord    12.0    1413  sfz/Karoryfer.Scarypiano.v1.002/Scarypiano/Programs/Scarypiano.sfz
+chord    24.9    1018  sfz/Karoryfer_Black_And_Green_Guitars_1000/Programs/04-green_twang.sfz
+arp      34.0    1835  sfz/Karoryfer.Bear_Sax.v1.004/Bear_Sax/Programs/1-solo-mono.sfz
+arp      26.9    2983  sfz/aliexpress-erhu_v1000/Programs/02-erhu_long.sfz
+arp      13.5    2290  sfz/Karoryfer_Bigcat_cello.v1.001/Karoryfer_Bigcat_cello/Programs/02- Bowed (mod wheel).sfz
+pad      13.3     708  sfz/vsco2/Bassoon-sus.sfz
+pad      14.2     714  sfz/vsco2/FHorn-sus.sfz
+pad      24.9     720  sfz/vsco2/Tuba-sus.sfz
+harm     20.2    2361  sfz/vsco2/Clarinet-susLong.sfz
+metal    6.3    1421  sfz/steel-drum/jSteelDrum.sfz
+perc     34.5    2835  sfz/body-percussion/Programs/body.sfz

@@ -35,7 +35,7 @@ jobs = []
 for scene in songs:
     for l in open(os.path.join(S, scene + ".txt"), encoding="utf8"):
         w = l.split()
-        if len(w) >= 4 and w[0] in ("metal", "perc") and (w[3].startswith("3rd/") or w[3] in ("internal/deep", "internal/metal")): jobs.append((scene, w[0], l.split(None, 3)[3].strip()))
+        if len(w) >= 4 and w[0] in ("metal", "perc") and (w[3].startswith(("3rd/", "sfz/")) or w[3] in ("internal/deep", "internal/metal")): jobs.append((scene, w[0], l.split(None, 3)[3].strip()))
 with ThreadPoolExecutor(4) as ex: rows = list(ex.map(measure, jobs))
 for scene in songs:
     p = os.path.join(S, scene + ".txt"); txt = open(p, encoding="utf8").read()

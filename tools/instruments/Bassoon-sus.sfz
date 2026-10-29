@@ -1,0 +1,28 @@
+// Woodwinds/Bassoon sus: generated from the VSCO 2 CE (CC0) file names; C-1 convention: their A#0 is MIDI 34
+<control> default_path=Woodwinds/Bassoon/sus/
+<global> ampeg_release=0.4
+<region> sample=PSBassoon_A#0_v1_1.wav lokey=0 hikey=35 pitch_keycenter=34 lovel=1 hivel=63
+<region> sample=PSBassoon_A#0_v2_1.wav lokey=0 hikey=35 pitch_keycenter=34 lovel=64 hivel=127
+<region> sample=PSBassoon_C#1_v1_1.wav lokey=36 hikey=39 pitch_keycenter=37 lovel=1 hivel=63
+<region> sample=PSBassoon_C#1_v2_1.wav lokey=36 hikey=39 pitch_keycenter=37 lovel=64 hivel=127
+<region> sample=PSBassoon_F1_v1_1.wav lokey=40 hikey=43 pitch_keycenter=41 lovel=1 hivel=63
+<region> sample=PSBassoon_F1_v2_1.wav lokey=40 hikey=43 pitch_keycenter=41 lovel=64 hivel=127
+<region> sample=PSBassoon_A1_v1_1.wav lokey=44 hikey=45 pitch_keycenter=45 lovel=1 hivel=63
+<region> sample=PSBassoon_A1_v2_1.wav lokey=44 hikey=45 pitch_keycenter=45 lovel=64 hivel=127
+<region> sample=PSBassoon_A#1_v1_1.wav lokey=46 hikey=47 pitch_keycenter=46 lovel=1 hivel=63
+<region> sample=PSBassoon_A#1_v2_1.wav lokey=46 hikey=47 pitch_keycenter=46 lovel=64 hivel=127
+<region> sample=PSBassoon_C2_v1_1.wav lokey=48 hikey=51 pitch_keycenter=48 lovel=1 hivel=63
+<region> sample=PSBassoon_C2_v2_1.wav lokey=48 hikey=51 pitch_keycenter=48 lovel=64 hivel=127
+<region> sample=PSBassoon_G2_v1_1.wav lokey=52 hikey=57 pitch_keycenter=55 lovel=1 hivel=63
+<region> sample=PSBassoon_G2_v2_1.wav lokey=52 hikey=57 pitch_keycenter=55 lovel=64 hivel=127
+<region> sample=PSBassoon_C3_v1_1.wav lokey=58 hikey=61 pitch_keycenter=60 lovel=1 hivel=63
+<region> sample=PSBassoon_C3_v2_1.wav lokey=58 hikey=61 pitch_keycenter=60 lovel=64 hivel=127
+<region> sample=PSBassoon_D#3_v1_1.wav lokey=62 hikey=65 pitch_keycenter=63 lovel=1 hivel=63
+<region> sample=PSBassoon_D#3_v2_1.wav lokey=62 hikey=65 pitch_keycenter=63 lovel=64 hivel=127
+<region> sample=PSBassoon_G#3_v1_1.wav lokey=66 hikey=68 pitch_keycenter=68 lovel=1 hivel=63
+<region> sample=PSBassoon_G#3_v2_1.wav lokey=66 hikey=68 pitch_keycenter=68 lovel=64 hivel=127
+<region> sample=PSBassoon_A3_v1_1.wav lokey=69 hikey=70 pitch_keycenter=69 lovel=1 hivel=63
+<region> sample=PSBassoon_A3_v2_1.wav lokey=69 hikey=70 pitch_keycenter=69 lovel=64 hivel=127
+<region> sample=PSBassoon_C4_v1_1.wav lokey=71 hikey=73 pitch_keycenter=72 lovel=1 hivel=63
+<region> sample=PSBassoon_C4_v2_1.wav lokey=71 hikey=73 pitch_keycenter=72 lovel=64 hivel=127
+<region> sample=PSBassoon_D#4_v2_1.wav lokey=74 hikey=127 pitch_keycenter=75 lovel=1 hivel=127

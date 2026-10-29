@@ -1,0 +1,26 @@
+// Brass/Tuba sus: generated from the VSCO 2 CE (CC0) file names; C-1 convention: their A#0 is MIDI 34
+<control> default_path=Brass/Tuba/sus/
+<global> ampeg_release=0.4
+<region> sample=Tuba3_sus_F0_v1_rr1_Mid.wav lokey=0 hikey=31 pitch_keycenter=29 lovel=1 hivel=127
+<region> sample=Tuba3_sus_A#0_v1_rr1_Mid.wav lokey=32 hikey=36 pitch_keycenter=34 lovel=1 hivel=42
+<region> sample=Tuba3_sus_A#0_v2_rr1_Mid.wav lokey=32 hikey=36 pitch_keycenter=34 lovel=43 hivel=84
+<region> sample=Tuba3_sus_A#0_v3_rr1_Mid.wav lokey=32 hikey=36 pitch_keycenter=34 lovel=85 hivel=127
+<region> sample=Tuba3_sus_D#1_v1_rr1_Mid.wav lokey=37 hikey=40 pitch_keycenter=39 lovel=1 hivel=42
+<region> sample=Tuba3_sus_D#1_v2_rr1_Mid.wav lokey=37 hikey=40 pitch_keycenter=39 lovel=43 hivel=84
+<region> sample=Tuba3_sus_D#1_v3_rr1_Mid.wav lokey=37 hikey=40 pitch_keycenter=39 lovel=85 hivel=127
+<region> sample=Tuba3_sus_F1_v1_rr1_Mid.wav lokey=41 hikey=43 pitch_keycenter=41 lovel=1 hivel=42
+<region> sample=Tuba3_sus_F1_v2_rr1_Mid.wav lokey=41 hikey=43 pitch_keycenter=41 lovel=43 hivel=84
+<region> sample=Tuba3_sus_F1_v3_rr1_Mid.wav lokey=41 hikey=43 pitch_keycenter=41 lovel=85 hivel=127
+<region> sample=Tuba3_sus_A#1_v1_rr1_Mid.wav lokey=44 hikey=48 pitch_keycenter=46 lovel=1 hivel=42
+<region> sample=Tuba3_sus_A#1_v2_rr1_Mid.wav lokey=44 hikey=48 pitch_keycenter=46 lovel=43 hivel=84
+<region> sample=Tuba3_sus_A#1_v3_rr1_Mid.wav lokey=44 hikey=48 pitch_keycenter=46 lovel=85 hivel=127
+<region> sample=Tuba3_sus_D2_v1_rr1_Mid.wav lokey=49 hikey=51 pitch_keycenter=50 lovel=1 hivel=42
+<region> sample=Tuba3_sus_D2_v2_rr1_Mid.wav lokey=49 hikey=51 pitch_keycenter=50 lovel=43 hivel=84
+<region> sample=Tuba3_sus_D2_v3_rr1_Mid.wav lokey=49 hikey=51 pitch_keycenter=50 lovel=85 hivel=127
+<region> sample=Tuba3_sus_F2_v1_rr1_Mid.wav lokey=52 hikey=55 pitch_keycenter=53 lovel=1 hivel=42
+<region> sample=Tuba3_sus_F2_v2_rr1_Mid.wav lokey=52 hikey=55 pitch_keycenter=53 lovel=43 hivel=84
+<region> sample=Tuba3_sus_F2_v3_rr1_Mid.wav lokey=52 hikey=55 pitch_keycenter=53 lovel=85 hivel=127
+<region> sample=Tuba3_sus_A#2_v1_rr1_Mid.wav lokey=56 hikey=60 pitch_keycenter=58 lovel=1 hivel=42
+<region> sample=Tuba3_sus_A#2_v2_rr1_Mid.wav lokey=56 hikey=60 pitch_keycenter=58 lovel=43 hivel=84
+<region> sample=Tuba3_sus_A#2_v3_rr1_Mid.wav lokey=56 hikey=60 pitch_keycenter=58 lovel=85 hivel=127
+<region> sample=Tuba3_sus_D3_v1_rr1_Mid.wav lokey=61 hikey=127 pitch_keycenter=62 lovel=1 hivel=127
