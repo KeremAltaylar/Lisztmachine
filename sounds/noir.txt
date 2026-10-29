@@ -39,8 +39,8 @@ gain perc    -5.4
 gain pad     -3.4
 gain bass    1.1
 gain sub     -9.9
-gain arp     -5.6
-gain chord   -10.7
+gain arp     -5.5
+gain chord   -10.5
 gain fx     -6.0
 master 8.5
 amp bass  0.63 1800 0.75

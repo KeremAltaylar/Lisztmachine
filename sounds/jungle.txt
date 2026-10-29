@@ -17,7 +17,7 @@ pad       3.8     188  3rd/Inigo Kennedy/Pads/Deep Space 1
 pad      -0.7     442  Pads/MKS-70 Warm Pad
 chord     6.4     585  3rd/Giana Brotherz/Keys/Sin Ring
 chord     4.6     935  3rd/Giana Brotherz/Keys/Tri Meets Saw
-arp       5.5    1008  3rd/Luna/Synths/Window Warp
+arp       -6.9    1008  3rd/Luna/Synths/Window Warp
 arp      -6.0     539  3rd/TNMG/Leads/Acid Gizmo
 arp     -11.2     288  Leads/Sine Lead
 bass      0.2     269  3rd/Giana Brotherz/Basses/Warm Square

@@ -14,7 +14,7 @@ fx        4.0    4170  FX/Radio Noise
 pad     -13.2    1194  3rd/Databroth/Pads/Warmbo
 pad      -0.1     579  3rd/Giana Brotherz/Organs/Wanna B3
 chord     0.8     726  3rd/Giana Brotherz/Keys/Vintage Boost
-chord     2.0     374  3rd/Luna/Keys/Electric Nightmares
+chord     -2.3     374  3rd/Luna/Keys/Electric Nightmares
 arp      -3.4     293  Leads/Acidofil
 arp      -7.8     976  3rd/Dan Maurer/Synths/Warm Reception
 arp      -1.7     583  3rd/Emu/Leads/Doink Realm Organ
@@ -31,14 +31,14 @@ delay arp 1.5 0.45 0.25
 
 # Balance (to be measured in the mix)
 gain pulse   0.0
-gain metal   -5.9
+gain metal   -5.5
 gain tick    13.1
 gain perc    -5.1
 gain pad     -9.9
-gain bass    2.2
+gain bass    2.1
 gain sub     -13.0
-gain arp     -13.8
-gain chord   -5.2
+gain arp     -13.7
+gain chord   -5.1
 gain fx    -11.7
 master 9.3
 amp bass  0.51 1800 0.75
@@ -61,7 +61,7 @@ metal    13.7     783  3rd/Malfunction/Drums/Gong
 harm      5.6    1136  3rd/Giana Brotherz/Pads/Dub Choir
 harm     -3.2     740  3rd/Giana Brotherz/Pads/Deep Choir
 perc     -9.1     300  internal/deep
-gain harm    -8.6
+gain harm    -8.8
 amp harm  0.25 2200 0.35
 drive sub  0.55 2500
 duck sub 0.30
@@ -88,4 +88,4 @@ delay impact 1.5 0.55 0.4 throws
 chord    12.0    1413  sfz/Karoryfer.Scarypiano.v1.002/Scarypiano/Programs/Scarypiano.sfz
 bass     17.0     400  sfz/Karoryfer.Growlybass.v1.002/Growlybass/growlybass_clean.sfz
 pad      24.9     720  sfz/vsco2/Tuba-sus.sfz
-arp      34.0    1835  sfz/Karoryfer.Bear_Sax.v1.004/Bear_Sax/Programs/2-solo-poly.sfz
+arp      19.0    1835  sfz/Karoryfer.Bear_Sax.v1.004/Bear_Sax/Programs/2-solo-poly.sfz

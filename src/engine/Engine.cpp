@@ -812,7 +812,10 @@ juce::String Engine::loadInto(Slot& slot, int track, int entry)
             slot.dexed = false;
         }
     }
-    else if (dexed != slot.dexed || slot.sfz.isNotEmpty() || !slot.plugin)
+    // Surge always gets a fresh instance: a patch loaded into a used one left the host's cached
+    // parameters stale (Late Night's cutoff read 0.78 for 0.04, and the filter automation then
+    // opened it ten dB hot), so a sound's level depended on what the instance played before.
+    else if (!dexed || slot.dexed != dexed || slot.sfz.isNotEmpty() || !slot.plugin)
     {
         juce::String err;
         auto p = dexed ? createDexed(sampleRate_, maxBlock_, err) : createSurge(sampleRate_, maxBlock_, err);

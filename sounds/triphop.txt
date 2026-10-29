@@ -11,7 +11,7 @@ pad      -2.2     385  3rd/Luna/Strings/Alias Syn Strings
 chord     4.8     777  3rd/Emu/Keys/Trashion EP
 chord    -5.9     481  3rd/Luna/Brass/Fat Brass
 arp       3.7     939  3rd/Luna/Bells/Tubular Bellsish
-arp      -5.2    1515  3rd/Emu/Leads/Sax Destroyer
+arp      -15.9    1515  3rd/Emu/Leads/Sax Destroyer
 arp       1.1     590  3rd/Psiome Send Sound/Leads/Tuba Cello
 bass     -4.9     217  3rd/Luna/Basses/Screamy Bass
 bass     -6.2     559  3rd/Altenberg/Basses/Ancient FM
@@ -23,7 +23,7 @@ metal    0.8     812  3rd/Malfunction/Drums/Inharmonic Attack 1
 tick     0.0    6000  internal/click
 perc     -4.4     287  3rd/Vospi/Drums/Modular Drum
 perc     -0.6    1652  3rd/Cybersoda/Drums/Perc 1
-perc     -1.8    4877  3rd/Emu/Drums/T8 Conga
+perc     -6.5    4877  3rd/Emu/Drums/T8 Conga
 harm      5.6    1136  3rd/Giana Brotherz/Pads/Dub Choir
 harm    -10.6    3541  3rd/Bluelight/Vox/Gregorian Rant Poly
 
@@ -36,14 +36,14 @@ delay arp 1.5 0.45 0.25
 
 # Balance (to be measured in the mix)
 gain pulse   0.0
-gain metal   2.0
+gain metal   2.3
 gain tick    12.1
 gain perc    -1.3
 gain pad     -4.1
 gain bass    5.2
 gain sub     -11.3
 gain arp     -8.8
-gain chord   -14.0
+gain chord   -14.1
 gain fx     -6.0
 master 8.5
 amp bass  0.63 1800 0.75
@@ -62,7 +62,7 @@ delay perc  1.0 0.5 0.3 throws
 
 # 2026-10-29: the 808, the choir, deep metal, darker synths
 sub      0.0      60  internal/808
-gain harm    -6.7
+gain harm    -6.4
 amp harm  0.32 2200 0.35
 drive sub  0.55 2500
 duck sub 0.30
@@ -97,5 +97,5 @@ pad      13.3     708  sfz/vsco2/Bassoon-sus.sfz
 pad      14.2     714  sfz/vsco2/FHorn-sus.sfz
 pad      24.9     720  sfz/vsco2/Tuba-sus.sfz
 harm     20.2    2361  sfz/vsco2/Clarinet-susLong.sfz
-metal    6.3    1421  sfz/steel-drum/jSteelDrum.sfz
+metal    10.5    1421  sfz/steel-drum/jSteelDrum.sfz
 perc     34.5    2835  sfz/body-percussion/Programs/body.sfz

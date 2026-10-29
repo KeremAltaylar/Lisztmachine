@@ -32,10 +32,10 @@ delay chord 1.5 0.40 0.20
 
 # Balance (to be measured in the mix)
 gain pulse   0.0
-gain metal   -6.3
+gain metal   -6.4
 gain tick    10.0
-gain perc    -9.8
-gain pad     -9.4
+gain perc    -9.7
+gain pad     -9.3
 gain bass    -4.5
 gain sub     -14.6
 gain arp     -17.0
@@ -62,7 +62,7 @@ metal    14.7     783  3rd/Malfunction/Drums/Gong
 perc     -6.1     287  3rd/Vospi/Drums/Modular Drum
 harm     -3.2     740  3rd/Giana Brotherz/Pads/Deep Choir
 harm    -10.6    3541  3rd/Bluelight/Vox/Gregorian Rant Poly
-gain harm    -6.7
+gain harm    -6.9
 amp harm  0.40 2200 0.35
 drive sub  0.55 2500
 duck sub 0.30
@@ -86,7 +86,7 @@ delay mallet 0.75 0.4 0.25
 delay impact 1.5 0.55 0.4 throws
 
 # Sampled instruments (CC0: Karoryfer, D. Smolken, VSCO 2 CE; jSteelDrum: Unlicense), played by sfizz
-chord    30.0    1019  sfz/vsco2/TenorTrombone-stac.sfz
+chord    24.4    1019  sfz/vsco2/TenorTrombone-stac.sfz
 chord    16.0     714  sfz/vsco2/FHorn-stac.sfz
 bass     12.0     900  sfz/Karoryfer.Growlybass.v1.002/Growlybass/growlybass_angry.sfz
 arp      34.0    1835  sfz/Karoryfer.Bear_Sax.v1.004/Bear_Sax/Programs/3-duo-mono.sfz

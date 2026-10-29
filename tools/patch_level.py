@@ -1,7 +1,9 @@
-# Levels the sampled and Dexed instruments in context. A held note misjudges them (a plucked bass
-# decays, a sax waits for its breath), so each section's middle eight bars are rendered, each track's
+# Levels the sampled and Dexed instruments in context (and pulls down any sound far over its track). A held note misjudges them (a plucked bass
+# decays, a sax waits for its breath), so eight bars of every sixteen in each section are rendered, each track's
 # RMS read, and the sound playing there (from the render's sound plan) compared with the same track
-# at the summit. An instrument more than 4 dB off has its palette gain moved that far.
+# at the summit, and with the track's target level (balance.py's): an instrument more than 4 dB off
+# the summit, or more than 4 dB over the target or 8 under it in any section from energy .35 up, has
+# its palette gain moved that far. (VSCO's dynamic layers differ by 20 dB: only context tells.)
 # Usage: python tools/patch_level.py [songs...]   (then balance.py)
 import os, re, subprocess, sys, collections
 from concurrent.futures import ThreadPoolExecutor
@@ -10,6 +12,7 @@ R = r"C:\Users\kerem\build\Lisztmachine\liszt_render_artefacts\Release\liszt_ren
 S = os.path.join(HERE, "..", "sounds")
 G = open(os.path.join(HERE, "..", "src", "core", "Genres.cpp"), encoding="utf8").read()
 TRACKS = ("pad", "chord", "arp", "bass", "harm", "metal", "perc")
+TARGET = dict(pad=-27, metal=-28, perc=-29, bass=-25, arp=-26, chord=-28, harm=-29)
 songs = sys.argv[1:] or ["jungle", "triphop", "ecstatic", "dubtechno", "noir", "gqom", "deconstructed", "halftime"]
 TMP = os.environ.get("TEMP", ".")
 
@@ -41,7 +44,8 @@ for scene in songs:
             if at <= sec + 1: now = p
         return now
     peak = max(e for *_, e in secs)
-    jobs = [(scene, b + n // 2 - min(8, n // 2) // 2, min(8, n // 2)) for _, b, n, e in secs if e >= .5]
+    # every 16 bars of every section from energy .35 up, so each sound in the plan is heard where it plays
+    jobs = [(scene, b + k + 2, min(8, n - k - 2)) for _, b, n, e in secs if e >= .35 for k in range(0, n - 4, 16)]
     with ThreadPoolExecutor(2) as ex: outs = list(ex.map(render, jobs))
     rows = []
     for (sc, at, bars), t in zip(jobs, outs):
@@ -52,9 +56,14 @@ for scene in songs:
     moves = collections.defaultdict(list)
     for at, rms in rows:
         for tr in TRACKS:
-            if rms.get(tr, -150) < -90 or ref.get(tr, -150) < -90: continue
+            if rms.get(tr, -150) < -90: continue
             p = playing(tr, at)
-            if p and (p.startswith("sfz/") or p.startswith("dexed/")): moves[(tr, p)].append(ref[tr] - rms[tr])
+            if not p or p.startswith("internal/"): continue
+            over = rms[tr] - TARGET[tr]
+            if over > 4: moves[(tr, p)].append(-over)           # any sound far over its track's level
+            elif not (p.startswith("sfz/") or p.startswith("dexed/")): continue
+            elif over < -8: moves[(tr, p)].append(-over)
+            elif ref.get(tr, -150) > -90: moves[(tr, p)].append(ref[tr] - rms[tr])
     path = os.path.join(S, scene + ".txt"); txt = open(path, encoding="utf8").read()
     for (tr, p), ds in moves.items():
         d = sum(ds) / len(ds)

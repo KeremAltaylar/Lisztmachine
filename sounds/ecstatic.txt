@@ -14,7 +14,7 @@ fx        4.0    4170  FX/Radio Noise
 pad      -5.3     768  3rd/Giana Brotherz/Pads/Digitized Choir
 pad      -5.5    1385  3rd/Kuniklo/Pads/After Warp
 chord    -4.7     356  3rd/Rozzer/Plucks/JP80x0 Pluck
-chord     1.0    1582  Plucks/Lighter
+chord     -3.1    1582  Plucks/Lighter
 arp      -8.9     499  3rd/Bluelight/Leads/Lead 5
 arp      -8.8     787  3rd/Bluelight/Leads/Lead 4
 arp       2.1    2070  3rd/Bluelight/Leads/Lead 2
@@ -33,8 +33,8 @@ gain pulse   0.0
 gain metal   -7.2
 gain tick    15.5
 gain perc    -4.0
-gain pad     -5.4
-gain bass    -2.0
+gain pad     -4.4
+gain bass    -1.7
 gain sub     -12.1
 gain arp     -1.7
 gain chord   -6.8
@@ -59,7 +59,7 @@ sub      0.0      60  internal/808
 harm      5.6    1136  3rd/Giana Brotherz/Pads/Dub Choir
 harm     -2.1    4204  3rd/Giana Brotherz/Pads/Dark Whisper
 perc     -9.3     300  internal/deep
-gain harm    -8.3
+gain harm    -8.6
 amp harm  0.22 2200 0.35
 drive sub  0.55 2500
 duck sub 0.30
