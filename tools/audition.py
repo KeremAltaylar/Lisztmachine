@@ -35,9 +35,10 @@ def run(job):
     m = re.search(rf"seed {seed}: (.+)", txt)
     return scene, seed, m.group(1).strip() if m else "", name
 
-with ThreadPoolExecutor(4) as ex:
+with ThreadPoolExecutor(3) as ex:
     rows = list(ex.map(run, [(s, n) for s in songs for n in seeds]))
-info = {}
+J = os.path.join(out, "auditions.json")
+info = json.load(open(J)) if os.path.exists(J) else {}  # a run over some songs keeps the others
 for scene, seed, desc, name in rows: info.setdefault(scene, {})[str(seed)] = {"describe": desc, "section": name}
-json.dump(info, open(os.path.join(out, "auditions.json"), "w"), indent=1)
+json.dump(info, open(J, "w"), indent=1)
 for r in rows: print(*r)
