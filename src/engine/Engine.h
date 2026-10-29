@@ -33,6 +33,8 @@ struct CrushSpec { float bits = 16, hold = 1, mix = 0; };
 struct CompSpec { float thresholdDb = 0, ratio = 1, attackMs = 10, releaseMs = 120, mix = 0; };
 // A per-track drive, like an amp or a tape pushed hard: how hard (0..1) and where its top rolls off.
 struct DriveSpec { float amount = 0, toneHz = 6000; };
+// An amp: how hard (0..1), the cabinet's presence peak, how much of it against the dry track.
+struct AmpSpec { float gain = 0, presenceHz = 2500, mix = 0; };
 struct Palette
 {
     std::string scene = "berlin";
@@ -42,6 +44,7 @@ struct Palette
     float masterDb = 0;                 // "master dB": drive into the master's soft clipper
     InsertDelay delays[kMaxTracks];     // "delay <track> beats feedback mix"
     DriveSpec drives[kMaxTracks];       // "drive <track> amount toneHz"
+    AmpSpec amps[kMaxTracks];           // "amp <track> gain presenceHz mix"
     CrushSpec crushes[kMaxTracks];      // "crush <track> bits hold mix"
     CompSpec comps[kMaxTracks];         // "comp <track> thresholdDb ratio attackMs releaseMs mix"
     float duckDepth[kMaxTracks];        // "duck <track> depth": over the mix stage's own; -1 keeps it
@@ -159,7 +162,9 @@ private:
 struct Biquad
 {
     float b0 = 1, b1 = 0, b2 = 0, a1 = 0, a2 = 0, z1 = 0, z2 = 0;
-    void highpass(double sampleRate, double hz);
+    void highpass(double sampleRate, double hz, double q = 0.7071);
+    void lowpass(double sampleRate, double hz, double q = 0.7071);
+    void peak(double sampleRate, double hz, double q, double dB);
     float process(float x) { const float y = b0 * x + z1; z1 = b1 * x - a1 * y + z2; z2 = b2 * x - a2 * y; return y; }
 };
 
@@ -181,6 +186,26 @@ private:
     float k_ = 1, comp_ = 1, lpA_ = 1, bias_ = 0.2f;
     float last_[2] = {}, lp_[2] = {}, dcIn_[2] = {}, dcOut_[2] = {};
     float shape(float x) const { return std::tanh(k_ * x + bias_) - std::tanh(bias_); }
+};
+
+// An amplifier and its cabinet, for aggression that still sounds like an instrument: a tight low
+// cut and a mid push into two gain stages (the second asymmetric, like a valve), at twice the sample
+// rate; then a 4x12 cabinet's curve (a scooped low-mid, a presence peak, the speaker's steep top
+// roll-off). The clean low end comes back under it, so the bass and the 808 keep their weight, and
+// the level follows the dry track's, so the balance stays.
+class Amp
+{
+public:
+    void prepare(double sampleRate, const AmpSpec& spec);
+    bool on() const { return spec_.mix > 0; }
+    void process(float& l, float& r);
+
+private:
+    AmpSpec spec_;
+    float g1_ = 1, g2_ = 1, lowA_ = 0, envA_ = 0, envIn_ = 1e-6f, envOut_ = 1e-6f;
+    Biquad tight_[2], push_[2], inter_[2], cab_[2][5];
+    float last_[2] = {}, low_[2] = {}, lp_[2] = {}, lpA_ = 1;
+    float stage(float x, int c);
 };
 
 class Crusher
@@ -309,6 +334,7 @@ private:
         bool lowCut = false;
         Biquad hp[2];
         Drive drive;
+        Amp amp;
         Crusher crush;
         Compressor comp;
         // The widener: the track's mid, delayed a few ms and high-passed, added as side. Mono

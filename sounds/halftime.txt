@@ -32,20 +32,20 @@ delay arp 1.5 0.45 0.25
 
 # Balance (to be measured in the mix)
 gain pulse   0.0
-gain metal  -2.0
+gain metal  -0.9
 gain tick    5.9
 gain perc   -4.8
-gain pad    -9.9
-gain bass   -3.7
+gain pad    -7.3
+gain bass    1.4
 gain sub   -14.0
-gain arp   -11.7
-gain chord -16.2
+gain arp    -6.4
+gain chord -14.5
 gain fx     -6.0
 master 8.5
-drive bass  0.55 3500
-drive chord 0.50 4500
-drive arp   0.45 5000
-drive pad   0.20 5000
+amp bass  0.63 1800 0.75
+amp chord 0.63 2500 0.85
+amp arp   0.63 3000 0.80
+amp pad   0.32 2000 0.45
 drive metal 0.30 4500
 drive perc  0.30 6000
 crush tick  8 3 0.3
@@ -62,8 +62,8 @@ metal    -2.4    1063  3rd/Malfunction/Drums/Tuning Drums
 harm     -3.2     740  3rd/Giana Brotherz/Pads/Deep Choir
 harm      5.6    1136  3rd/Giana Brotherz/Pads/Dub Choir
 perc     -10.7     300  internal/deep
-gain harm  -10.8
-drive harm 0.25 5000
+gain harm   -8.0
+amp harm  0.32 2200 0.35
 drive sub  0.55 2500
 duck sub 0.30
 lowcut bass 90

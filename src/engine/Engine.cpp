@@ -258,9 +258,88 @@ void PeakLimiter::process(float* l, float* r, int n)
     }
 }
 
-void Biquad::highpass(double sr, double hz)
+void Biquad::lowpass(double sr, double hz, double q)
 {
-    const double w = juce::MathConstants<double>::twoPi * hz / sr, c = std::cos(w), alpha = std::sin(w) / (2 * 0.7071), a0 = 1 + alpha;
+    const double w = juce::MathConstants<double>::twoPi * hz / sr, c = std::cos(w), alpha = std::sin(w) / (2 * q), a0 = 1 + alpha;
+    b0 = float((1 - c) / 2 / a0);
+    b1 = float((1 - c) / a0);
+    b2 = b0;
+    a1 = float(-2 * c / a0);
+    a2 = float((1 - alpha) / a0);
+    z1 = z2 = 0;
+}
+
+void Biquad::peak(double sr, double hz, double q, double dB)
+{
+    const double A = std::pow(10.0, dB / 40), w = juce::MathConstants<double>::twoPi * hz / sr, c = std::cos(w), alpha = std::sin(w) / (2 * q);
+    const double a0 = 1 + alpha / A;
+    b0 = float((1 + alpha * A) / a0);
+    b1 = float(-2 * c / a0);
+    b2 = float((1 - alpha * A) / a0);
+    a1 = b1;
+    a2 = float((1 - alpha / A) / a0);
+    z1 = z2 = 0;
+}
+
+void Amp::prepare(double sr, const AmpSpec& s)
+{
+    spec_ = s;
+    g1_ = 2 + 22 * s.gain * s.gain;
+    g2_ = 1.5f + 5 * s.gain;
+    for (int c = 0; c < 2; ++c)
+    {
+        tight_[c].highpass(sr, 110);
+        push_[c].peak(sr, 850, 0.8, 7);
+        inter_[c].highpass(2 * sr, 45);           // between the stages, at the doubled rate
+        cab_[c][0].highpass(sr, 75);
+        cab_[c][1].peak(sr, 110, 1.2, 3);         // the cabinet's thump
+        cab_[c][2].peak(sr, 450, 0.9, -5);        // the scoop
+        cab_[c][3].peak(sr, s.presenceHz, 1.0, 4); // presence
+        cab_[c][4].lowpass(sr, 5200, 0.9);
+        last_[c] = low_[c] = lp_[c] = 0;
+    }
+    lpA_ = 1 - std::exp(-juce::MathConstants<float>::twoPi * 6500.0f / float(2 * sr)); // the speaker's second pole, at the doubled rate
+    lowA_ = 1 - std::exp(-juce::MathConstants<float>::twoPi * 140.0f / float(sr));
+    envA_ = 1 - std::exp(-1.0f / float(0.3 * sr));
+    envIn_ = envOut_ = 1e-6f;
+}
+
+float Amp::stage(float x, int c)
+{
+    x = std::tanh(g1_ * x);
+    x = inter_[c].process(x);
+    x = std::tanh(g2_ * x + 0.25f) - std::tanh(0.25f);
+    lp_[c] += (x - lp_[c]) * lpA_;
+    return lp_[c];
+}
+
+void Amp::process(float& l, float& r)
+{
+    float io[2] = { l, r }, wet[2];
+    for (int c = 0; c < 2; ++c)
+    {
+        const float dry = io[c];
+        low_[c] += (dry - low_[c]) * lowA_;
+        const float x = push_[c].process(tight_[c].process(dry));
+        // twice the rate: the midpoint and the sample, averaged back down
+        float y = 0.5f * (stage(0.5f * (last_[c] + x), c) + stage(x, c));
+        last_[c] = x;
+        for (auto& f : cab_[c]) y = f.process(y);
+        wet[c] = y;
+    }
+    // the amp follows the dry track's level (slowly, so it still compresses like an amp does)
+    envIn_ += (0.5f * (l * l + r * r) - envIn_) * envA_;
+    envOut_ += (0.5f * (wet[0] * wet[0] + wet[1] * wet[1]) - envOut_) * envA_;
+    const float match = juce::jmin(8.0f, std::sqrt((envIn_ + 1e-9f) / (envOut_ + 1e-9f)));
+    for (int c = 0; c < 2; ++c)
+        io[c] = io[c] * (1 - spec_.mix) + (wet[c] * match + 0.8f * low_[c]) * spec_.mix;
+    l = io[0];
+    r = io[1];
+}
+
+void Biquad::highpass(double sr, double hz, double q)
+{
+    const double w = juce::MathConstants<double>::twoPi * hz / sr, c = std::cos(w), alpha = std::sin(w) / (2 * q), a0 = 1 + alpha;
     b0 = float((1 + c) / 2 / a0);
     b1 = float(-(1 + c) / a0);
     b2 = b0;
@@ -368,6 +447,7 @@ juce::String Palette::load(const juce::File& file, const std::string& sceneName)
     for (auto& g : trackGainDb) g = 0;
     masterDb = 0;
     for (auto& d : drives) d = {};
+    for (auto& a : amps) a = {};
     for (auto& c : crushes) c = {};
     for (auto& c : comps) c = {};
     for (auto& d : duckDepth) d = -1;
@@ -385,7 +465,7 @@ juce::String Palette::load(const juce::File& file, const std::string& sceneName)
         tokens.removeEmptyStrings();
         const auto where = file.getFileName() + " line " + juce::String(n + 1) + ": ";
         if (tokens[0] == "master" && tokens.size() >= 2) { masterDb = tokens[1].getFloatValue(); continue; }
-        if (tokens[0] == "gain" || tokens[0] == "delay" || tokens[0] == "drive" || tokens[0] == "crush" || tokens[0] == "comp" || tokens[0] == "duck" || tokens[0] == "lowcut")
+        if (tokens[0] == "gain" || tokens[0] == "delay" || tokens[0] == "drive" || tokens[0] == "crush" || tokens[0] == "comp" || tokens[0] == "duck" || tokens[0] == "lowcut" || tokens[0] == "amp")
         {
             const int t = info->trackOf(tokens[1].toStdString());
             if (t < 0) return where + "no track '" + tokens[1] + "' in the " + juce::String(scene) + " scene";
@@ -394,6 +474,7 @@ juce::String Palette::load(const juce::File& file, const std::string& sceneName)
             else if (tokens[0] == "comp" && tokens.size() >= 7) comps[t] = { tokens[2].getFloatValue(), juce::jmax(1.0f, tokens[3].getFloatValue()), tokens[4].getFloatValue(), tokens[5].getFloatValue(), juce::jlimit(0.0f, 1.0f, tokens[6].getFloatValue()) };
             else if (tokens[0] == "duck") duckDepth[t] = juce::jlimit(0.0f, 1.0f, tokens[2].getFloatValue());
             else if (tokens[0] == "lowcut") lowCutHz[t] = juce::jmax(0.0f, tokens[2].getFloatValue());
+            else if (tokens[0] == "amp" && tokens.size() >= 5) amps[t] = { juce::jlimit(0.0f, 1.0f, tokens[2].getFloatValue()), tokens[3].getFloatValue(), juce::jlimit(0.0f, 1.0f, tokens[4].getFloatValue()) };
             else if (tokens[0] == "drive") drives[t] = { juce::jlimit(0.0f, 1.0f, tokens[2].getFloatValue()), tokens.size() >= 4 ? tokens[3].getFloatValue() : 6000.0f };
             else if (tokens[0] == "delay" && tokens.size() >= 5) delays[t] = { tokens[2].getFloatValue(), juce::jlimit(0.0f, 0.95f, tokens[3].getFloatValue()), tokens[4].getFloatValue(), tokens[5] == "throws" };
             else if (tokens[0] == "delay") return where + "expected 'delay <track> beats feedback mix [throws]'";
@@ -508,6 +589,7 @@ juce::String Engine::load(double sampleRate, int maxBlock, const Palette& palett
         for (auto& f : t.hp) f.highpass(sampleRate, juce::jmax(10.0f, cut));
         t.mix.setSize(2, maxBlock);
         t.drive.prepare(sampleRate, palette.drives[i]);
+        t.amp.prepare(sampleRate, palette.amps[i]);
         t.crush.prepare(palette.crushes[i]);
         t.comp.prepare(sampleRate, palette.comps[i]);
         if (palette.duckDepth[i] >= 0) t.duck = palette.duckDepth[i];
@@ -951,6 +1033,7 @@ void Engine::renderChunk(float* const* out, int numChannels, int offset, int len
             if (mixStage)
             {
                 if (t.drive.on()) { l = t.drive.process(l, 0); r = t.drive.process(r, 1); }
+                if (t.amp.on()) t.amp.process(l, r);
                 if (t.crush.on()) t.crush.process(l, r);
                 if (t.comp.on()) t.comp.process(l, r);
                 if (t.lowCut) { l = t.hp[0].process(l); r = t.hp[1].process(r); }

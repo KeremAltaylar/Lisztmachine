@@ -33,20 +33,20 @@ delay arp 1.5 0.45 0.25
 
 # Balance (to be measured in the mix)
 gain pulse   0.0
-gain metal   0.7
+gain metal   0.9
 gain tick   11.9
 gain perc   -5.4
-gain pad    -7.7
-gain bass   -4.1
+gain pad    -5.4
+gain bass    1.1
 gain sub    -9.9
-gain arp   -10.9
-gain chord -13.8
+gain arp    -8.7
+gain chord -10.6
 gain fx     -6.0
 master 8.5
-drive bass  0.55 3500
-drive chord 0.50 4500
-drive arp   0.45 5000
-drive pad   0.20 5000
+amp bass  0.63 1800 0.75
+amp chord 0.63 2500 0.85
+amp arp   0.63 3000 0.80
+amp pad   0.32 2000 0.45
 drive metal 0.30 4500
 drive perc  0.30 6000
 crush tick  8 3 0.3
@@ -59,8 +59,8 @@ delay perc  1.0 0.5 0.3 throws
 
 # 2026-10-29: the 808, the choir, deep metal, darker synths
 sub      0.0      60  internal/808
-gain harm  -10.2
-drive harm 0.25 5000
+gain harm   -7.4
+amp harm  0.32 2200 0.35
 drive sub  0.55 2500
 duck sub 0.30
 lowcut bass 90

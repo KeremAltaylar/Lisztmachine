@@ -58,3 +58,9 @@ lead   -10.5   3669  Leads/Distortionworks
 lead   -11.1   3765  Leads/Nastyfication
 lead    -8.8   4138  Leads/Squelch
 master 6.8
+
+# 2026-10-29: an amp and its cabinet on the melodic parts (gain, presence Hz, mix)
+amp bass  0.50 1800 0.70
+amp seq   0.50 2600 0.70
+amp lead  0.55 3000 0.75
+amp pad   0.25 2000 0.35
