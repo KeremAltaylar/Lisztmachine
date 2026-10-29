@@ -32,14 +32,14 @@ delay chord 1.5 0.40 0.20
 
 # Balance (to be measured in the mix)
 gain pulse   0.0
-gain metal  -6.4
+gain metal  -6.3
 gain tick   10.0
-gain perc   -9.7
+gain perc   -9.6
 gain pad   -12.0
 gain bass   -7.2
 gain sub   -14.6
-gain arp   -13.2
-gain chord  -8.2
+gain arp   -13.6
+gain chord  -8.3
 gain fx     -6.9
 master 9.6
 drive bass  0.69 3500

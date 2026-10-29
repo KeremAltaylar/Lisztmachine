@@ -2,7 +2,8 @@ name: mac
 
 # Builds the app on an Apple Silicon runner (same CPU family as the show's Mac mini M1),
 # runs the composer tests, installs Surge XT and renders a minute of Berlin and of Jungle (the
-# genre songs, their third-party percussion patches) to prove the sound path.
+# genre songs, their third-party percussion patches) and a stretch of Trip-Hop with Dexed in it
+# (fetched from its GitHub release, bundled in the app's Resources/plugins) to prove the sound path.
 on:
   push:
   workflow_dispatch:
@@ -29,16 +30,26 @@ jobs:
           sudo installer -pkg "$(ls /Volumes/surge/*.pkg | head -1)" -target /
           ls "/Library/Audio/Plug-Ins/VST3"
 
+      - name: Fetch Dexed
+        run: |
+          curl -sL -o dexed.zip https://github.com/asb2m10/dexed/releases/download/v1.0.1/Dexed-1.0.1-macOS.zip
+          mkdir -p dexed plugins && ditto -x -k dexed.zip dexed
+          V="$(find dexed -name Dexed.vst3 -maxdepth 4 | head -1)"
+          if [ -z "$V" ]; then find dexed -maxdepth 4; exit 1; fi
+          cp -R "$V" plugins/
+
       - name: Render one minute
         run: |
           mkdir -p render
           R="$(find build -name liszt_render -type f -perm -u+x | head -1)"
           "$R" --seed 1 --seconds 60 --out "$PWD/render/seed1-60s.wav"
           "$R" --scene jungle --seed 1 --seconds 60 --out "$PWD/render/jungle1-60s.wav"
+          "$R" --scene triphop --seed 1 --from 60 --bars 24 --out "$PWD/render/triphop1-dexed.wav" | grep -E "dexed|rendered"
 
       - name: Package the app
         run: |
           APP="$(find build -name Lisztmachine.app -type d | head -1)"
+          mkdir -p "$APP/Contents/Resources/plugins" && cp -R plugins/Dexed.vst3 "$APP/Contents/Resources/plugins/"
           codesign --force --deep -s - "$APP"
           ditto -c -k --keepParent "$APP" Lisztmachine-mac.zip
 

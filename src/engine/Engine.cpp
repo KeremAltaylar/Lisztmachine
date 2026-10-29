@@ -66,6 +66,39 @@ std::unique_ptr<juce::AudioPluginInstance> createSurge(double sampleRate, int ma
     return p;
 }
 
+// Dexed (a DX7): in the standard VST3 folders, or in a plugins/ folder next to the executable or any
+// parent of it (the repo in development; Resources/plugins inside the Mac .app bundle).
+juce::File findDexed()
+{
+    auto dir = juce::File::getSpecialLocation(juce::File::currentExecutableFile).getParentDirectory();
+    for (int up = 0; up < 8 && dir.exists(); ++up, dir = dir.getParentDirectory())
+        for (auto sub : { "plugins", "Resources/plugins" })
+            if (auto f = dir.getChildFile(sub).getChildFile("Dexed.vst3"); f.exists()) return f;
+    return firstExisting({ "C:/Users/kerem/OneDrive/Desktop/Claude/Projects/Lisztmachine/plugins/Dexed.vst3", // the repo, from the build dir
+                           "C:/Program Files/Common Files/VST3/Dexed.vst3", "/Library/Audio/Plug-Ins/VST3/Dexed.vst3",
+                           juce::File::getSpecialLocation(juce::File::userHomeDirectory).getFullPathName() + "/Library/Audio/Plug-Ins/VST3/Dexed.vst3" });
+}
+
+bool isDexedSound(const juce::String& patch) { return patch.startsWith("dexed/"); }
+
+std::unique_ptr<juce::AudioPluginInstance> createDexed(double sampleRate, int maxBlock, juce::String& error)
+{
+    auto file = findDexed();
+    if (!file.exists()) { error = "Dexed is not installed (no Dexed.vst3 found)"; return nullptr; }
+    return createVst3(file, sampleRate, maxBlock, error);
+}
+
+// "dexed/<program name>": one of the voices of Dexed's cartridge, by name.
+juce::String loadDexedVoice(juce::AudioPluginInstance& dexed, const juce::String& patch)
+{
+    const auto name = patch.fromFirstOccurrenceOf("dexed/", false, false);
+    for (int i = 0; i < dexed.getNumPrograms(); ++i)
+        if (dexed.getProgramName(i).trim().equalsIgnoreCase(name)) { dexed.setCurrentProgram(i); return {}; }
+    juce::StringArray names;
+    for (int i = 0; i < dexed.getNumPrograms(); ++i) names.add(dexed.getProgramName(i).trim());
+    return "no Dexed voice '" + name + "' (has: " + names.joinIntoString(", ") + ")";
+}
+
 juce::String setParameterText(juce::AudioPluginInstance& plugin, const juce::String& name, const juce::String& value)
 {
     juce::AudioProcessorParameter* p = nullptr;
@@ -374,7 +407,7 @@ juce::String Palette::load(const juce::File& file, const std::string& sceneName)
             return where + "expected 'part gain bright Category/Patch'";
         // The patch name is the rest of the line: it may contain spaces.
         auto patch = line.fromFirstOccurrenceOf(tokens[2], false, false).trim();
-        if (!isEngineSound(patch) && !findSurgePatch(patch).existsAsFile())
+        if (!isEngineSound(patch) && !isDexedSound(patch) && !findSurgePatch(patch).existsAsFile())
             return where + "no Surge patch '" + patch + "'";
         for (int t : targets) parts[t].push_back({ patch, tokens[1].getFloatValue(), tokens[2].getFloatValue() });
     }
@@ -572,12 +605,27 @@ juce::String Engine::loadInto(Slot& slot, int track, int entry)
 {
     const auto& e = palette_.parts[track][size_t(entry)];
     if (tracks_[track].internal) { slot.entry = entry; return {}; }
-    if (auto err = loadSurgePatch(*slot.plugin, findSurgePatch(e.patch)); err.isNotEmpty()) return err;
-    if (palette_.info->pure[track]) purify(*slot.plugin, palette_.info->pure[track] == 1);
+    // A track may rotate between Surge and Dexed: the slot's instance is swapped for the other synth.
+    const bool dexed = isDexedSound(e.patch);
+    if (dexed != slot.dexed || !slot.plugin)
+    {
+        juce::String err;
+        auto p = dexed ? createDexed(sampleRate_, maxBlock_, err) : createSurge(sampleRate_, maxBlock_, err);
+        if (!p) return err;
+        p->prepareToPlay(sampleRate_, maxBlock_);
+        slot.plugin = std::move(p);
+        slot.dexed = dexed;
+    }
+    if (dexed) { if (auto err = loadDexedVoice(*slot.plugin, e.patch); err.isNotEmpty()) return err; }
+    else
+    {
+        if (auto err = loadSurgePatch(*slot.plugin, findSurgePatch(e.patch)); err.isNotEmpty()) return err;
+        if (palette_.info->pure[track]) purify(*slot.plugin, palette_.info->pure[track] == 1);
+    }
     slot.plugin->reset();
     slot.cutoff = nullptr;
     for (auto* p : slot.plugin->getParameters())
-        if (p->getName(64) == "A Filter 1 Cutoff") { slot.cutoff = p; slot.cutoffBase = p->getValue(); }
+        if (p->getName(64) == (dexed ? "Cutoff" : "A Filter 1 Cutoff")) { slot.cutoff = p; slot.cutoffBase = p->getValue(); }
     slot.gain = juce::Decibels::decibelsToGain(e.gainDb);
     slot.entry = entry;
     slot.quiet = 0;

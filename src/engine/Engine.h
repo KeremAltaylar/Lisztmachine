@@ -132,6 +132,10 @@ juce::String loadSurgePatch(juce::AudioPluginInstance& surge, const juce::File& 
 void purify(juce::AudioPluginInstance& surge, bool roundTuning = true);
 
 std::unique_ptr<juce::AudioPluginInstance> createSurge(double sampleRate, int maxBlock, juce::String& error);
+// Dexed, the free DX7: "dexed/<voice name>" in a palette plays one of its cartridge's voices.
+std::unique_ptr<juce::AudioPluginInstance> createDexed(double sampleRate, int maxBlock, juce::String& error);
+juce::String loadDexedVoice(juce::AudioPluginInstance& dexed, const juce::String& patch);
+bool isDexedSound(const juce::String& patch);
 
 // Lookahead peak limiter. The signal is delayed 1.5 ms so the gain is already down when
 // a peak arrives; below the threshold it is exactly unity. (juce::dsp::Limiter was measured
@@ -277,6 +281,7 @@ private:
         juce::AudioProcessorParameter* cutoff = nullptr;
         float cutoffBase = 0.5f, gain = 1;
         int entry = -1;
+        bool dexed = false;            // the instance is Dexed, not Surge
         std::atomic<int> state { Idle };
         int64_t quiet = 0, tailed = 0; // samples of silence, and in all, while ringing out
         int64_t releaseAt = -1;        // the old sound lets go of its held notes here: a crossfade

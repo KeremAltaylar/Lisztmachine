@@ -27,19 +27,23 @@ perc     -3.2    4877  3rd/Emu/Drums/T8 Conga
 harm      5.6    1136  3rd/Giana Brotherz/Pads/Dub Choir
 harm    -10.6    3541  3rd/Bluelight/Vox/Gregorian Rant Poly
 
+# Dexed (the free DX7, plugins/Dexed.vst3): voices of its cartridge, by name
+chord    -7.7     861  dexed/TRW
+arp      -0.3    2773  dexed/LAURIE
+
 # Echoes: beats, feedback, mix
 delay arp 1.5 0.45 0.25
 
 # Balance (to be measured in the mix)
 gain pulse   0.0
-gain metal   0.5
+gain metal   0.7
 gain tick   10.9
 gain perc   -6.3
-gain pad    -6.2
-gain bass   -3.3
+gain pad    -6.4
+gain bass   -3.0
 gain sub   -11.3
-gain arp   -10.3
-gain chord -14.1
+gain arp    -9.6
+gain chord  -9.7
 gain fx     -6.0
 master 8.5
 drive bass  0.55 3500

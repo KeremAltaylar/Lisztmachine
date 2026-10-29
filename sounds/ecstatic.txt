@@ -33,10 +33,10 @@ gain pulse   0.0
 gain metal  -7.2
 gain tick   15.5
 gain perc   -4.0
-gain pad    -9.2
-gain bass   -7.6
+gain pad    -9.3
+gain bass   -7.1
 gain sub   -12.1
-gain arp    -5.0
+gain arp    -4.7
 gain chord -12.3
 gain fx     -2.9
 master 9.2
@@ -59,7 +59,7 @@ sub      0.0      60  internal/808
 harm      5.6    1136  3rd/Giana Brotherz/Pads/Dub Choir
 harm     -2.1    4204  3rd/Giana Brotherz/Pads/Dark Whisper
 perc     -9.3     300  internal/deep
-gain harm  -11.2
+gain harm  -11.1
 drive harm 0.25 5000
 drive sub  0.55 2500
 duck sub 0.30

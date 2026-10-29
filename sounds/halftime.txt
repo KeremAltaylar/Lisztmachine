@@ -24,16 +24,19 @@ bass     -1.8    1063  3rd/A.Liv/Basses/Sqweird
 arp     -10.1    1132  3rd/Nick Moritz/Leads/Demon Here
 bass     -2.4    1824  3rd/Giana Brotherz/Basses/Black Swarm
 
+# Dexed (the free DX7, plugins/Dexed.vst3): voices of its cartridge, by name
+bass      6.0     672  dexed/ARP 2600
+
 # Echoes: beats, feedback, mix
 delay arp 1.5 0.45 0.25
 
 # Balance (to be measured in the mix)
 gain pulse   0.0
-gain metal  -1.1
+gain metal  -2.0
 gain tick    5.9
 gain perc   -4.8
 gain pad    -9.9
-gain bass   -6.6
+gain bass   -3.7
 gain sub   -14.0
 gain arp   -11.7
 gain chord -16.2
@@ -59,7 +62,7 @@ metal    -2.4    1063  3rd/Malfunction/Drums/Tuning Drums
 harm     -3.2     740  3rd/Giana Brotherz/Pads/Deep Choir
 harm      5.6    1136  3rd/Giana Brotherz/Pads/Dub Choir
 perc     -10.7     300  internal/deep
-gain harm  -10.9
+gain harm  -10.8
 drive harm 0.25 5000
 drive sub  0.55 2500
 duck sub 0.30

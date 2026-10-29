@@ -24,19 +24,23 @@ perc     -3.5     300  internal/deep
 harm     -3.2     740  3rd/Giana Brotherz/Pads/Deep Choir
 harm     -2.1    4204  3rd/Giana Brotherz/Pads/Dark Whisper
 
+# Dexed (the free DX7, plugins/Dexed.vst3): voices of its cartridge, by name
+pad      -1.0     464  dexed/PHAROH
+arp      -2.2    1961  dexed/SAHARA
+
 # Echoes: beats, feedback, mix
 delay arp 1.5 0.45 0.25
 
 # Balance (to be measured in the mix)
 gain pulse   0.0
-gain metal   0.9
+gain metal   0.7
 gain tick   11.9
 gain perc   -5.4
-gain pad    -6.9
+gain pad    -7.7
 gain bass   -4.1
 gain sub    -9.9
 gain arp   -10.9
-gain chord -13.9
+gain chord -13.8
 gain fx     -6.0
 master 8.5
 drive bass  0.55 3500

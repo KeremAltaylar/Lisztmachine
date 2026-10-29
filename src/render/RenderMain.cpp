@@ -110,10 +110,11 @@ static int audition(const juce::String& patch, int note, bool pure)
     const double sr = 48000;
     const int block = 256;
     juce::String err;
-    auto surge = createSurge(sr, block, err);
+    const bool dexed = isDexedSound(patch);
+    auto surge = dexed ? createDexed(sr, block, err) : createSurge(sr, block, err);
     if (!surge) { std::cerr << err << "\n"; return 1; }
-    if (auto e = loadSurgePatch(*surge, findSurgePatch(patch)); e.isNotEmpty()) { std::cerr << e << "\n"; return 1; }
-    if (pure) purify(*surge);
+    if (auto e = dexed ? loadDexedVoice(*surge, patch) : loadSurgePatch(*surge, findSurgePatch(patch)); e.isNotEmpty()) { std::cerr << e << "\n"; return 1; }
+    if (pure && !dexed) purify(*surge);
     surge->prepareToPlay(sr, block);
 
     const int holdBlocks = int(3.0 * sr / block), tailBlocks = int(2.0 * sr / block);

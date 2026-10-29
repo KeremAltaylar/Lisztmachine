@@ -34,7 +34,7 @@ delay chord 0.75 0.40 0.22
 
 # Balance (to be measured in the mix)
 gain pulse   0.0
-gain metal -14.6
+gain metal -14.5
 gain tick    4.3
 gain perc  -16.7
 gain pad   -18.1
@@ -63,7 +63,7 @@ sub      0.0      60  internal/808
 metal    7.2     997  3rd/Malfunction/Drums/Inharmonic Attack 2
 harm     -2.1    4204  3rd/Giana Brotherz/Pads/Dark Whisper
 harm    -10.6    3541  3rd/Bluelight/Vox/Gregorian Rant Poly
-gain harm  -13.8
+gain harm  -13.9
 drive harm 0.25 5000
 drive sub  0.55 2500
 duck sub 0.30
