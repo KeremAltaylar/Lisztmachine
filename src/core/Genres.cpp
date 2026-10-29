@@ -34,17 +34,21 @@ const G::Spec kJungle {
     .scene = "jungle", .title = "Jungle",
     .bpmLo = 168, .bpmHi = 174, .mode = &kAeolian, .tonics = { 4, 5, 2, 7, 9 },
     .progs = { { { 0, 5, 2, 6 }, { 0, 3, 5, 4 }, { 0, 6, 5, 6 } } }, .preRoot = 6,
-    .form = { { { "Mist", 16, .15f, "PF" }, { "Signal", 16, .35f, "PAHF" }, { "First Break", 64, .65f, "PKSHBUA" },
-                { "Undertow", 32, .45f, "PBUAD" }, { "Second Break", 64, .85f, "PKSHBUAD" }, { "Void", 16, .30f, "PAF" },
-                { "Ascension", 80, 1.0f, "PKSHBUADF" }, { "Rain", 32, .50f, "PKSHAL" }, { "Tide", 16, .10f, "PF" } } },
+    .form = { { { "Mist", 16, .15f, "PF" }, { "Signal", 16, .35f, "PAHF" }, { "First Break", 64, .65f, "PKSHCBUA" },
+                { "Undertow", 32, .45f, "PBUAD" }, { "Second Break", 64, .85f, "PKSHCBUAD" }, { "Void", 16, .30f, "PAF" },
+                { "Ascension", 80, 1.0f, "PKSHCBUADF" }, { "Rain", 32, .50f, "PKSHCAL" }, { "Tide", 16, .10f, "PF" } } },
     // the break's skeleton drives the pulse; the metal answers off the backbeat, the ticks run between
     .pulse = part("X.........X.....", "X.X.......XX....X.X.......X.....", "X.X.......XX....X.X.......X..X.."),
     .metal = part("..........1.....", "...1......2..3..", "...1..2...3..1.2..1...3.2...4..2"),
     .tick = part("x.o.x.o.x.o.x.o.", "xgogxgo2xgogxg2g", "xoxgxoxgx2xgxoxg"),
-    .perc = none(),
+    // deep struck metal, tuned to the chord, away from the backbeats the live breaks play
+    .perc = part("", "......1...3.....", "......1...3...2.......1.....4.2."),
     // the reese: whole bars, the fifth at the end of the phrase
     .bass = part("x---------------", "x-----------5---", "x-------x---5-8-"),
     .chord = part("", "x---------------................", "x---------------................"),
+    // the 808 in halftime under the breaks, sliding up the octave into the turn
+    .sub = part("x---------------", "x-----------x---x-------^-------", "x-------x---x---x-----5-^---x---"),
+    .percLo = 36, .percHi = 52,
     .chop = .35f,
 };
 
@@ -62,6 +66,7 @@ const G::Spec kFootwork {
     .perc = part("1.......2.......3.......", "1.......2.....3.1.......", "1.2.3.......1.2.3...4.4.", 24),
     .bass = part("x-----......", "x-----..x-..", "x-----..5-..x--.x-..5---", 12),
     .chord = part("", "x..x..x.....", "x.xx.xx..x.x", 12),
+    .sub = part("x-----------", "x-----..x-^-", "x-----..x-^-x--.x-..5-^-", 12),
     .percLo = 38, .percHi = 57,
     .chop = .20f,
 };
@@ -71,35 +76,37 @@ const G::Spec kEcstatic {
     .bpmLo = 136, .bpmHi = 142, .mode = &kAeolian, .tonics = { 9, 2, 4, 7, 0 },
     .progs = { { { 0, 5, 2, 6 }, { 5, 6, 0, 0 }, { 0, 3, 5, 6 } } }, .preRoot = 6,
     .form = { { { "Dawn", 16, .15f, "PA" }, { "Spiral", 32, .35f, "PA" }, { "Lattice", 48, .55f, "PADH" },
-                { "Suspension", 32, .40f, "PAFS" }, { "Ecstasy", 64, .80f, "PADHSBUL" }, { "Afterimage", 32, .45f, "PAS" },
-                { "Computation", 64, 1.0f, "PKSHBUADF" }, { "Halo", 32, .20f, "PAD" } } },
+                { "Suspension", 32, .40f, "PAFS" }, { "Ecstasy", 64, .80f, "PADHSCBUL" }, { "Afterimage", 32, .45f, "PAS" },
+                { "Computation", 64, 1.0f, "PKSHCBUADF" }, { "Halo", 32, .20f, "PAD" } } },
     // no break here: the arpeggio is the rhythm; the pulse only lands at the summit
     .pulse = part("", "", "X...X...X...X..."),
     .metal = part("", "", "......1.......2."),
     .tick = part("", "..g...g...g...g.", "g.g.g.g.g.g.g.g."),
-    .perc = none(),
+    .perc = part("", "..........1.....", "..........1...........3.....2..."),
     .bass = part("", "x-------x-------", "x-------5---8---"),
     // the chords gated pointillistically: the trance without its kick
     .chord = part("x-------........", "x.x.x..x.x.x..x.", "x.xx.xx.x.xx.xx."),
+    .sub = part("", "x---------------", "x-------x---^---"),
     .arpRate = { 16, 16, 32 }, .arpLenLo = 7, .arpLenHi = 11, .arpDensLo = .60f, .arpDensHi = 1.0f, .arpGate = .7f,
-    .arpLo = 60, .arpHi = 96, .hook = false,
+    .arpLo = 60, .arpHi = 96, .percLo = 36, .percHi = 52, .hook = false,
 };
 
 const G::Spec kDub {
     .scene = "dubtechno", .title = "Dub Techno",
     .bpmLo = 120, .bpmHi = 124, .mode = &kAeolian, .tonics = { 9, 2, 7, 0, 5 },
     .progs = { { { 0, 0, 3, 3 }, { 0, 5, 3, 0 }, { 0, 3, 0, 6 } } }, .preRoot = 3,
-    .form = { { { "Fog", 16, .15f, "PD" }, { "Current", 32, .35f, "PKHD" }, { "Depth", 48, .55f, "PKSHBUDL" },
-                { "Haze", 32, .35f, "PDF" }, { "Pressure", 64, .80f, "PKSHBUDF" }, { "Echo Chamber", 32, .45f, "PDHA" },
-                { "Submersion", 64, 1.0f, "PKSHBUADF" }, { "Silt", 16, .15f, "PD" } } },
+    .form = { { { "Fog", 16, .15f, "PD" }, { "Current", 32, .35f, "PKHD" }, { "Depth", 48, .55f, "PKSHCBUDL" },
+                { "Haze", 32, .35f, "PDF" }, { "Pressure", 64, .80f, "PKSHCBUDF" }, { "Echo Chamber", 32, .45f, "PDHA" },
+                { "Submersion", 64, 1.0f, "PKSHCBUADF" }, { "Silt", 16, .15f, "PD" } } },
     .pulse = part("X...x...x...x...", "X...x...x...x...", "X...x...x...x..."),
     .metal = part("", "......1.......1.", "......1....2..1."), // rimshots
     .tick = part("..o...o...o...o.", "g.2.g.2.g.2.g.2.", "g.2gg.2gg.2gg.2g"),
-    .perc = none(),
+    .perc = part("", "..........1.....", "..........1...........3...2....."), // a deep drum into the echo
     .bass = part("x.......x.......", "..x...x...x...x.", "..x..xx...x..x5."),
     // the stab: a minor seventh, short, into a long echo; its filter breathes over minutes
     .chord = part("..x.............", "..x.....x.....x.", "..x..x....x..x.."),
-    .ext = 1, .swing = .12f, .chordSweep = .55f,
+    .sub = part("x---------------", "x-----------x---", "x-------x---^---"),
+    .percLo = 36, .percHi = 52, .ext = 1, .swing = .12f, .chordSweep = .55f,
 };
 
 const G::Spec kGlitch {
@@ -116,6 +123,7 @@ const G::Spec kGlitch {
     .perc = part("euclid", "euclid", "euclid", 32), // sine clicks, tuned to the chord, spread evenly
     .bass = part("", "x-------........", "x---....x---...."),
     .chord = part("x---------------................", "x---------------................", "x-------x-------"),
+    .sub = part("x-------........", "x---....x---5---", "x---..x-x---^-5-"),
     .percLo = 72, .percHi = 95,
     .stutter = .20f, .stutterTrack = G::Perc, .stutterDiv = 64,
 };
@@ -134,6 +142,7 @@ const G::Spec kGqom {
     .perc = part("1.....2.....1.....3.....", "1..2..3..1..2.....3..2..", "1..2..3..1..2..3..2..1.3", 24),
     .bass = part("", "x---............", "x---......x-----"),
     .chord = part("x...............................", "x.........x.....", "x.....x...x....."),
+    .sub = part("x---------------", "x-----x-----x---", "x--x--x---x-^---"),
     .percLo = 38, .percHi = 57, .swing = .08f,
 };
 
@@ -150,6 +159,7 @@ const G::Spec kDeconstructed {
     .perc = part("1.......3.......", "1..3..2...4..1..", "1.3.2.41.3.2.4.1"), // metal: clicks tuned to the chord
     .bass = part("x---------------", "x-------x---5---", "x--x--x-x---8-5-"),
     .chord = part("X---------------", "X.......X..X....", "X..X..X.X.X..X.."),
+    .sub = part("x---------------", "x-------x--x----", "x--x--x-x---^-5-"),
     .percLo = 60, .percHi = 90,
     .chop = .30f, .gap = .25f, .stutter = .20f, .stutterTrack = G::Metal, .stutterDiv = 32,
 };
@@ -158,16 +168,18 @@ const G::Spec kHalftime {
     .scene = "halftime", .title = "Halftime",
     .bpmLo = 168, .bpmHi = 174, .mode = &kAeolian, .tonics = { 4, 5, 2, 7, 9 },
     .progs = { { { 0, 5, 2, 6 }, { 0, 3, 5, 6 }, { 0, 5, 3, 4 } } }, .preRoot = 6,
-    .form = { { { "Smoke", 16, .15f, "PF" }, { "Weight", 32, .35f, "PHBU" }, { "Halftime", 64, .60f, "PKSHBUD" },
-                { "Hollow", 32, .40f, "PAF" }, { "Mass", 64, .85f, "PKSHBUAD" }, { "Breath", 16, .25f, "PA" },
-                { "Gravity", 64, 1.0f, "PKSHBUADF" }, { "Fall", 32, .30f, "PKSAL" } } },
+    .form = { { { "Smoke", 16, .15f, "PF" }, { "Weight", 32, .35f, "PHBU" }, { "Halftime", 64, .60f, "PKSHCBUD" },
+                { "Hollow", 32, .40f, "PAF" }, { "Mass", 64, .85f, "PKSHCBUAD" }, { "Breath", 16, .25f, "PA" },
+                { "Gravity", 64, 1.0f, "PKSHCBUADF" }, { "Fall", 32, .30f, "PKSCAL" } } },
     // halftime: the tempo is 170, the body feels 85 (the live snare on three); the metal answers around it
     .pulse = part("X...............", "X.........x.....", "X.........x...x.X......x..x....."),
     .metal = part("..........1.....", "......1...2.....", "......1...2...3.......1...2..1.3"),
     .tick = part("x...x...x...x...", "x.x.x.x.x.x.x.x.", "x.xgx.x.x.xgx.x."),
-    .perc = none(),
+    .perc = part("", "..........1.....", "......1...3...........2...4..1.."), // deep metal around the snare on three
     .bass = part("x---------------", "x-------..x-----", "x-----x-..x---5-"),
     .chord = part("", "x---------------................", "x---------------................"),
+    .sub = part("x---------------", "x---------x-----x-------^-------", "x-------x-x-----x-----5-^---x-x-"),
+    .percLo = 36, .percHi = 52,
     .chop = .10f, .stutter = .25f, .stutterTrack = G::Tick, .stutterDiv = 32,
 };
 
@@ -189,16 +201,16 @@ const G::Spec* GenreComposer::find(const std::string& scene)
 
 const SceneInfo* genreSceneInfo(const std::string& scene)
 {
-    // The same ten tracks for every genre: the pad and the chords into the reverb, the arpeggio and
-    // the chords into the echo, the low end dry.
+    // The same eleven tracks for every genre: the pad, the choir and the chords into the reverb, the
+    // arpeggio and the chords into the echo, the low end dry.
     static const std::vector<SceneInfo> infos = [] {
         std::vector<SceneInfo> v;
         for (auto* s : G::all())
-            v.push_back({ s->scene, 10, { "pad", "pulse", "metal", "tick", "perc", "bass", "sub", "arp", "chord", "fx" },
-                          { 0, 1, 2, 2, 2, 1, 1, 3, 0, 0 },
-                          { { 0, .30f }, { 0, .02f }, { .05f, .12f }, { .03f, .08f }, { .10f, .15f }, { 0, .03f }, { 0, 0 }, { .20f, .20f }, { .20f, .25f }, { .10f, .35f } },
-                          { -1, -1, -1, -1, -1, -1, -1, -1, -1, -1 },
-                          { 1, 0, 0, 0, 0, 1, 0, 1, 1, 0 }, true });
+            v.push_back({ s->scene, 11, { "pad", "pulse", "metal", "tick", "perc", "bass", "sub", "arp", "chord", "fx", "harm" },
+                          { 0, 1, 2, 2, 2, 1, 1, 3, 0, 0, 0 },
+                          { { 0, .30f }, { 0, .02f }, { .05f, .12f }, { .03f, .08f }, { .10f, .15f }, { 0, .03f }, { 0, 0 }, { .20f, .20f }, { .20f, .25f }, { .10f, .35f }, { .08f, .40f } },
+                          { -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1 },
+                          { 1, 0, 0, 0, 0, 1, 0, 1, 1, 0, 1 }, true });
         return v;
     }();
     for (auto& i : infos) if (scene == i.name) return &i;
@@ -437,6 +449,7 @@ void GenreComposer::makeArp()
 bool GenreComposer::active(int track, int bar) const
 {
     if (bar < 0 || bar >= totalBars()) return false;
+    if (track == Harm) return (sectionAt(bar).layers & bit(Pad)) != 0 && sectionAt(bar).energy >= .4f;
     return (sectionAt(bar).layers & bit(track)) != 0;
 }
 
@@ -450,9 +463,10 @@ std::array<int, 2> GenreComposer::range(int track) const
         case Tick: return { 72, 100 };
         case Perc: return { spec_.percLo, spec_.percHi };
         case Bass: return { 40, 64 };
-        case Sub: return { 22, 40 };
+        case Sub: return { 24, 52 };
         case Arp: return { spec_.arpLo, spec_.arpHi };
         case Chord: return { 46, 76 };
+        case Harm: return { 60, 86 };
         default: return { 48, 72 };
     }
 }
@@ -468,7 +482,7 @@ float GenreComposer::levelAt(int track, int bar) const
     if (!active(track, bar)) return 0;
     auto& sec = sectionAt(bar);
     const int in = bar - sec.startBar, left = sec.startBar + sec.bars - bar;
-    const float fade = track == Pad || track == Fx || track == Sub || track == Chord ? 4.0f : 2.0f;
+    const float fade = track == Pad || track == Fx || track == Sub || track == Chord || track == Harm ? 4.0f : 2.0f;
     const float fadeIn = active(track, bar - in - 1) || (bar == 0 && track != Pad) ? 1.0f : std::min(1.0f, (in + 1) / fade);
     const float fadeOut = active(track, bar + left) ? 1.0f : std::min(1.0f, left / fade);
     return std::min(fadeIn, fadeOut);
@@ -566,6 +580,59 @@ void GenreComposer::emitPad(int bar, std::vector<Event>& out)
         for (int p : padHeld_) out.push_back({ t0 + kBarTicks, Event::NoteOff, Pad, uint8_t(p), 0 });
         padHeld_.clear();
     }
+}
+
+void GenreComposer::emitHarm(int bar, std::vector<Event>& out)
+{
+    // The choir: three voices above the pad, voice-led on their own. On a new chord they breathe:
+    // the old chord ends on the bar line, the new one enters half a bar late; while a chord holds, every other bar the top voice sighs
+    // up to its neighbour in the mode on beat three and comes back with the next bar.
+    const int64_t t0 = int64_t(bar) * kBarTicks;
+    std::vector<int> want;
+    if (active(Harm, bar)) want = voice(bar, 3, 62, 84, true, harmVoices_);
+    const bool late = !want.empty() && bar > 0 && rootAt(bar) != rootAt(bar - 1);
+    const int64_t at = t0 + (late ? 2 * kPPQ : 0);
+    for (int p : harmHeld_)
+        if (std::find(want.begin(), want.end(), p) == want.end()) out.push_back({ t0, Event::NoteOff, Harm, uint8_t(p), 0 });
+    for (int p : want)
+        if (std::find(harmHeld_.begin(), harmHeld_.end(), p) == harmHeld_.end()) out.push_back({ at, Event::NoteOn, Harm, uint8_t(p), .7f });
+    harmHeld_ = want;
+    const bool holds = !want.empty() && !late && bar + 1 < totalBars() && rootAt(bar + 1) == rootAt(bar);
+    if (holds && bar % 2 == 1 && energyAt(bar) > .55f)
+    {
+        const int top = want.back();
+        int up = top + 1;
+        while (up <= top + 2 && !inMode(bar, up)) ++up;
+        if (up <= 86 && up <= top + 2 && inMode(bar, up))
+        {
+            out.push_back({ t0 + 2 * kPPQ, Event::NoteOff, Harm, uint8_t(top), 0 });
+            out.push_back({ t0 + 2 * kPPQ, Event::NoteOn, Harm, uint8_t(up), .62f });
+            out.push_back({ t0 + kBarTicks - 30, Event::NoteOff, Harm, uint8_t(up), 0 });
+            out.push_back({ t0 + kBarTicks - 30, Event::NoteOn, Harm, uint8_t(top), .66f });
+        }
+    }
+    if (bar + 1 == totalBars())
+    {
+        for (int p : harmHeld_) out.push_back({ t0 + kBarTicks, Event::NoteOff, Harm, uint8_t(p), 0 });
+        harmHeld_.clear();
+    }
+}
+
+bool GenreComposer::inMode(int bar, int pitch) const
+{
+    for (int d = 0; d < 7; ++d)
+        if ((tonicAt(bar) + degreeSemis(*spec_.mode, d)) % 12 == pitch % 12) return true;
+    return false;
+}
+
+int GenreComposer::subPitch(int bar, char c) const
+{
+    // the 808: the root low (41 to 78 Hz), a digit the scale degree above it, ^ the root an octave up
+    const auto& m = *spec_.mode;
+    const int r = rootAt(bar), root = pitchOf(bar, 0, 28, 39, 24);
+    if (c == '^') return root + 12;
+    const int deg = c >= '1' && c <= '9' ? c - '1' : 0;
+    return root + degreeSemis(m, r + deg) - degreeSemis(m, r);
 }
 
 void GenreComposer::emitPart(int track, const Part& part, int bar, std::vector<Event>& out)
@@ -669,7 +736,7 @@ void GenreComposer::emitPart(int track, const Part& part, int bar, std::vector<E
         if (c == '.' || c == '-') continue;
         if (live && track != Pulse && (i & 1)) continue; // half the percussion: the live kit has the room
         int holds = 0;
-        if (!drum) while (holds + 1 < len && pat.s[(at + holds + 1) % len] == '-') ++holds;
+        if (!drum) while (holds + 1 < len && (track != Sub || i + holds + 1 < P) && pat.s[(at + holds + 1) % len] == '-') ++holds; // the 808 within its bar: the next bar may play another pattern
         float vel = c == 'X' ? 1.0f : c == 'x' || c == 'e' ? .85f : c == 'o' ? .65f : c == 'g' ? .38f : .8f;
         int64_t t = t0 + i * stepT;
         if (P == 16 && (i & 1)) t += int64_t(spec_.swing * six);
@@ -685,6 +752,19 @@ void GenreComposer::emitPart(int track, const Part& part, int bar, std::vector<E
             continue;
         }
         const int64_t noteLen = int64_t(double(stepT * (1 + holds)) * (holds ? .95 : .7));
+        if (track == Sub)
+        {
+            // Legato into a different note: the next one starts before this one ends, and the 808 slides.
+            const int p = subPitch(bar, c), at2 = i + 1 + holds;
+            const int nextBar = bar + at2 / P;
+            const Pat& np = at2 < P ? pat : part.tier[size_t(tier(std::min(nextBar, totalBars() - 1)))];
+            const int nl = int(std::strlen(np.s));
+            const char nc = nl == 0 ? '.' : np.s[(int64_t(nextBar) * np.perBar + at2 % P) % nl];
+            const bool slide = nc != '.' && nc != '-' && nextBar < totalBars() && active(Sub, nextBar) && subPitch(nextBar, nc) != p;
+            const int64_t late = t - (t0 + i * stepT); // the swing: the note ends on the grid all the same
+            hit(t, p, vel, stepT * (1 + holds) - late + (slide ? 40 : -10));
+            continue;
+        }
         if (track == Bass)
         {
             const int deg = c >= '1' && c <= '9' ? c - '1' : 0;
@@ -787,7 +867,8 @@ void GenreComposer::generateBar(int bar, std::vector<Event>& out)
     emitPart(Chord, spec_.chord, bar, out);
     if (spec_.hook) emitHook(bar, out);
     else emitArp(bar, out);
-    emitHeld(Sub, bar, out, subHeld_, active(Sub, bar) ? pitchOf(bar, 0, 24, 35, 24) : -1);
+    emitPart(Sub, spec_.sub, bar, out);
+    emitHarm(bar, out);
     emitHeld(Fx, bar, out, fxHeld_, active(Fx, bar) ? foldInto(48 + tonicAt(bar), 48, 59) : -1);
 }
 

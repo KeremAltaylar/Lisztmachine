@@ -7,11 +7,9 @@
 pad      -1.0     582  Pads/Yeti Funeral
 pad       6.6     599  Pads/Still
 pulse    0.0      60  internal/none
-metal    -2.8     997  3rd/Malfunction/Drums/Inharmonic Attack 2
-metal    12.5     783  3rd/Malfunction/Drums/Gong
+metal    -2.9     997  3rd/Malfunction/Drums/Inharmonic Attack 2
+metal    7.8     783  3rd/Malfunction/Drums/Gong
 tick     0.0    6000  internal/click
-perc     0.0    2000  internal/click
-sub     -6.0      40  internal/sub
 fx       -5.7     286  FX/Unsettler
 
 # Echoes: beats, feedback, mix
@@ -27,14 +25,14 @@ delay arp 1.5 0.45 0.25
 
 # Balance (to be measured in the mix)
 gain pulse   0.0
-gain metal  -2.1
+gain metal  -1.7
 gain tick    6.2
-gain perc    0.0
-gain pad   -11.7
-gain bass   -9.2
-gain sub    -7.9
+gain perc   -5.0
+gain pad   -12.0
+gain bass   -9.8
+gain sub   -14.0
 gain arp   -11.7
-gain chord -11.9
+gain chord -11.8
 gain fx     -6.0
 master 8.5
 drive bass  0.55 3500
@@ -50,3 +48,19 @@ duck tick 0.2
 duck perc 0.25
 delay metal 0.75 0.55 0.35 throws
 delay perc  1.0 0.5 0.3 throws
+
+# 2026-10-29: the 808, the choir, deep metal, darker synths
+sub      0.0      60  internal/808
+metal    -2.4    1063  3rd/Malfunction/Drums/Tuning Drums
+harm     -3.2     740  3rd/Giana Brotherz/Pads/Deep Choir
+harm      5.6    1136  3rd/Giana Brotherz/Pads/Dub Choir
+arp     -10.1    1132  3rd/Nick Moritz/Leads/Demon Here
+arp      -1.4    1218  3rd/Bluelight/Leads/Distorted Cello
+bass    -10.5     856  3rd/Cybersoda/Basses/Growl
+bass     -2.4    1824  3rd/Giana Brotherz/Basses/Black Swarm
+perc     -10.7     300  internal/deep
+gain harm  -11.6
+drive harm 0.25 5000
+drive sub  0.55 2500
+duck sub 0.30
+lowcut bass 90

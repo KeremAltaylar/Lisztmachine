@@ -7,13 +7,12 @@
 pad      -1.0     582  Pads/Yeti Funeral
 pad       6.6     599  Pads/Still
 pulse    0.0      60  internal/none
-metal    3.2    1063  3rd/Malfunction/Drums/Tuning Drums
-metal    3.1     997  3rd/Malfunction/Drums/Inharmonic Attack 2
+metal    4.2    1063  3rd/Malfunction/Drums/Tuning Drums
+metal    4.5     997  3rd/Malfunction/Drums/Inharmonic Attack 2
 tick     0.0    6000  internal/click
-perc     -5.2    4877  3rd/Emu/Drums/T8 Conga
+perc     -5.0    4877  3rd/Emu/Drums/T8 Conga
 perc     -6.6    1486  3rd/Cybersoda/Drums/Perc 8
-perc     -3.1     431  3rd/Emu/Drums/Mort Noisey Drum
-sub     -6.0      40  internal/sub
+perc     -3.0     431  3rd/Emu/Drums/Mort Noisey Drum
 fx       -5.7     286  FX/Unsettler
 
 # Echoes: beats, feedback, mix
@@ -27,14 +26,14 @@ delay chord 1.5 0.40 0.20
 
 # Balance (to be measured in the mix)
 gain pulse   0.0
-gain metal  -7.7
+gain metal  -6.0
 gain tick   10.0
-gain perc   -7.5
-gain pad   -15.1
-gain bass   -8.2
-gain sub    -8.1
+gain perc   -9.8
+gain pad   -14.9
+gain bass   -3.2
+gain sub   -14.6
 gain arp   -13.1
-gain chord   1.1
+gain chord   7.6
 gain fx     -6.9
 master 9.6
 drive bass  0.69 3500
@@ -50,3 +49,19 @@ duck tick 0.2
 duck perc 0.25
 delay metal 0.75 0.55 0.35 throws
 delay perc  1.0 0.5 0.3 throws
+
+# 2026-10-29: the 808, the choir, deep metal, darker synths
+sub      0.0      60  internal/808
+metal    14.7     783  3rd/Malfunction/Drums/Gong
+perc     -6.1     287  3rd/Vospi/Drums/Modular Drum
+harm     -3.2     740  3rd/Giana Brotherz/Pads/Deep Choir
+harm    -10.6    3541  3rd/Bluelight/Vox/Gregorian Rant Poly
+arp     -10.1    1132  3rd/Nick Moritz/Leads/Demon Here
+chord    -7.1     879  3rd/Emu/Synths/Disto Brass Pass
+bass    -12.8     263  3rd/Nick Moritz/Basses/Black Betty
+bass     -4.9    2207  3rd/Altenberg/Basses/Aggressive
+gain harm   -9.1
+drive harm 0.25 5000
+drive sub  0.55 2500
+duck sub 0.30
+lowcut bass 90

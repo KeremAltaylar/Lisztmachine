@@ -7,12 +7,10 @@
 pad       6.6     599  Pads/Still
 pad       2.4    2052  Pads/Sunday
 pulse    0.0      60  internal/none
-metal    0.0    2000  internal/metal
+metal    -0.7    2000  internal/metal
 tick     0.0    6000  internal/click
-perc     0.0    2000  internal/click
 bass     -8.4      99  Basses/Sub 2
 bass     -8.8     108  Basses/Digibass
-sub     -6.0      40  internal/sub
 arp      -6.8     263  Leads/Sine-Saw Acidish
 arp     -12.2     419  Leads/Classic Lead 1
 arp      -0.3    1522  Leads/Moogy Saw
@@ -28,12 +26,12 @@ delay chord 0.75 0.30 0.15
 
 # Balance (to be measured in the mix)
 gain pulse   0.0
-gain metal  -7.3
+gain metal  -6.6
 gain tick   15.5
-gain perc    0.0
-gain pad    -9.0
-gain bass   -8.1
-gain sub    -6.8
+gain perc   -3.8
+gain pad    -8.9
+gain bass   -5.0
+gain sub   -12.2
 gain arp    -4.8
 gain chord  -6.3
 gain fx     -2.9
@@ -51,3 +49,16 @@ duck tick 0.2
 duck perc 0.25
 delay metal 0.75 0.55 0.35 throws
 delay perc  1.0 0.5 0.3 throws
+
+# 2026-10-29: the 808, the choir, deep metal, darker synths
+sub      0.0      60  internal/808
+harm      5.6    1136  3rd/Giana Brotherz/Pads/Dub Choir
+harm     -2.1    4204  3rd/Giana Brotherz/Pads/Dark Whisper
+arp      -2.8    2959  3rd/Argitoth/Leads/Screaming Saw
+bass      0.3    3850  3rd/Giana Brotherz/Basses/Distorro
+perc     -9.3     300  internal/deep
+gain harm  -11.3
+drive harm 0.25 5000
+drive sub  0.55 2500
+duck sub 0.30
+lowcut bass 90

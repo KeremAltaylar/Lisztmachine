@@ -235,7 +235,7 @@ int main()
     for (auto* spec : GenreComposer::all())
     {
         using G = GenreComposer;
-        for (auto* p : { &spec->pulse, &spec->metal, &spec->tick, &spec->perc, &spec->bass, &spec->chord })
+        for (auto* p : { &spec->pulse, &spec->metal, &spec->tick, &spec->perc, &spec->bass, &spec->chord, &spec->sub })
             for (auto& t : p->tier)
                 CHECK(std::strcmp(t.s, "euclid") == 0 || std::strlen(t.s) % size_t(t.perBar) == 0, "%s: pattern \"%s\" is not whole bars of %d", spec->scene, t.s, t.perBar);
         for (seed = 1; seed <= 12; ++seed)
@@ -249,10 +249,12 @@ int main()
             const double minutes = c.totalBars() * 4 / c.bpm();
             CHECK(minutes > 6.5 && minutes < 11, "%s length %.1f min", spec->scene, minutes);
             std::map<std::pair<int, int>, int> held;
-            int notes[G::kGenreTracks] = {};
+            int notes[G::kGenreTracks] = {}, slides = 0, subHeld = 0;
             for (auto& x : ev)
             {
                 const auto key = std::make_pair(int(x.track), int(x.pitch));
+                if (x.track == G::Sub && x.type == Event::NoteOn && subHeld++ > 0) ++slides; // the 808 starts a note while one holds
+                if (x.track == G::Sub && x.type == Event::NoteOff) --subHeld;
                 if (x.type == Event::NoteOn)
                 {
                     CHECK(held[key] == 0, "%s double trigger track %d pitch %d at tick %lld", spec->scene, x.track, x.pitch, (long long) x.tick);
@@ -267,6 +269,8 @@ int main()
                 else if (x.type == Event::NoteOff) { CHECK(held[key] == 1, "%s note-off without note-on track %d pitch %d", spec->scene, x.track, x.pitch); --held[key]; }
             }
             for (auto& [k, n] : held) CHECK(n == 0, "%s stuck note track %d pitch %d", spec->scene, k.first, k.second);
+            CHECK(slides > 10, "%s: the 808 never slides (%d)", spec->scene, slides);
+            CHECK(notes[G::Harm] > 20, "%s: the choir never sings", spec->scene);
             // the fills throw their last hit into the echo
             CHECK(std::count_if(ev.begin(), ev.end(), [](auto& x) { return x.type == Event::Throw && x.value > 0; }) > 10, "%s: no echo throws", spec->scene);
             // the summit plays the home progression, four bars a chord

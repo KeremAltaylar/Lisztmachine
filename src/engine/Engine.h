@@ -45,6 +45,7 @@ struct Palette
     CrushSpec crushes[kMaxTracks];      // "crush <track> bits hold mix"
     CompSpec comps[kMaxTracks];         // "comp <track> thresholdDb ratio attackMs releaseMs mix"
     float duckDepth[kMaxTracks];        // "duck <track> depth": over the mix stage's own; -1 keeps it
+    float lowCutHz[kMaxTracks];         // "lowcut <track> Hz": over the mix stage's own; -1 keeps it
     // Lines: "part gain bright Category/Patch" (a Surge patch, or internal/click|blip|sub),
     // "voices ..." for every track of the voice group, "gain ...", "delay ...".
     juce::String load(const juce::File& file, const std::string& scene = "berlin"); // returns an error or empty
@@ -63,16 +64,18 @@ std::vector<SoundChange> planSounds(const Composer& composer, const Palette& pal
 //   blip:  a sine at the note's pitch, 1 ms attack, 30-90 ms decay by velocity
 //   sub:   a held sine (and a little of its octave, for small speakers), 40 ms in, 400 ms out
 //   snare: a falling tone body and a burst of noise; from note 60 up a short rimshot
+//   deep:  struck metal low and long: FM on inharmonic ratios, its brightness fading over a second
+//   808:   a held, saturated sine with a short pitch punch; a note started while one is held slides there
 class InternalSynth
 {
 public:
-    enum Kind { Click, Blip, Sub, Kick, Hat, Clap, Snare, Metal, Zap, None };
+    enum Kind { Click, Blip, Sub, Kick, Hat, Clap, Snare, Metal, Zap, None, Deep, Bass808 };
     void prepare(double sampleRate, Kind kind) { sr_ = sampleRate; kind_ = kind; for (auto& v : voices_) v.note = -1; }
     void render(const juce::MidiBuffer& midi, float* left, float* right, int numSamples);
     void allOff() { for (auto& v : voices_) v.note = -1; }
 
 private:
-    struct Voice { int note = -1; double phase = 0, phase2 = 0, phase3 = 0, inc = 0, env = 0, gain = 0, decay = 0, attack = 0, release = 0; float panL = 0.7f, panR = 0.7f; bool noise = false, held = false; float lastNoise = 0, lastNoise2 = 0; int64_t age = 0; };
+    struct Voice { int note = -1; double phase = 0, phase2 = 0, phase3 = 0, inc = 0, env = 0, gain = 0, decay = 0, attack = 0, release = 0; double target = 0; float panL = 0.7f, panR = 0.7f; bool noise = false, held = false; float lastNoise = 0, lastNoise2 = 0; int64_t age = 0; };
     void start(int note, float velocity);
     void stopNote(int note);
     void run(float* l, float* r, int from, int to);

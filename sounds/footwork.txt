@@ -7,13 +7,12 @@
 pad      -1.0     582  Pads/Yeti Funeral
 pad      -3.9    2383  Pads/Subtle Comb Strings
 pulse    0.0      60  internal/none
-metal    5.4    2646  3rd/Emu/Drums/T8 Cowbell
-metal     12.7    1593  3rd/Cybersoda/Drums/Classic 808 Cowbell
+metal    4.4    2646  3rd/Emu/Drums/T8 Cowbell
+metal     11.7    1593  3rd/Cybersoda/Drums/Classic 808 Cowbell
 tick     0.0    6000  internal/click
-perc     -0.5    1652  3rd/Cybersoda/Drums/Perc 1
-perc     -0.9    4877  3rd/Emu/Drums/T8 Conga
-perc      -1.5     287  3rd/Vospi/Drums/Modular Drum
-sub     -6.0      40  internal/sub
+perc     -2.6    1652  3rd/Cybersoda/Drums/Perc 1
+perc     -2.9    4877  3rd/Emu/Drums/T8 Conga
+perc      -3.5     287  3rd/Vospi/Drums/Modular Drum
 fx       -5.7     286  FX/Unsettler
 
 # Echoes: beats, feedback, mix
@@ -28,14 +27,14 @@ delay arp 1.0 0.30 0.15
 
 # Balance (to be measured in the mix)
 gain pulse   0.0
-gain metal -21.2
+gain metal -17.4
 gain tick    0.8
-gain perc  -10.1
-gain pad    -9.8
-gain bass   -8.8
-gain sub    -8.1
+gain perc   -8.5
+gain pad   -10.2
+gain bass   -7.9
+gain sub   -13.6
 gain arp   -11.7
-gain chord  -9.3
+gain chord -13.9
 gain fx     -7.5
 master 9.4
 drive bass  0.55 3500
@@ -51,3 +50,20 @@ duck tick 0.2
 duck perc 0.25
 delay metal 0.75 0.55 0.35 throws
 delay perc  1.0 0.5 0.3 throws
+
+# 2026-10-29: the 808, the choir, deep metal, darker synths
+sub      0.0      60  internal/808
+metal    18.0     812  3rd/Malfunction/Drums/Inharmonic Attack 1
+perc     -0.4    1063  3rd/Malfunction/Drums/Tuning Drums
+harm    -10.6    3541  3rd/Bluelight/Vox/Gregorian Rant Poly
+harm     -3.2     740  3rd/Giana Brotherz/Pads/Deep Choir
+arp      -2.8    2959  3rd/Argitoth/Leads/Screaming Saw
+arp       1.4    4212  3rd/Bluelight/Leads/Crusher
+chord    -7.1     879  3rd/Emu/Synths/Disto Brass Pass
+bass     -4.9    2207  3rd/Altenberg/Basses/Aggressive
+bass    -12.8     263  3rd/Nick Moritz/Basses/Black Betty
+gain harm   -9.2
+drive harm 0.25 5000
+drive sub  0.55 2500
+duck sub 0.30
+lowcut bass 90

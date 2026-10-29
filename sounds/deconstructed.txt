@@ -8,13 +8,12 @@ pad      -1.0     582  Pads/Yeti Funeral
 pad      -2.4     999  Pads/Retro Choir
 pulse    0.0      60  internal/none
 metal    18.0     783  3rd/Malfunction/Drums/Gong
-metal    13.8     812  3rd/Malfunction/Drums/Inharmonic Attack 1
-metal    12.2    2537  3rd/Malfunction/Drums/Jerry
+metal    13.7     812  3rd/Malfunction/Drums/Inharmonic Attack 1
+metal    12.0    2537  3rd/Malfunction/Drums/Jerry
 tick     0.0    6000  internal/click
-perc     2.8    7466  3rd/Cybersoda/Drums/Perc 2
-perc      6.3    2000  3rd/Giana Brotherz/Drums/Zap
-perc     16.0    2737  3rd/Cybersoda/Drums/Perc 6
-sub     -6.0      40  internal/sub
+perc     2.4    7466  3rd/Cybersoda/Drums/Perc 2
+perc      5.9    2000  3rd/Giana Brotherz/Drums/Zap
+perc     15.7    2737  3rd/Cybersoda/Drums/Perc 6
 fx       -5.7     286  FX/Unsettler
 fx        4.0    4170  FX/Radio Noise
 
@@ -30,14 +29,14 @@ delay chord 0.75 0.40 0.22
 
 # Balance (to be measured in the mix)
 gain pulse   0.0
-gain metal -14.2
+gain metal -15.2
 gain tick    4.3
-gain perc  -16.9
-gain pad   -19.3
-gain bass  -12.2
-gain sub    -9.7
-gain arp   -15.1
-gain chord  -9.2
+gain perc  -16.7
+gain pad   -19.1
+gain bass   -7.6
+gain sub   -15.7
+gain arp   -13.0
+gain chord  -9.1
 gain fx     -9.2
 master 9.6
 drive bass  0.72 3500
@@ -53,3 +52,18 @@ duck tick 0.2
 duck perc 0.25
 delay metal 0.75 0.55 0.35 throws
 delay perc  1.0 0.5 0.3 throws
+
+# 2026-10-29: the 808, the choir, deep metal, darker synths
+sub      0.0      60  internal/808
+metal    7.2     997  3rd/Malfunction/Drums/Inharmonic Attack 2
+harm     -2.1    4204  3rd/Giana Brotherz/Pads/Dark Whisper
+harm    -10.6    3541  3rd/Bluelight/Vox/Gregorian Rant Poly
+arp      -2.8    2959  3rd/Argitoth/Leads/Screaming Saw
+arp       1.4    4212  3rd/Bluelight/Leads/Crusher
+bass    -15.2    3468  3rd/Altenberg/Basses/Neuro
+bass     -2.4    1824  3rd/Giana Brotherz/Basses/Black Swarm
+gain harm  -14.9
+drive harm 0.25 5000
+drive sub  0.55 2500
+duck sub 0.30
+lowcut bass 90

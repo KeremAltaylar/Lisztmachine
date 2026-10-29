@@ -16,7 +16,10 @@ namespace liszt {
 // slowed in the calm, answered by its sequence a third up, turned upside down in the breakdowns,
 // doubled in octaves at the summit, where it comes home as it was first heard.
 //
-// Ten tracks for every genre: pad, pulse, metal, tick, perc, bass, sub, arp, chord, fx.
+// Eleven tracks for every genre: pad, pulse, metal, tick, perc, bass, sub, arp, chord, fx, harm.
+// The sub is an 808: long notes on a rhythm of their own, sliding into the next (after Ghostemane
+// and Icepeak). The harm is a choir above the pad, a second harmony layer that answers it late and
+// sighs on a neighbour note while a chord holds.
 //
 // No kick, snare or hi-hat: Kerem plays those live on his acoustic kit. The machine's drums are
 // electronic percussion only. The pulse is silent: its notes only duck the mix (a ghost kick, until
@@ -25,17 +28,19 @@ namespace liszt {
 class GenreComposer : public Composer
 {
 public:
-    enum GTrack : uint8_t { Pad, Pulse, Metal, Tick, Perc, Bass, Sub, Arp, Chord, Fx, kGenreTracks };
+    enum GTrack : uint8_t { Pad, Pulse, Metal, Tick, Perc, Bass, Sub, Arp, Chord, Fx, Harm, kGenreTracks };
 
     // A pattern: one character per step, perBar steps to the bar, as many bars as it is long.
     //   X x o g  a hit (accent, normal, soft, ghost) on the part's own pitch
-    //   1-9      metal/perc: the n-th chord tone up · tick: 2 = a noise tick · bass: the n-th scale degree above the root (5 = the fifth)
+    //   1-9      metal/perc: the n-th chord tone up · tick: 2 = a noise tick · bass, sub: the n-th scale degree above the root (5 = the fifth)
+    //   ^        sub: the root an octave up (the 808 slides there from the note before)
     //   -        the note before holds on · .  rest
     // "euclid" (perc only): k hits spread evenly over perBar steps, more as the music drives.
     struct Pat { const char* s = ""; int perBar = 16; };
     struct Part { Pat tier[3]; };                  // energy below .4, below .75, above
     // layers: P K S H C B U A D F (pad, pulse, metal, tick, perc, bass, sub, arp, chord, fx), and
-    // L: Kerem's drums lead here, the machine's percussion thins out
+    // L: Kerem's drums lead here, the machine's percussion thins out. The harm sings wherever the pad
+    // plays and the music has some motion (energy .4 and up).
     struct Sec { const char* name; int bars; float energy; const char* layers; };
     struct Spec
     {
@@ -47,7 +52,7 @@ public:
         std::array<std::array<int, 4>, 3> progs;   // four chord roots (scale degrees): one is home, another the breakdowns'
         int preRoot = 6;                           // the last chord before the peak
         std::array<Sec, 10> form;                  // name nullptr ends it
-        Part pulse, metal, tick, perc, bass, chord;
+        Part pulse, metal, tick, perc, bass, chord, sub;
         std::array<int, 3> arpRate {};             // arpeggio steps per bar per tier (0 silent)
         int arpLenLo = 5, arpLenHi = 7;            // its cycle, in notes: phases against the bar
         float arpDensLo = .4f, arpDensHi = .8f, arpGate = .7f;
@@ -89,6 +94,9 @@ private:
     int ladderPitch(int bar, int idx, int lo, int hi) const;
     void emitAutomation(int bar, std::vector<Event>& out);
     void emitPad(int bar, std::vector<Event>& out);
+    void emitHarm(int bar, std::vector<Event>& out);
+    int subPitch(int bar, char c) const;
+    bool inMode(int bar, int pitch) const;
     void emitPart(int track, const Part& part, int bar, std::vector<Event>& out);
     void emitArp(int bar, std::vector<Event>& out);
     void emitHeld(int track, int bar, std::vector<Event>& out, int& held, int pitch);
@@ -99,12 +107,12 @@ private:
     std::vector<int> rootOfBar_;
     std::vector<int> arp_, arpHome_;                // ladder indices
     std::vector<int> arpRank_;
-    std::vector<int> padHeld_, padVoices_, chordVoices_;
+    std::vector<int> padHeld_, padVoices_, chordVoices_, harmHeld_, harmVoices_;
     std::array<int, 4> home_ {}, away_ {};
     std::vector<bool> awayBar_;                     // the bars that play the breakdown's progression
     struct Note { int step, len, deg; float vel; }; // the hook: sixteenths over two bars, degrees above the chord's root
     std::vector<Note> hook_, hookHome_;
-    int subHeld_ = -1, fxHeld_ = -1;
+    int fxHeld_ = -1;
     int percRot_ = 0;
     int64_t arpStep_ = 0;
     // this bar's breaks: the beat each beat plays (chop), the beat left silent (gap), the beat stuttered

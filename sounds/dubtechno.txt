@@ -7,11 +7,9 @@
 pad       6.6     599  Pads/Still
 pad      -3.9    2383  Pads/Subtle Comb Strings
 pulse    0.0      60  internal/none
-metal    11.6     812  3rd/Malfunction/Drums/Inharmonic Attack 1
-metal    9.7    2537  3rd/Malfunction/Drums/Jerry
+metal    8.7     812  3rd/Malfunction/Drums/Inharmonic Attack 1
+metal    7.4    2537  3rd/Malfunction/Drums/Jerry
 tick     0.0    6000  internal/click
-perc     0.0    2000  internal/click
-sub     -6.0      40  internal/sub
 chord    -8.7     396  Keys/Organ 2
 chord    -4.7    4145  Plucks/Saw Pluck
 chord    -0.1    6135  Polysynths/Notched Saws
@@ -27,14 +25,14 @@ delay arp 1.5 0.45 0.25
 
 # Balance (to be measured in the mix)
 gain pulse   0.0
-gain metal  -7.0
+gain metal  -5.6
 gain tick   13.1
-gain perc    0.0
+gain perc   -5.1
 gain pad    -8.8
 gain bass   -4.4
-gain sub    -8.1
+gain sub   -13.0
 gain arp    -8.8
-gain chord -11.3
+gain chord -10.2
 gain fx    -11.7
 master 9.3
 drive bass  0.44 3500
@@ -50,3 +48,17 @@ duck tick 0.2
 duck perc 0.25
 delay metal 0.75 0.55 0.35 throws
 delay perc  1.0 0.5 0.3 throws
+
+# 2026-10-29: the 808, the choir, deep metal, darker synths
+sub      0.0      60  internal/808
+metal    13.7     783  3rd/Malfunction/Drums/Gong
+harm      5.6    1136  3rd/Giana Brotherz/Pads/Dub Choir
+harm     -3.2     740  3rd/Giana Brotherz/Pads/Deep Choir
+chord    -7.1     879  3rd/Emu/Synths/Disto Brass Pass
+bass    -10.5     856  3rd/Cybersoda/Basses/Growl
+perc     -9.1     300  internal/deep
+gain harm  -11.6
+drive harm 0.25 5000
+drive sub  0.55 2500
+duck sub 0.30
+lowcut bass 90

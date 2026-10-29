@@ -317,7 +317,7 @@ TrackMix mixFor(const std::string& name)
         { "seq", { .2f, 1.2f, 0, 120 } },  { "lead", { .2f, 1.1f, 0, 150 } },  { "snare", { 0, 1.0f, 0, 120 } },
         { "clap", { 0, 1.2f, 0, 150 } },   { "pulse", { 0, 0, 0, 0 } },       { "metal", { .15f, 1.3f, -.15f, 200 } },
         { "tick", { .1f, 1.0f, .25f, 400 } },   { "hats", { 0, 1.0f, .25f, 300 } }, { "perc", { .1f, 1.3f, -.2f, 200 } },
-        { "fx", { .5f, 1.6f, 0, 200 } },
+        { "fx", { .5f, 1.6f, 0, 200 } },   { "harm", { .45f, 1.5f, 0, 180 } },
     };
     for (auto& [n, m] : table) if (name == n) return m;
     return { 0, 1, 0, 0 }; // the chorale's voices and anything else: as they are
@@ -338,6 +338,7 @@ juce::String Palette::load(const juce::File& file, const std::string& sceneName)
     for (auto& c : crushes) c = {};
     for (auto& c : comps) c = {};
     for (auto& d : duckDepth) d = -1;
+    for (auto& d : lowCutHz) d = -1;
     for (auto& d : delays) d = {};
     if (!file.existsAsFile()) return "no palette at " + file.getFullPathName();
 
@@ -351,7 +352,7 @@ juce::String Palette::load(const juce::File& file, const std::string& sceneName)
         tokens.removeEmptyStrings();
         const auto where = file.getFileName() + " line " + juce::String(n + 1) + ": ";
         if (tokens[0] == "master" && tokens.size() >= 2) { masterDb = tokens[1].getFloatValue(); continue; }
-        if (tokens[0] == "gain" || tokens[0] == "delay" || tokens[0] == "drive" || tokens[0] == "crush" || tokens[0] == "comp" || tokens[0] == "duck")
+        if (tokens[0] == "gain" || tokens[0] == "delay" || tokens[0] == "drive" || tokens[0] == "crush" || tokens[0] == "comp" || tokens[0] == "duck" || tokens[0] == "lowcut")
         {
             const int t = info->trackOf(tokens[1].toStdString());
             if (t < 0) return where + "no track '" + tokens[1] + "' in the " + juce::String(scene) + " scene";
@@ -359,6 +360,7 @@ juce::String Palette::load(const juce::File& file, const std::string& sceneName)
             else if (tokens[0] == "crush" && tokens.size() >= 5) crushes[t] = { tokens[2].getFloatValue(), tokens[3].getFloatValue(), juce::jlimit(0.0f, 1.0f, tokens[4].getFloatValue()) };
             else if (tokens[0] == "comp" && tokens.size() >= 7) comps[t] = { tokens[2].getFloatValue(), juce::jmax(1.0f, tokens[3].getFloatValue()), tokens[4].getFloatValue(), tokens[5].getFloatValue(), juce::jlimit(0.0f, 1.0f, tokens[6].getFloatValue()) };
             else if (tokens[0] == "duck") duckDepth[t] = juce::jlimit(0.0f, 1.0f, tokens[2].getFloatValue());
+            else if (tokens[0] == "lowcut") lowCutHz[t] = juce::jmax(0.0f, tokens[2].getFloatValue());
             else if (tokens[0] == "drive") drives[t] = { juce::jlimit(0.0f, 1.0f, tokens[2].getFloatValue()), tokens.size() >= 4 ? tokens[3].getFloatValue() : 6000.0f };
             else if (tokens[0] == "delay" && tokens.size() >= 5) delays[t] = { tokens[2].getFloatValue(), juce::jlimit(0.0f, 0.95f, tokens[3].getFloatValue()), tokens[4].getFloatValue(), tokens[5] == "throws" };
             else if (tokens[0] == "delay") return where + "expected 'delay <track> beats feedback mix [throws]'";
@@ -468,8 +470,9 @@ juce::String Engine::load(double sampleRate, int maxBlock, const Palette& palett
         t.width = m.width;
         t.panL = std::sqrt(2.0f) * std::cos((m.pan + 1) * juce::MathConstants<float>::pi / 4);
         t.panR = std::sqrt(2.0f) * std::sin((m.pan + 1) * juce::MathConstants<float>::pi / 4);
-        t.lowCut = m.lowCutHz > 0;
-        for (auto& f : t.hp) f.highpass(sampleRate, juce::jmax(10.0f, m.lowCutHz));
+        const float cut = palette.lowCutHz[i] >= 0 ? palette.lowCutHz[i] : m.lowCutHz;
+        t.lowCut = cut > 0;
+        for (auto& f : t.hp) f.highpass(sampleRate, juce::jmax(10.0f, cut));
         t.mix.setSize(2, maxBlock);
         t.drive.prepare(sampleRate, palette.drives[i]);
         t.crush.prepare(palette.crushes[i]);
@@ -486,7 +489,8 @@ juce::String Engine::load(double sampleRate, int maxBlock, const Palette& palett
                             : first.endsWith("kick") ? InternalSynth::Kick : first.endsWith("hat") ? InternalSynth::Hat
                             : first.endsWith("clap") ? InternalSynth::Clap : first.endsWith("snare") ? InternalSynth::Snare
                             : first.endsWith("metal") ? InternalSynth::Metal
-                            : first.endsWith("zap") ? InternalSynth::Zap : first.endsWith("none") ? InternalSynth::None : InternalSynth::Click;
+                            : first.endsWith("zap") ? InternalSynth::Zap : first.endsWith("none") ? InternalSynth::None
+                            : first.endsWith("deep") ? InternalSynth::Deep : first.endsWith("808") ? InternalSynth::Bass808 : InternalSynth::Click;
             t.synth.prepare(sampleRate, kind);
             for (auto& s : t.slots) { s.plugin.reset(); s.midi.ensureSize(8192); s.state = Idle; s.entry = 0; s.gain = juce::Decibels::decibelsToGain(palette.parts[i].front().gainDb); }
             t.buffer.setSize(2, maxBlock);
@@ -1091,11 +1095,19 @@ void Engine::renderClick(float* const* out, int numChannels, int offset, int len
 void InternalSynth::start(int note, float velocity)
 {
     if (kind_ == None) return; // the silent pulse: its notes only duck the mix
+    if (kind_ == Bass808)
+        for (auto& x : voices_)
+            if (x.note >= 0 && x.held) // the slide
+            {
+                x.note = note;
+                x.target = juce::MathConstants<double>::twoPi * 440.0 * std::pow(2.0, (note - 69) / 12.0) / sr_;
+                return;
+            }
     Voice* v = &voices_[0];
     for (auto& x : voices_) if (x.note < 0) { v = &x; break; }       // a free voice, or steal the first
     v->note = note;
     v->phase = 0;
-    v->held = kind_ == Sub;
+    v->held = kind_ == Sub || kind_ == Bass808;
     v->noise = (kind_ == Click && note >= 96) || kind_ == Hat || kind_ == Clap || kind_ == Snare;
     v->age = 0;
     v->lastNoise = v->lastNoise2 = 0;
@@ -1110,11 +1122,14 @@ void InternalSynth::start(int note, float velocity)
     if (kind_ == Hat) tau = note >= 46 ? 0.07 + 0.1 * velocity : 0.012 + 0.02 * velocity; // 46 open, else closed
     if (kind_ == Metal) tau = 0.05 + 0.25 * velocity;   // struck metal, tuned to the note
     if (kind_ == Zap) tau = 0.04 + 0.08 * velocity;     // a laser: a sine diving onto the note
+    if (kind_ == Deep) tau = 0.45 + 0.9 * velocity;     // a struck plate the size of a door
+    if (kind_ == Bass808) tau = 2.5;                    // while held the 808 fades slowly, as the real one does
     v->decay = std::exp(-1.0 / (tau * sr_));
     v->phase2 = v->phase3 = 0;
-    const bool struck = kind_ != Sub && kind_ != Blip;
-    v->attack = struck ? 1.0 : 1.0 / ((kind_ == Sub ? 0.04 : 0.001) * sr_);
-    v->release = std::exp(-1.0 / (0.4 * sr_));
+    v->target = v->inc;
+    const bool struck = kind_ != Sub && kind_ != Blip && kind_ != Bass808;
+    v->attack = struck ? 1.0 : 1.0 / ((kind_ == Sub ? 0.04 : kind_ == Bass808 ? 0.002 : 0.001) * sr_);
+    v->release = std::exp(-1.0 / ((kind_ == Bass808 ? 0.09 : 0.4) * sr_));
     v->env = struck ? v->gain : 0.0;
     // stereo: clicks and hats alternate a little left and right, blips spread by pitch, the rest sits centre
     float pan = kind_ == Click || kind_ == Hat ? ((flip_++ & 1) ? 0.3f : -0.3f) : kind_ == Blip ? juce::jlimit(-0.5f, 0.5f, float(note - 88) / 24.0f) : 0.0f;
@@ -1134,6 +1149,21 @@ void InternalSynth::run(float* l, float* r, int from, int to)
         if (v.note < 0) continue;
         for (int n = from; n < to; ++n)
         {
+            if (kind_ == Bass808)
+            {
+                // the attack in 2 ms, then a slow fade while held; the pitch punches in from a fifth up
+                // in 12 ms, and glides to a new note in 50 ms
+                if (v.held) { if (v.attack > 0) { v.env += v.gain * v.attack; if (v.env >= v.gain) { v.env = v.gain; v.attack = 0; } } else v.env *= v.decay; }
+                else v.env *= v.release;
+                v.inc += (v.target - v.inc) * (1.0 - std::exp(-1.0 / (0.05 * sr_)));
+                v.phase += v.inc * (1 + 0.5 * std::exp(-double(v.age) / (0.012 * sr_)));
+                if (v.phase > juce::MathConstants<double>::twoPi) v.phase -= juce::MathConstants<double>::twoPi;
+                ++v.age;
+                const float y = float(std::tanh(2.2 * std::sin(v.phase)) * 0.62 * v.env);
+                l[n] += y * v.panL;
+                r[n] += y * v.panR;
+                continue;
+            }
             if (kind_ == Click || kind_ == Kick || kind_ == Hat || kind_ == Snare || kind_ >= Metal) v.env *= v.decay;
             else if (kind_ == Clap)
             {
@@ -1176,6 +1206,16 @@ void InternalSynth::run(float* l, float* r, int from, int to)
                     const double index = 4.0 * std::exp(-age / 0.03);
                     y = std::sin(v.phase + index * std::sin(v.phase2) + 0.6 * index * std::sin(v.phase3)) * v.env;
                 }
+                else if (kind_ == Deep)
+                {
+                    // low struck metal: modulators at 1.41 and 2.45 times the note, the index fading over
+                    // a quarter second and the pitch settling a little, so it rings dark for a long time
+                    v.phase += v.inc * (1 + 0.04 * std::exp(-age / 0.08));
+                    v.phase2 += v.inc * 1.4142;
+                    v.phase3 += v.inc * 2.4495;
+                    const double index = 2.6 * std::exp(-age / 0.25) + 0.35;
+                    y = std::sin(v.phase + index * std::sin(v.phase2) + 0.5 * index * std::sin(v.phase3)) * v.env;
+                }
                 else
                 {
                     v.phase += v.inc * (1 + 15 * std::exp(-age / 0.012));
@@ -1208,7 +1248,7 @@ void InternalSynth::run(float* l, float* r, int from, int to)
             l[n] += x * v.panL;
             r[n] += x * v.panR;
         }
-        const bool done = kind_ == Sub ? (!v.held && v.env < 1e-5) : kind_ == Blip ? (v.attack == 0 && v.env < 1e-5) : v.env < 1e-5;
+        const bool done = kind_ == Sub || kind_ == Bass808 ? (!v.held && v.env < 1e-5) : kind_ == Blip ? (v.attack == 0 && v.env < 1e-5) : v.env < 1e-5;
         if (done) v.note = -1;
     }
 }

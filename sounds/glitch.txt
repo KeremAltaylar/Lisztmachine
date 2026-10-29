@@ -6,12 +6,11 @@
 
 pad       6.6     599  Pads/Still
 pulse    0.0      60  internal/none
-metal    0.0    2000  internal/metal
+metal    2.2    2000  internal/metal
 tick     0.0    6000  internal/click
-perc      1.7    6000  3rd/Vospi/Drums/Nice Clicks Perc
-perc     -1.5    3000  3rd/Emu/Drums/Mort Chippy Bits
-perc     1.7    4977  3rd/Damon Armani/Drums/FX Glitch
-sub     -6.0      40  internal/sub
+perc      2.6    6000  3rd/Vospi/Drums/Nice Clicks Perc
+perc     -0.5    3000  3rd/Emu/Drums/Mort Chippy Bits
+perc     2.6    4977  3rd/Damon Armani/Drums/FX Glitch
 fx        4.0    4170  FX/Radio Noise
 
 # Echoes: beats, feedback, mix
@@ -26,14 +25,14 @@ delay arp 0.75 0.30 0.15
 
 # Balance (to be measured in the mix)
 gain pulse   0.0
-gain metal -12.9
+gain metal -14.9
 gain tick    4.5
-gain perc   -8.1
-gain pad   -17.6
-gain bass   -6.6
-gain sub    -9.7
-gain arp    -9.9
-gain chord -15.1
+gain perc   -8.6
+gain pad   -17.5
+gain bass   -6.2
+gain sub   -15.0
+gain arp   -13.1
+gain chord -15.2
 gain fx    -13.4
 master 9.1
 drive bass  0.39 3500
@@ -49,3 +48,16 @@ duck tick 0.2
 duck perc 0.25
 delay metal 0.75 0.55 0.35 throws
 delay perc  1.0 0.5 0.3 throws
+
+# 2026-10-29: the 808, the choir, deep metal, darker synths
+sub      0.0      60  internal/808
+harm     -2.1    4204  3rd/Giana Brotherz/Pads/Dark Whisper
+harm    -10.6    3541  3rd/Bluelight/Vox/Gregorian Rant Poly
+arp       1.4    4212  3rd/Bluelight/Leads/Crusher
+arp     -10.1    1132  3rd/Nick Moritz/Leads/Demon Here
+bass    -15.2    3468  3rd/Altenberg/Basses/Neuro
+gain harm  -14.5
+drive harm 0.25 5000
+drive sub  0.55 2500
+duck sub 0.30
+lowcut bass 90
