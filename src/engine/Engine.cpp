@@ -430,6 +430,8 @@ TrackMix mixFor(const std::string& name)
         { "clap", { 0, 1.2f, 0, 150 } },   { "pulse", { 0, 0, 0, 0 } },       { "metal", { .15f, 1.3f, -.15f, 200 } },
         { "tick", { .1f, 1.0f, .25f, 400 } },   { "hats", { 0, 1.0f, .25f, 300 } }, { "perc", { .1f, 1.3f, -.2f, 200 } },
         { "fx", { .5f, 1.6f, 0, 200 } },   { "harm", { .45f, 1.5f, 0, 180 } },
+        { "ground", { .2f, 1.0f, 0, 35 } }, { "body", { .15f, 1.3f, .3f, 90 } }, { "mallet", { .15f, 1.4f, -.3f, 150 } },
+        { "texture", { .05f, 1.8f, 0, 200 } }, { "impact", { .1f, 1.6f, 0, 40 } },
     };
     for (auto& [n, m] : table) if (name == n) return m;
     return { 0, 1, 0, 0 }; // the chorale's voices and anything else: as they are
@@ -600,13 +602,13 @@ juce::String Engine::load(double sampleRate, int maxBlock, const Palette& palett
         t.hasEcho = palette.delays[i].beats > 0 && palette.delays[i].mix > 0;
         if (t.internal)
         {
-            const auto kind = first.endsWith("sub") ? InternalSynth::Sub : first.endsWith("blip") ? InternalSynth::Blip
+            const auto kind = first.contains("/modal-") ? InternalSynth::Modal : first.endsWith("sub") ? InternalSynth::Sub : first.endsWith("blip") ? InternalSynth::Blip
                             : first.endsWith("kick") ? InternalSynth::Kick : first.endsWith("hat") ? InternalSynth::Hat
                             : first.endsWith("clap") ? InternalSynth::Clap : first.endsWith("snare") ? InternalSynth::Snare
                             : first.endsWith("metal") ? InternalSynth::Metal
                             : first.endsWith("zap") ? InternalSynth::Zap : first.endsWith("none") ? InternalSynth::None
                             : first.endsWith("deep") ? InternalSynth::Deep : first.endsWith("808") ? InternalSynth::Bass808 : InternalSynth::Click;
-            t.synth.prepare(sampleRate, kind);
+            t.synth.prepare(sampleRate, kind, first.fromFirstOccurrenceOf("/modal-", false, false));
             for (auto& s : t.slots) { s.plugin.reset(); s.midi.ensureSize(8192); s.state = Idle; s.entry = 0; s.gain = juce::Decibels::decibelsToGain(palette.parts[i].front().gainDb); }
             t.buffer.setSize(2, maxBlock);
             continue;
@@ -1223,9 +1225,125 @@ void Engine::renderClick(float* const* out, int numChannels, int offset, int len
 }
 
 // ---------------------------------------------------------------- the engine's own instrument
+// The modal materials: mode frequency ratios (measured shapes of real objects: a marimba bar, a
+// circular membrane, a wine glass...), the fundamental's decay, how much faster the upper modes die,
+// the strike's length (short = hard mallet, bright), how much raw noise the hit carries, and how it
+// is excited.
+static const InternalSynth::Material kMaterials[] = {
+    { "wood",    { 1, 3.93f, 9.54f, 16.2f },                                   4, 0.22f, 0.6f,  1.2f, 0.05f, InternalSynth::Strike },
+    { "block",   { 1, 2.68f, 5.40f },                                          3, 0.07f, 0.3f,  0.6f, 0.10f, InternalSynth::Strike },
+    { "log",     { 1, 2.32f, 4.25f, 6.63f },                                   4, 0.55f, 0.5f,  3.0f, 0.04f, InternalSynth::Strike },
+    { "skin",    { 1, 1.59f, 2.14f, 2.30f, 2.65f, 2.92f, 3.16f, 3.50f },       8, 0.16f, 1.2f,  2.0f, 0.30f, InternalSynth::Strike },
+    { "glass",   { 1, 2.76f, 5.40f, 8.93f },                                   4, 1.40f, 0.4f,  0.4f, 0.02f, InternalSynth::Strike },
+    { "bowl",    { 1, 2.71f, 5.15f, 8.43f },                                   4, 3.50f, 0.25f, 2.0f, 0.01f, InternalSynth::Strike },
+    { "kalimba", { 1, 5.92f, 13.0f },                                          3, 0.90f, 0.7f,  1.0f, 0.03f, InternalSynth::Strike },
+    { "plate",   { 1, 1.47f, 2.09f, 2.56f, 3.14f, 3.90f, 4.70f, 5.60f },       8, 2.20f, 0.15f, 6.0f, 0.15f, InternalSynth::Strike },
+    { "scrape",  { 1, 1.83f, 2.71f, 3.47f, 4.90f, 6.30f },                     6, 0.08f, 0.1f,  0.0f, 0.20f, InternalSynth::Scrape },
+    { "rattle",  { 1, 2.30f, 3.90f, 5.60f },                                   4, 0.03f, 0.2f,  0.5f, 0.40f, InternalSynth::Rattle },
+    { "chain",   { 1, 1.90f, 2.70f, 3.60f, 4.40f, 5.30f },                     6, 0.25f, 0.3f,  0.8f, 0.25f, InternalSynth::Rattle },
+    { "crackle", { 1, 3.10f, 7.20f },                                          3, 0.004f, 0.0f, 0.0f, 0.60f, InternalSynth::Crackle },
+};
+
+void InternalSynth::prepare(double sampleRate, Kind kind, const juce::String& material)
+{
+    sr_ = sampleRate;
+    kind_ = kind;
+    material_ = &kMaterials[0];
+    for (auto& m : kMaterials) if (material == m.name) material_ = &m;
+    for (auto& v : voices_) v.note = -1;
+}
+
+void InternalSynth::startModal(Voice& v, int note, float velocity)
+{
+    const auto& m = *material_;
+    const double hz = 440.0 * std::pow(2.0, (note - 69) / 12.0);
+    v.modes = 0;
+    v.maxTau = 0;
+    for (int i = 0; i < m.modes; ++i)
+    {
+        const double f = hz * m.ratios[size_t(i)];
+        if (f > 0.45 * sr_) break;
+        const double tau = m.tau * (0.6 + 0.8 * velocity) / (1 + m.damp * (m.ratios[size_t(i)] - 1));
+        const double rr = std::exp(-1.0 / (tau * sr_)), w = juce::MathConstants<double>::twoPi * f / sr_;
+        const size_t k = size_t(v.modes++);
+        v.c1[k] = float(2 * rr * std::cos(w));
+        v.c2[k] = float(-rr * rr);
+        // a harder hit reaches the upper modes: the higher, the more velocity it takes
+        v.gin[k] = float(std::sin(w) / (1 + 0.7 * i) * (i == 0 ? 1.0 : 0.35 + 0.65 * velocity));
+        v.y1[k] = v.y2[k] = 0;
+        v.maxTau = juce::jmax(v.maxTau, float(tau));
+    }
+    v.gain = 0.6 * std::pow(double(velocity), 1.2);
+    v.held = m.excite == Scrape || m.excite == Crackle;
+    v.exc = m.excite == Scrape ? 0.0f : 1.0f;
+    v.excTarget = 1;
+    v.impGap = float(0.09 * sr_);
+    v.nextImp = 0;
+    v.decay = std::exp(-1.0 / (juce::jmax(0.0002, m.exciteMs * 0.001 * (1.3 - 0.8 * velocity)) * sr_));
+    v.release = std::exp(-1.0 / (0.08 * sr_));
+    const float pan = (flip_++ % 3 - 1) * 0.15f; // a little to each side in turn, as hands move
+    v.panL = std::sqrt(0.5f * (1 - pan));
+    v.panR = std::sqrt(0.5f * (1 + pan));
+}
+
+void InternalSynth::runModal(Voice& v, float* l, float* r, int from, int to)
+{
+    const auto& m = *material_;
+    for (int n = from; n < to; ++n)
+    {
+        seed_ = seed_ * 1664525u + 1013904223u;
+        const float w = float(int32_t(seed_)) * (1.0f / 2147483648.0f);
+        float e = 0;
+        switch (m.excite)
+        {
+            case Strike: e = w * v.exc; v.exc *= float(v.decay); break;
+            case Scrape: // a noise that swells and wavers while held: a bow, a brush, a scrape
+                if ((v.age & 2047) == 0) v.excTarget = 0.25f + 0.75f * std::abs(w);
+                if (v.held) v.exc += (v.excTarget - v.exc) * 0.0005f; else v.exc *= float(v.release);
+                e = w * v.exc * 0.12f;
+                break;
+            case Rattle: // bouncing: impulses ever closer together and softer
+                if (float(v.age) >= v.nextImp && v.impGap > 0.004f * float(sr_))
+                {
+                    e = v.exc * (0.6f + 0.4f * std::abs(w));
+                    v.exc *= 0.82f;
+                    v.nextImp += v.impGap;
+                    v.impGap *= 0.8f;
+                }
+                break;
+            case Crackle: // dust on a record: sparse random clicks while held
+                if (v.held && std::abs(w) > 0.9994f) e = w;
+                break;
+        }
+        float y = e * m.slap * 0.3f;
+        for (int k = 0; k < v.modes; ++k)
+        {
+            const float yk = v.gin[size_t(k)] * e + v.c1[size_t(k)] * v.y1[size_t(k)] + v.c2[size_t(k)] * v.y2[size_t(k)];
+            v.y2[size_t(k)] = v.y1[size_t(k)];
+            v.y1[size_t(k)] = yk;
+            y += yk;
+        }
+        y *= float(v.gain);
+        l[n] += y * v.panL;
+        r[n] += y * v.panR;
+        ++v.age;
+    }
+    const bool rung = double(v.age) > (6.0 * v.maxTau + (m.excite == Rattle ? 0.6 : 0.0)) * sr_;
+    if (!v.held && rung && (m.excite != Scrape || v.exc < 1e-4f)) v.note = -1;
+}
+
 void InternalSynth::start(int note, float velocity)
 {
     if (kind_ == None) return; // the silent pulse: its notes only duck the mix
+    if (kind_ == Modal)
+    {
+        Voice* v = &voices_[0];
+        for (auto& x : voices_) if (x.note < 0) { v = &x; break; }
+        v->note = note;
+        v->age = 0;
+        startModal(*v, note, velocity);
+        return;
+    }
     if (kind_ == Bass808)
         for (auto& x : voices_)
             if (x.note >= 0 && x.held) // the slide
@@ -1278,6 +1396,7 @@ void InternalSynth::run(float* l, float* r, int from, int to)
     for (auto& v : voices_)
     {
         if (v.note < 0) continue;
+        if (kind_ == Modal) { runModal(v, l, r, from, to); continue; }
         for (int n = from; n < to; ++n)
         {
             if (kind_ == Bass808)

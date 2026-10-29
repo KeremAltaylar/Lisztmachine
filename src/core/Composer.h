@@ -14,7 +14,7 @@ constexpr int kBarTicks = 4 * kPPQ;       // 4/4 throughout this scene
 enum Track : uint8_t { Pad, Bass, Seq, Lead, kNumTracks };
 inline const char* kTrackNames[kNumTracks] = { "pad", "bass", "seq", "lead" };
 
-constexpr int kMaxTracks = 12;
+constexpr int kMaxTracks = 16;
 
 // What a scene asks of the engine: its tracks by name, what each is to the visuals
 // (0 harmony, 1 bass and drums, 2 rhythm, 3 melody), its sends to the shared delay and

@@ -20,7 +20,7 @@ G::Part none() { return part("", "", ""); }
 
 uint16_t layersOf(const char* s)
 {
-    static const char* letters = "PKSHCBUADF"; // in GTrack order
+    static const char* letters = "PKSHCBUADF_GYMTI"; // in GTrack order (the harm has no letter: it follows the pad)
     uint16_t m = 0;
     for (; *s; ++s)
         if (const char* p = std::strchr(letters, *s)) m |= bit(int(p - letters));
@@ -59,17 +59,23 @@ const G::Spec kTripHop {
     // the dominant IV and V), a walking bass, the comping chords answering the hook
     .bpmLo = 88, .bpmHi = 96, .mode = &kMelodicMinor, .tonics = { 0, 3, 10, 5, 8 },
     .progs = { { { 0, 3, 0, 4 }, { 0, 5, 1, 4 }, { 2, 3, 0, 4 } } }, .preRoot = 4,
-    .form = { { { "Smoke Room", 8, .15f, "PF" }, { "Foley", 16, .35f, "PHCD" }, { "Supermodified", 32, .60f, "PKSHCBUADL" },
-                { "Ghost Note", 16, .40f, "PDAF" }, { "Bloodstone", 32, .85f, "PKSHCBUAD" }, { "Vacuum", 8, .25f, "PA" },
-                { "Four Ton Mantis", 40, 1.0f, "PKSHCBUADF" }, { "Ash", 16, .30f, "PDAL" } } },
+    .form = { { { "Smoke Room", 8, .15f, "PFT" }, { "Foley", 16, .35f, "PHCDTY" }, { "Supermodified", 32, .60f, "PKSHCBUADLGYMT" },
+                { "Ghost Note", 16, .40f, "PDAFMT" }, { "Bloodstone", 32, .85f, "PKSHCBUADGYMTI" }, { "Vacuum", 8, .25f, "PAT" },
+                { "Four Ton Mantis", 40, 1.0f, "PKSHCBUADFGYMTI" }, { "Ash", 16, .30f, "PDALMT" } } },
     // the live kit plays the break; the machine's percussion cuts it up around him
     .pulse = part("X.......X.X.....", "X.....X...X.....", "X.....X.X.X...x."),
     .metal = part("......1.......2.", "...1..2....3..1.", "..1..2.1...3.2.1"), // vibraphone-like struck metal
-    .tick = part("x.g.x.g.x.g.x.g.", "xgg2xgxgxgg2xgxg", "xgxgx2xgxgxgx2xg"),
+    .tick = part("x.......x.......", "x...x.g.x...x.g.", "x.g.x.g.x.g.x.g2"), // fewer: the colour, not the groove
     .perc = part("", "1.....3...2.....", "1..3..2...4.1.3."),
     .bass = part("x-------5-------", "x---x---5---3---", "x--.x-5-3---x-8-"), // walking: root, fifth, third, octave
     .chord = part("x-------........", "x-----..x-......", "x-..x-....x-..x."),
     .sub = part("x---------------", "x-------x-----^-", "x-----x-x-------"),
+    // the section: log drums under, hand drums answering the snare (never on 2 or 4), a kalimba in
+    // threes against the bar, vinyl crackle held through
+    .ground = part("", "..........1.....", "......1...3...........2...1....."),
+    .body = part("", "..o.....x..o..x.", "..o..g.o..x.o.xg"),
+    .mallet = part("", "1..3..4..3..1..2", "1.23.14.32.14.3."),
+    .texture = part("x---------------", "x---------------", "x-------x-------"),
     .percLo = 38, .percHi = 57,
     .chop = .30f, .stutter = .15f, .stutterTrack = G::Tick, .stutterDiv = 32, .swing = .18f, .chordSweep = .35f,
 };
@@ -210,11 +216,13 @@ const SceneInfo* genreSceneInfo(const std::string& scene)
     static const std::vector<SceneInfo> infos = [] {
         std::vector<SceneInfo> v;
         for (auto* s : G::all())
-            v.push_back({ s->scene, 11, { "pad", "pulse", "metal", "tick", "perc", "bass", "sub", "arp", "chord", "fx", "harm" },
-                          { 0, 1, 2, 2, 2, 1, 1, 3, 0, 0, 0 },
-                          { { 0, .30f }, { 0, .02f }, { .05f, .12f }, { .03f, .08f }, { .10f, .15f }, { 0, .03f }, { 0, 0 }, { .20f, .20f }, { .20f, .25f }, { .10f, .35f }, { .08f, .40f } },
-                          { -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1 },
-                          { 1, 0, 0, 0, 0, 1, 0, 1, 1, 0, 1 }, true });
+            v.push_back({ s->scene, 16, { "pad", "pulse", "metal", "tick", "perc", "bass", "sub", "arp", "chord", "fx", "harm",
+                                          "ground", "body", "mallet", "texture", "impact" },
+                          { 0, 1, 2, 2, 2, 1, 1, 3, 0, 0, 0, 1, 2, 2, 2, 1 },
+                          { { 0, .30f }, { 0, .02f }, { .05f, .12f }, { .03f, .08f }, { .10f, .15f }, { 0, .03f }, { 0, 0 }, { .20f, .20f }, { .20f, .25f }, { .10f, .35f }, { .08f, .40f },
+                            { 0, .10f }, { .05f, .12f }, { .20f, .25f }, { 0, .20f }, { .10f, .45f } },
+                          { -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1 },
+                          { 1, 0, 0, 0, 0, 1, 0, 1, 1, 0, 1, 0, 0, 0, 0, 0 }, true });
         return v;
     }();
     for (auto& i : infos) if (scene == i.name) return &i;
@@ -471,6 +479,11 @@ std::array<int, 2> GenreComposer::range(int track) const
         case Arp: return { spec_.arpLo, spec_.arpHi };
         case Chord: return { 46, 76 };
         case Harm: return { 60, 86 };
+        case Ground: return { 28, 48 };
+        case Body: return { 45, 69 };
+        case Mallet: return { 60, 88 };
+        case Texture: return { 48, 84 };
+        case Impact: return { 30, 50 };
         default: return { 48, 72 };
     }
 }
@@ -622,6 +635,18 @@ void GenreComposer::emitHarm(int bar, std::vector<Event>& out)
     }
 }
 
+void GenreComposer::emitImpact(int bar, std::vector<Event>& out)
+{
+    // One big hit where a section rises: on its first downbeat, thrown into the echo.
+    auto& sec = sectionAt(bar);
+    if (!active(Impact, bar) || bar != sec.startBar || bar == 0 || sectionAt(bar - 1).energy >= sec.energy) return;
+    const int64_t t0 = int64_t(bar) * kBarTicks;
+    const int p = ladderPitch(bar, 0, 30, 50);
+    out.push_back({ t0, Event::NoteOn, Impact, uint8_t(p), 1.0f });
+    out.push_back({ t0 + kPPQ, Event::NoteOff, Impact, uint8_t(p), 0 });
+    out.push_back({ t0, Event::Throw, Impact, 0, 1.0f });
+}
+
 bool GenreComposer::inMode(int bar, int pitch) const
 {
     for (int d = 0; d < 7; ++d)
@@ -646,8 +671,8 @@ void GenreComposer::emitPart(int track, const Part& part, int bar, std::vector<E
     auto& sec = sectionAt(bar);
     const int si = sectionOfBar_[size_t(bar)], in = bar - sec.startBar;
     const bool lastBar = bar + 1 == sec.startBar + sec.bars;
-    const bool drum = track == Pulse || track == Metal || track == Tick || track == Perc;
-    const bool tuned = track == Metal || track == Perc; // the fills walk down their chord tones
+    const bool drum = track == Pulse || track == Metal || track == Tick || track == Perc || track == Ground || track == Body || track == Mallet;
+    const bool tuned = track == Metal || track == Perc || track == Body; // the fills walk down their chord tones
     // before the summit the drums, the bass and the chords hold their breath for half a bar
     const bool drop = lastBar && bar + 1 < totalBars() && sectionAt(bar + 1).restoreTheme;
     const bool rising = lastBar && bar + 1 < totalBars() && sectionAt(bar + 1).energy > sec.energy;
@@ -661,7 +686,7 @@ void GenreComposer::emitPart(int track, const Part& part, int bar, std::vector<E
     const bool turn = drum && ph % 4 == 3 && !fill8 && !fill16 && !drop;
     // A section the percussion enters: the ticks first, the metal a quarter in, the perc at half.
     const bool entering = si > 0 && !(sections_[size_t(si - 1)].layers & (bit(Metal) | bit(Tick) | bit(Perc)));
-    if (entering && ((track == Metal && in < sec.bars / 4) || (track == Perc && in < sec.bars / 2))) return;
+    if (entering && (((track == Metal || track == Body) && in < sec.bars / 4) || ((track == Perc || track == Mallet) && in < sec.bars / 2))) return;
     // Where Kerem's drums lead, the machine's percussion steps back to half and leaves him the room.
     const bool live = drummerLeads_[size_t(si)];
 
@@ -677,6 +702,9 @@ void GenreComposer::emitPart(int track, const Part& part, int bar, std::vector<E
             case Pulse: return foldInto(24 + tonicAt(bar), 24, 35);
             case Metal: return ladderPitch(bar, alt, 48, 76);
             case Tick: return alt == 1 ? 100 : ladderPitch(bar, 3 + step % 3, 72, 95); // 2: a noise tick, else tuned
+            case Ground: return ladderPitch(bar, alt, 28, 48);
+            case Body: return ladderPitch(bar, alt + step % 2, 45, 69); // the two hands: two pitches of the drum
+            case Mallet: return ladderPitch(bar, alt, 60, 88);
             default: return ladderPitch(bar, c == 'e' ? step % 5 : alt, spec_.percLo, spec_.percHi);
         }
     };
@@ -735,7 +763,13 @@ void GenreComposer::emitPart(int track, const Part& part, int bar, std::vector<E
         if (gapBeat_ == beat && track != Pad) continue;
         if (stutterBeat_ == beat && track == spec_.stutterTrack) continue;
         const int src = drum ? i + (chopMap_[size_t(beat)] - beat) * P / 4 : i;
-        const int at = int((int64_t(bar) * P + src) % len);
+        // The section's cells develop, phrase by phrase of eight bars: the hand drums displaced by a
+        // dotted eighth every other phrase, the mallet phasing a sixteenth further each phrase
+        // (Reich), the ground thinned to its first stroke at the fourth phrase.
+        const int phrase = in / 8;
+        const int rot = track == Body ? (phrase % 2) * 3 : track == Mallet ? phrase % P : 0;
+        if (track == Ground && phrase % 4 == 3 && i > P / 2) break;
+        const int at = int(((int64_t(bar) * P + src + rot) % len + len) % len);
         const char c = euclid ? (((i + percRot_) * k) % P < k ? 'e' : '.') : pat.s[at];
         if (c == '.' || c == '-') continue;
         if (live && track != Pulse && (i & 1)) continue; // half the percussion: the live kit has the room
@@ -767,6 +801,12 @@ void GenreComposer::emitPart(int track, const Part& part, int bar, std::vector<E
             const bool slide = nc != '.' && nc != '-' && nextBar < totalBars() && active(Sub, nextBar) && subPitch(nextBar, nc) != p;
             const int64_t late = t - (t0 + i * stepT); // the swing: the note ends on the grid all the same
             hit(t, p, vel, stepT * (1 + holds) - late + (slide ? 40 : -10));
+            continue;
+        }
+        if (track == Texture) // held: the scrape, the rattle, the crackle, on a chord tone
+        {
+            const int deg = c >= '1' && c <= '9' ? c - '1' : 0;
+            hit(t, ladderPitch(bar, deg, 48, 84), vel, std::max<int64_t>(stepT, stepT * (1 + holds) - 10));
             continue;
         }
         if (track == Bass)
@@ -873,6 +913,11 @@ void GenreComposer::generateBar(int bar, std::vector<Event>& out)
     else emitArp(bar, out);
     emitPart(Sub, spec_.sub, bar, out);
     emitHarm(bar, out);
+    emitPart(Ground, spec_.ground, bar, out);
+    emitPart(Body, spec_.body, bar, out);
+    emitPart(Mallet, spec_.mallet, bar, out);
+    emitPart(Texture, spec_.texture, bar, out);
+    emitImpact(bar, out);
     emitHeld(Fx, bar, out, fxHeld_, active(Fx, bar) ? foldInto(48 + tonicAt(bar), 48, 59) : -1);
 }
 

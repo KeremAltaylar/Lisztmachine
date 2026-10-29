@@ -69,20 +69,29 @@ std::vector<SoundChange> planSounds(const Composer& composer, const Palette& pal
 //   snare: a falling tone body and a burst of noise; from note 60 up a short rimshot
 //   deep:  struck metal low and long: FM on inharmonic ratios, its brightness fading over a second
 //   808:   a held, saturated sine with a short pitch punch; a note started while one is held slides there
+//   modal-<material>: struck, scraped or shaken objects (wood, log drum, skin, glass, bowl, kalimba,
+//          plate, scrape, rattle, chain, crackle): a bank of resonant modes excited by a short noise
+//          burst, a noise held while the note is, or bouncing impulses; tuned to the note
 class InternalSynth
 {
 public:
-    enum Kind { Click, Blip, Sub, Kick, Hat, Clap, Snare, Metal, Zap, None, Deep, Bass808 };
-    void prepare(double sampleRate, Kind kind) { sr_ = sampleRate; kind_ = kind; for (auto& v : voices_) v.note = -1; }
+    enum Kind { Click, Blip, Sub, Kick, Hat, Clap, Snare, Metal, Zap, None, Deep, Bass808, Modal };
+    enum Excite { Strike, Scrape, Rattle, Crackle };
+    struct Material { const char* name; std::array<float, 8> ratios; int modes; float tau, damp, exciteMs, slap; Excite excite; };
+    void prepare(double sampleRate, Kind kind, const juce::String& material = {});
     void render(const juce::MidiBuffer& midi, float* left, float* right, int numSamples);
     void allOff() { for (auto& v : voices_) v.note = -1; }
 
 private:
-    struct Voice { int note = -1; double phase = 0, phase2 = 0, phase3 = 0, inc = 0, env = 0, gain = 0, decay = 0, attack = 0, release = 0; double target = 0; float panL = 0.7f, panR = 0.7f; bool noise = false, held = false; float lastNoise = 0, lastNoise2 = 0; int64_t age = 0; };
+    struct Voice { int note = -1; double phase = 0, phase2 = 0, phase3 = 0, inc = 0, env = 0, gain = 0, decay = 0, attack = 0, release = 0; double target = 0; float panL = 0.7f, panR = 0.7f;
+                    std::array<float, 8> y1 {}, y2 {}, c1 {}, c2 {}, gin {}; int modes = 0; float exc = 1, excTarget = 1, maxTau = 0, nextImp = 0, impGap = 0; bool noise = false, held = false; float lastNoise = 0, lastNoise2 = 0; int64_t age = 0; };
     void start(int note, float velocity);
     void stopNote(int note);
     void run(float* l, float* r, int from, int to);
+    void startModal(Voice& v, int note, float velocity);
+    void runModal(Voice& v, float* l, float* r, int from, int to);
     std::array<Voice, 64> voices_;
+    const Material* material_ = nullptr;
     double sr_ = 48000;
     Kind kind_ = Click;
     uint32_t seed_ = 12345;

@@ -36,14 +36,14 @@ delay arp 1.5 0.45 0.25
 
 # Balance (to be measured in the mix)
 gain pulse   0.0
-gain metal   0.7
-gain tick   10.9
-gain perc   -6.4
-gain pad    -4.7
-gain bass    5.1
-gain sub   -11.3
-gain arp    -8.8
-gain chord  -4.7
+gain metal   0.5
+gain tick    12.1
+gain perc    -6.4
+gain pad     -4.6
+gain bass    5.3
+gain sub     -11.3
+gain arp     -8.8
+gain chord   -4.7
 gain fx     -6.0
 master 8.5
 amp bass  0.63 1800 0.75
@@ -62,8 +62,25 @@ delay perc  1.0 0.5 0.3 throws
 
 # 2026-10-29: the 808, the choir, deep metal, darker synths
 sub      0.0      60  internal/808
-gain harm   -4.8
+gain harm    -4.8
 amp harm  0.32 2200 0.35
 drive sub  0.55 2500
 duck sub 0.30
 lowcut bass 90
+
+# The percussion section (modal: struck and shaken objects, tuned to the chords)
+ground   0.0     200  internal/modal-log
+body     0.0     800  internal/modal-skin
+mallet   0.0    2000  internal/modal-kalimba
+texture  0.0    4000  internal/modal-crackle
+impact   0.0    1000  internal/modal-plate
+gain ground  -18.4
+gain body    -15.9
+gain mallet  -28.3
+gain texture -17.1
+gain impact  -4.0
+comp body -24 3 8 90 0.35
+duck body 0.2
+duck mallet 0.15
+delay mallet 0.75 0.4 0.25
+delay impact 1.5 0.55 0.4 throws

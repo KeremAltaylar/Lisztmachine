@@ -28,7 +28,11 @@ namespace liszt {
 class GenreComposer : public Composer
 {
 public:
-    enum GTrack : uint8_t { Pad, Pulse, Metal, Tick, Perc, Bass, Sub, Arp, Chord, Fx, Harm, kGenreTracks };
+    // The percussion section (2026-10-29, Kerem: "more percussion layers, not only high-pitched, variety"):
+    // ground (low strikes off his kick: log drums, deep metal), body (the groove: hand drums answering
+    // his snare), mallet (tuned figures crossing the bar), texture (scrapes, rattles, crackle, held),
+    // impact (one big hit where a section rises). Each one's rhythm develops phrase by phrase.
+    enum GTrack : uint8_t { Pad, Pulse, Metal, Tick, Perc, Bass, Sub, Arp, Chord, Fx, Harm, Ground, Body, Mallet, Texture, Impact, kGenreTracks };
 
     // A pattern: one character per step, perBar steps to the bar, as many bars as it is long.
     //   X x o g  a hit (accent, normal, soft, ghost) on the part's own pitch
@@ -38,7 +42,8 @@ public:
     // "euclid" (perc only): k hits spread evenly over perBar steps, more as the music drives.
     struct Pat { const char* s = ""; int perBar = 16; };
     struct Part { Pat tier[3]; };                  // energy below .4, below .75, above
-    // layers: P K S H C B U A D F (pad, pulse, metal, tick, perc, bass, sub, arp, chord, fx), and
+    // layers: P K S H C B U A D F (pad, pulse, metal, tick, perc, bass, sub, arp, chord, fx),
+    // G Y M T I (ground, body, mallet, texture, impact), and
     // L: Kerem's drums lead here, the machine's percussion thins out. The harm sings wherever the pad
     // plays and the music has some motion (energy .4 and up).
     struct Sec { const char* name; int bars; float energy; const char* layers; };
@@ -52,7 +57,7 @@ public:
         std::array<std::array<int, 4>, 3> progs;   // four chord roots (scale degrees): one is home, another the breakdowns'
         int preRoot = 6;                           // the last chord before the peak
         std::array<Sec, 10> form;                  // name nullptr ends it
-        Part pulse, metal, tick, perc, bass, chord, sub;
+        Part pulse, metal, tick, perc, bass, chord, sub, ground, body, mallet, texture;
         std::array<int, 3> arpRate {};             // arpeggio steps per bar per tier (0 silent)
         int arpLenLo = 5, arpLenHi = 7;            // its cycle, in notes: phases against the bar
         float arpDensLo = .4f, arpDensHi = .8f, arpGate = .7f;
@@ -95,6 +100,7 @@ private:
     void emitAutomation(int bar, std::vector<Event>& out);
     void emitPad(int bar, std::vector<Event>& out);
     void emitHarm(int bar, std::vector<Event>& out);
+    void emitImpact(int bar, std::vector<Event>& out);
     int subPitch(int bar, char c) const;
     bool inMode(int bar, int pitch) const;
     void emitPart(int track, const Part& part, int bar, std::vector<Event>& out);

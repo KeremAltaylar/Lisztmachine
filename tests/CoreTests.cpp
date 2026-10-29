@@ -235,7 +235,7 @@ int main()
     for (auto* spec : GenreComposer::all())
     {
         using G = GenreComposer;
-        for (auto* p : { &spec->pulse, &spec->metal, &spec->tick, &spec->perc, &spec->bass, &spec->chord, &spec->sub })
+        for (auto* p : { &spec->pulse, &spec->metal, &spec->tick, &spec->perc, &spec->bass, &spec->chord, &spec->sub, &spec->ground, &spec->body, &spec->mallet, &spec->texture })
             for (auto& t : p->tier)
                 CHECK(std::strcmp(t.s, "euclid") == 0 || std::strlen(t.s) % size_t(t.perBar) == 0, "%s: pattern \"%s\" is not whole bars of %d", spec->scene, t.s, t.perBar);
         for (seed = 1; seed <= 12; ++seed)

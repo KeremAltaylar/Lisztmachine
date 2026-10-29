@@ -8,7 +8,7 @@ S = r"C:\Users\kerem\OneDrive\Desktop\Claude\Projects\Lisztmachine\sounds"
 G = open(r"C:\Users\kerem\OneDrive\Desktop\Claude\Projects\Lisztmachine\src\core\Genres.cpp", encoding="utf8").read()
 PEAK = dict(jungle="Ascension", triphop="Four Ton Mantis", ecstatic="Computation", dubtechno="Submersion", noir="Cathedral of Smoke",
             gqom="Possessed", deconstructed="Rebirth", halftime="Gravity")
-BASE = dict(pad=-27, metal=-28, tick=-31, perc=-29, bass=-25, sub=-25, arp=-26, chord=-28, harm=-29)  # no pulse: it is silent  # no fx: a riser, quiet at the summit and loud before it, so one place cannot judge it
+BASE = dict(pad=-27, metal=-28, tick=-31, perc=-29, bass=-25, sub=-25, arp=-26, chord=-28, harm=-29, ground=-30, body=-29, mallet=-31, texture=-38)  # no pulse: it is silent  # no fx: a riser, quiet at the summit and loud before it, so one place cannot judge it
 OVER = dict(ecstatic=dict(arp=-23, chord=-26), dubtechno=dict(chord=-25),
             gqom=dict(perc=-26), deconstructed=dict(chord=-25, perc=-28))
 OFF = os.path.join(os.path.dirname(__file__), "balance-offsets.json")   # per song: how far everything went down for the limiter
@@ -33,7 +33,7 @@ def run(scene):
     for t, target in {**BASE, **OVER.get(scene, {})}.items():
         if rms.get(t, -150) < -100: continue
         d = max(-10, min(10, target - off[scene] - rms[t]))
-        txt = re.sub(rf"^gain {t}\s+([-\d.]+)$", lambda m: f"gain {t:<6}{float(m.group(1)) + d:>5.1f}", txt, flags=re.M)
+        txt = re.sub(rf"^gain {t}\s+([-\d.]+)$", lambda m: f"gain {t:<7} {float(m.group(1)) + d:.1f}", txt, flags=re.M)
         moves.append(f"{t} {rms[t]:.1f}{d:+.1f}")
     open(p, "w", encoding="utf8", newline="").write(txt)
     return f"{scene}: limiter {lim:.1f} off {off[scene]:.1f} | " + ", ".join(moves)

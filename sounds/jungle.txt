@@ -30,14 +30,14 @@ delay arp 0.75 0.45 0.25
 
 # Balance (to be measured in the mix)
 gain pulse   0.0
-gain metal  -4.3
+gain metal   -3.5
 gain tick    7.2
-gain perc   -1.1
-gain pad    -4.5
-gain bass   -1.4
-gain sub   -12.0
+gain perc    -1.1
+gain pad     -3.0
+gain bass    -1.4
+gain sub     -12.0
 gain arp     0.2
-gain chord  -8.5
+gain chord   -8.4
 gain fx    -10.0
 master 8.0
 amp bass  0.63 1800 0.75
@@ -60,8 +60,15 @@ metal    8.4     783  3rd/Malfunction/Drums/Gong
 harm     -3.2     740  3rd/Giana Brotherz/Pads/Deep Choir
 harm     -2.1    4204  3rd/Giana Brotherz/Pads/Dark Whisper
 perc     -11.1     300  internal/deep
-gain harm   -8.0
+gain harm    -8.1
 amp harm  0.32 2200 0.35
 drive sub  0.55 2500
 duck sub 0.30
 lowcut bass 90
+
+# the percussion section's layers, not yet written for this song
+ground   0.0      60  internal/none
+body     0.0      60  internal/none
+mallet   0.0      60  internal/none
+texture  0.0      60  internal/none
+impact   0.0      60  internal/none

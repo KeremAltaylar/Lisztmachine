@@ -34,14 +34,14 @@ delay chord 0.75 0.40 0.22
 
 # Balance (to be measured in the mix)
 gain pulse   0.0
-gain metal -14.8
+gain metal   -14.7
 gain tick    4.3
-gain perc  -16.7
-gain pad   -15.7
-gain bass   -2.3
-gain sub   -15.6
-gain arp    -5.8
-gain chord  -5.5
+gain perc    -16.7
+gain pad     -15.7
+gain bass    -2.3
+gain sub     -15.6
+gain arp     -5.8
+gain chord   -5.5
 gain fx     -9.2
 master 9.6
 amp bass  0.83 1800 0.75
@@ -63,8 +63,15 @@ sub      0.0      60  internal/808
 metal    7.2     997  3rd/Malfunction/Drums/Inharmonic Attack 2
 harm     -2.1    4204  3rd/Giana Brotherz/Pads/Dark Whisper
 harm    -10.6    3541  3rd/Bluelight/Vox/Gregorian Rant Poly
-gain harm  -10.9
+gain harm    -11.1
 amp harm  0.41 2200 0.35
 drive sub  0.55 2500
 duck sub 0.30
 lowcut bass 90
+
+# the percussion section's layers, not yet written for this song
+ground   0.0      60  internal/none
+body     0.0      60  internal/none
+mallet   0.0      60  internal/none
+texture  0.0      60  internal/none
+impact   0.0      60  internal/none
