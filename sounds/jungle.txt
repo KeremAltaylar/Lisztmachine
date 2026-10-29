@@ -1,12 +1,9 @@
 # Lisztmachine sound palette: Jungle (ambient jungle at 168-174: chopped breaks, reese bass, bells over long pads).
-# Tracks: pad kick snare hats perc bass sub arp chord fx.
+# Tracks: pad pulse metal tick perc bass sub arp chord fx harm.
 # Patches from the earlier palettes, re-measured held at C4 (basses C3) with pure tuning, 2026-10-26: beating 1-15 %
 # (Semihaunt left out: 39 %, EP 1 left out: 43-51 %). Gain: a held note to -22 dB RMS (pads and chords -27, they play 3-4 notes).
 # part   gain   bright  patch
 
-pad      -1.0     582  Pads/Yeti Funeral
-pad       6.6     599  Pads/Still
-pad       2.4    2052  Pads/Sunday
 pulse    0.0      60  internal/none
 metal    -1.5     997  3rd/Malfunction/Drums/Inharmonic Attack 2
 metal    -2.3    1063  3rd/Malfunction/Drums/Tuning Drums
@@ -15,27 +12,32 @@ tick     0.0    6000  internal/click
 fx       -5.7     286  FX/Unsettler
 fx        4.0    4170  FX/Radio Noise
 
+# 2026-10-29 evening: this song's own synths (pitch-true, beating <= 15 %, none shared with another song)
+pad       3.8     188  3rd/Inigo Kennedy/Pads/Deep Space 1
+pad      -0.7     442  Pads/MKS-70 Warm Pad
+chord     6.4     585  3rd/Giana Brotherz/Keys/Sin Ring
+chord     4.6     935  3rd/Giana Brotherz/Keys/Tri Meets Saw
+arp       5.5    1008  3rd/Luna/Synths/Window Warp
+arp      -6.0     539  3rd/TNMG/Leads/Acid Gizmo
+arp     -11.2     288  Leads/Sine Lead
+bass      0.2     269  3rd/Giana Brotherz/Basses/Warm Square
+bass    -12.2     911  3rd/Emu/Basses/Beefy Boi
+bass     -2.6    1188  3rd/Zoozither/Basses/Drill
+bass    -10.5     856  3rd/Cybersoda/Basses/Growl
+
 # Echoes: beats, feedback, mix
-arp      -6.8     669  Leads/Resofest 2
-arp      -9.5     948  Leads/Untamed
-arp      -5.4    1478  Leads/Squelch
-chord    -9.2     382  Pads/Smooth Dist
-chord    -2.8    1002  Polysynths/Uni Saw FB
-bass     -8.3     410  Basses/Distorted MW
-bass     -8.8     554  Basses/Evilous
-bass     -8.6    2467  Basses/Saw Lo-Fi
 delay arp 0.75 0.45 0.25
 
 # Balance (to be measured in the mix)
 gain pulse   0.0
-gain metal  -3.7
-gain tick    6.9
-gain perc   -1.8
-gain pad    -9.7
-gain bass   -3.6
-gain sub   -12.7
-gain arp   -10.6
-gain chord  -8.8
+gain metal  -3.6
+gain tick    7.2
+gain perc   -1.1
+gain pad    -8.3
+gain bass   -8.7
+gain sub   -12.0
+gain arp    -4.5
+gain chord -12.8
 gain fx    -10.0
 master 8.0
 drive bass  0.55 3500
@@ -57,12 +59,8 @@ sub      0.0      60  internal/808
 metal    8.4     783  3rd/Malfunction/Drums/Gong
 harm     -3.2     740  3rd/Giana Brotherz/Pads/Deep Choir
 harm     -2.1    4204  3rd/Giana Brotherz/Pads/Dark Whisper
-arp     -10.1    1132  3rd/Nick Moritz/Leads/Demon Here
-arp      -1.4    1218  3rd/Bluelight/Leads/Distorted Cello
-bass    -10.5     856  3rd/Cybersoda/Basses/Growl
-bass     -2.4    1824  3rd/Giana Brotherz/Basses/Black Swarm
 perc     -11.1     300  internal/deep
-gain harm  -10.9
+gain harm  -10.8
 drive harm 0.25 5000
 drive sub  0.55 2500
 duck sub 0.30

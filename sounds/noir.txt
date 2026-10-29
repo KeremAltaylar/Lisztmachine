@@ -1,0 +1,62 @@
+# Lisztmachine sound palette: Noir (after Portishead and Bohren).
+# Tracks: pad pulse metal tick perc bass sub arp chord fx harm.
+# part   gain   bright  patch
+
+pulse    0.0      60  internal/none
+fx       -5.7     286  FX/Unsettler
+
+# 2026-10-29 evening: this song's own synths (pitch-true, beating <= 15 %, none shared with another song)
+pad      -1.7     445  3rd/Giana Brotherz/Organs/Liquid Steel
+pad       4.6    1016  3rd/Luna/Organs/Another Additive Organ
+chord    -0.7    1035  3rd/Giana Brotherz/Keys/Ring Piano
+chord    -6.0     501  3rd/Giana Brotherz/Keys/Glassy E-Piano
+arp       2.7     812  3rd/Luna/Bells/Taco Bell
+arp       2.4    1142  3rd/Luna/Synths/Wavetable Warp
+arp      -0.5     279  3rd/Nick Moritz/Synths/Moon Piano
+bass     12.1     409  3rd/Luna/Basses/Acidic Warp
+bass     11.7    1864  3rd/Giana Brotherz/Basses/Ring 'n' Shape
+bass     -0.5     151  Basses/WT Bass
+arp      -1.4    1218  3rd/Bluelight/Leads/Distorted Cello
+metal    12.0     783  3rd/Malfunction/Drums/Gong
+metal    5.9     812  3rd/Malfunction/Drums/Inharmonic Attack 1
+tick     0.0    6000  internal/click
+perc     -3.5     300  internal/deep
+harm     -3.2     740  3rd/Giana Brotherz/Pads/Deep Choir
+harm     -2.1    4204  3rd/Giana Brotherz/Pads/Dark Whisper
+
+# Echoes: beats, feedback, mix
+delay arp 1.5 0.45 0.25
+
+# Balance (to be measured in the mix)
+gain pulse   0.0
+gain metal   0.9
+gain tick   11.9
+gain perc   -5.4
+gain pad    -6.9
+gain bass   -4.1
+gain sub    -9.9
+gain arp   -10.9
+gain chord -13.9
+gain fx     -6.0
+master 8.5
+drive bass  0.55 3500
+drive chord 0.50 4500
+drive arp   0.45 5000
+drive pad   0.20 5000
+drive metal 0.30 4500
+drive perc  0.30 6000
+crush tick  8 3 0.3
+comp perc -22 4 5 80 0.4
+duck metal 0.15
+duck tick 0.2
+duck perc 0.25
+delay metal 0.75 0.55 0.35 throws
+delay perc  1.0 0.5 0.3 throws
+
+# 2026-10-29: the 808, the choir, deep metal, darker synths
+sub      0.0      60  internal/808
+gain harm  -10.2
+drive harm 0.25 5000
+drive sub  0.55 2500
+duck sub 0.30
+lowcut bass 90

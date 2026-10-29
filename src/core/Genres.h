@@ -4,7 +4,7 @@
 
 namespace liszt {
 
-// Songs 4-11, one per genre (jungle, footwork, ecstatic arpeggios, dub techno, clicks & glitch,
+// Songs 4-11, one per genre (jungle, trip-hop, ecstatic arpeggios, dub techno, noir,
 // gqom, deconstructed club, halftime), each named for its genre until Kerem names it. One
 // composer plays them all from a table per genre (Genres.cpp): the form, a drum machine of step
 // patterns per energy tier (each part on its own grid, so triplets run against sixteenths),

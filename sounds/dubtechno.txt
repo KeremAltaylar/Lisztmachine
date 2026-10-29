@@ -1,25 +1,28 @@
 # Lisztmachine sound palette: Dub Techno (dub techno at 120-124: minor-seventh stabs into long echoes, rimshots, offbeat hats).
-# Tracks: pad kick snare hats perc bass sub arp chord fx.
+# Tracks: pad pulse metal tick perc bass sub arp chord fx harm.
 # Patches from the earlier palettes, re-measured held at C4 (basses C3) with pure tuning, 2026-10-26: beating 1-15 %
 # (Semihaunt left out: 39 %, EP 1 left out: 43-51 %). Gain: a held note to -22 dB RMS (pads and chords -27, they play 3-4 notes).
 # part   gain   bright  patch
 
-pad       6.6     599  Pads/Still
-pad      -3.9    2383  Pads/Subtle Comb Strings
 pulse    0.0      60  internal/none
 metal    8.7     812  3rd/Malfunction/Drums/Inharmonic Attack 1
 metal    7.4    2537  3rd/Malfunction/Drums/Jerry
 tick     0.0    6000  internal/click
-chord    -8.7     396  Keys/Organ 2
-chord    -4.7    4145  Plucks/Saw Pluck
-chord    -0.1    6135  Polysynths/Notched Saws
 fx        4.0    4170  FX/Radio Noise
 
+# 2026-10-29 evening: this song's own synths (pitch-true, beating <= 15 %, none shared with another song)
+pad     -13.2    1194  3rd/Databroth/Pads/Warmbo
+pad      -0.1     579  3rd/Giana Brotherz/Organs/Wanna B3
+chord     0.8     726  3rd/Giana Brotherz/Keys/Vintage Boost
+chord     2.0     374  3rd/Luna/Keys/Electric Nightmares
+arp      -3.4     293  Leads/Acidofil
+arp      -7.8     976  3rd/Dan Maurer/Synths/Warm Reception
+arp      -1.7     583  3rd/Emu/Leads/Doink Realm Organ
+bass     16.7     431  3rd/Luna/Basses/Acid
+bass     -6.8     167  3rd/Luna/Basses/Synthwave
+bass     -5.1     805  3rd/Zoozither/Basses/Open Up
+
 # Echoes: beats, feedback, mix
-arp      -6.8     669  Leads/Resofest 2
-arp      -9.5     948  Leads/Untamed
-bass     -8.3     410  Basses/Distorted MW
-bass     -1.0     399  Basses/Metal Square
 delay chord 0.75 0.62 0.38
 delay arp 1.5 0.45 0.25
 
@@ -28,11 +31,11 @@ gain pulse   0.0
 gain metal  -5.6
 gain tick   13.1
 gain perc   -5.1
-gain pad    -8.8
-gain bass   -4.4
+gain pad    -7.4
+gain bass    2.2
 gain sub   -13.0
-gain arp    -8.8
-gain chord -10.2
+gain arp   -15.7
+gain chord  -7.9
 gain fx    -11.7
 master 9.3
 drive bass  0.44 3500
@@ -54,10 +57,8 @@ sub      0.0      60  internal/808
 metal    13.7     783  3rd/Malfunction/Drums/Gong
 harm      5.6    1136  3rd/Giana Brotherz/Pads/Dub Choir
 harm     -3.2     740  3rd/Giana Brotherz/Pads/Deep Choir
-chord    -7.1     879  3rd/Emu/Synths/Disto Brass Pass
-bass    -10.5     856  3rd/Cybersoda/Basses/Growl
 perc     -9.1     300  internal/deep
-gain harm  -11.6
+gain harm  -11.3
 drive harm 0.25 5000
 drive sub  0.55 2500
 duck sub 0.30

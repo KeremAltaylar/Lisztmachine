@@ -75,10 +75,10 @@ nav button[aria-pressed="true"] { color: var(--ember); }
       <button class="go" id="piece-berlin" data-piece="berlin" disabled>Berlin</button>
       <button class="go" id="piece-yours" data-piece="yours" disabled>Let All Be Yours</button>
       <button class="go" id="piece-jungle" data-piece="jungle" disabled>Jungle</button>
-      <button class="go" id="piece-footwork" data-piece="footwork" disabled>Footwork</button>
+      <button class="go" id="piece-triphop" data-piece="triphop" disabled>Trip-Hop</button>
       <button class="go" id="piece-ecstatic" data-piece="ecstatic" disabled>Ecstatic Arpeggios</button>
       <button class="go" id="piece-dubtechno" data-piece="dubtechno" disabled>Dub Techno</button>
-      <button class="go" id="piece-glitch" data-piece="glitch" disabled>Clicks &amp; Glitch</button>
+      <button class="go" id="piece-noir" data-piece="noir" disabled>Noir</button>
       <button class="go" id="piece-gqom" data-piece="gqom" disabled>Gqom</button>
       <button class="go" id="piece-deconstructed" data-piece="deconstructed" disabled>Deconstructed Club</button>
       <button class="go" id="piece-halftime" data-piece="halftime" disabled>Halftime</button>
@@ -141,18 +141,18 @@ const PIECES = {
   jungle: { name: 'Jungle', study: 'tunnel', strobeBeats: 1, media: 'media/jungle1', ranges: [[36, 86], [22, 64], [42, 62], [60, 86]],
     world: { name: 'Deep Rain', lo: [0.1, 0.45, 1.0], hi: [0.85, 1.0, 0.95],     // midnight blue, rain-white light
       palette: [[0.2, 0.8, 1], [0.9, 1, 1], [0.35, 0.4, 1], [0.1, 1, 0.75], [1, 1, 1], [1, 0.4, 0.25]] } },
-  footwork: { name: 'Footwork', study: 'score', strobeBeats: 1, media: 'media/footwork1', ranges: [[36, 86], [22, 64], [38, 62], [60, 86]],
-    world: { name: 'Black Origami', lo: [0.6, 0.05, 0.12], hi: [1.0, 0.94, 0.86],  // blood shadows, bone light
-      palette: [[1, 0.1, 0.12], [1, 0.95, 0.88], [0.9, 0.5, 0.2], [1, 1, 1], [0.6, 0.1, 0.3], [1, 0.75, 0.6]] } },
+  triphop: { name: 'Trip-Hop', study: 'score', strobeBeats: 1, media: 'media/triphop1', ranges: [[36, 86], [22, 64], [38, 62], [60, 86]],
+    world: { name: 'Smoke Jazz', lo: [0.08, 0.35, 0.4], hi: [1.0, 0.72, 0.38],    // teal smoke, amber lamplight
+      palette: [[1, 0.65, 0.25], [0.2, 0.7, 0.75], [0.85, 0.2, 0.1], [1, 0.9, 0.75], [0.5, 0.35, 0.2], [1, 0.8, 0.5]] } },
   ecstatic: { name: 'Ecstatic Arpeggios', study: 'form', strobeBeats: 1, media: 'media/ecstatic1', ranges: [[36, 86], [22, 64], [42, 62], [60, 96]],
     world: { name: 'Halo', lo: [0.7, 0.2, 1.0], hi: [1.0, 0.92, 0.7],            // magenta-violet shadows, white-gold light
       palette: [[1, 0.85, 0.5], [1, 0.3, 0.85], [0.6, 0.4, 1], [1, 1, 1], [0.4, 0.9, 1], [1, 0.6, 0.3]] } },
   dubtechno: { name: 'Dub Techno', study: 'dust', strobeBeats: 1, media: 'media/dubtechno1', ranges: [[36, 86], [22, 64], [42, 62], [60, 86]],
     world: { name: 'Submarine', lo: [0.05, 0.4, 0.55], hi: [0.7, 1.0, 0.85],     // deep sea teal, sonar green
       palette: [[0.2, 1, 0.8], [0.3, 0.6, 1], [0.6, 1, 0.9], [0.9, 1, 1], [0.1, 0.8, 0.6], [1, 0.6, 0.3]] } },
-  glitch: { name: 'Clicks & Glitch', study: 'pattern', strobeBeats: 1, media: 'media/glitch1', ranges: [[36, 86], [22, 64], [42, 95], [60, 86]],
-    world: { name: 'Data', lo: [0.5, 0.75, 1.0], hi: [1.0, 1.0, 1.0],            // white data, cold cyan, one red
-      palette: [[1, 1, 1], [0.6, 0.9, 1], [1, 0.1, 0.1], [1, 1, 1], [0.3, 0.7, 1], [1, 1, 1]] } },
+  noir: { name: 'Noir', study: 'dust', strobeBeats: 1, media: 'media/noir1', ranges: [[36, 86], [22, 64], [36, 62], [60, 86]],
+    world: { name: 'Black Rain', lo: [0.35, 0.38, 0.45], hi: [0.95, 0.95, 1.0],    // silver rain on black, one red light
+      palette: [[1, 1, 1], [0.7, 0.75, 0.85], [0.9, 0.05, 0.08], [0.85, 0.9, 1], [0.4, 0.45, 0.55], [1, 0.2, 0.2]] } },
   gqom: { name: 'Gqom', study: 'lumen', strobeBeats: 1, media: 'media/gqom1', ranges: [[36, 86], [22, 64], [38, 62], [60, 86]],
     world: { name: 'Ember', lo: [0.55, 0.08, 0.04], hi: [1.0, 0.7, 0.35],         // coal shadows, fire light
       palette: [[1, 0.45, 0.1], [1, 0.75, 0.3], [0.9, 0.1, 0.05], [1, 0.9, 0.7], [0.7, 0.2, 0.6], [1, 0.3, 0.15]] } },

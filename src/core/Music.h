@@ -44,6 +44,12 @@ struct Mode
 inline constexpr Mode kAeolian  { "aeolian",  { 0, 2, 3, 5, 7, 8, 10 } };
 inline constexpr Mode kDorian   { "dorian",   { 0, 2, 3, 5, 7, 9, 10 } };
 inline constexpr Mode kPhrygian { "phrygian", { 0, 1, 3, 5, 7, 8, 10 } };
+// for the genre songs: each its own colour of the dark
+inline constexpr Mode kLydian            { "lydian",            { 0, 2, 4, 6, 7, 9, 11 } };
+inline constexpr Mode kHarmonicMinor     { "harmonic minor",    { 0, 2, 3, 5, 7, 8, 11 } };
+inline constexpr Mode kMelodicMinor      { "melodic minor",     { 0, 2, 3, 5, 7, 9, 11 } };
+inline constexpr Mode kPhrygianDominant  { "phrygian dominant", { 0, 1, 4, 5, 7, 8, 10 } };
+inline constexpr Mode kHungarianMinor    { "hungarian minor",   { 0, 2, 3, 6, 7, 8, 11 } };
 
 inline int floorDiv(int a, int b) { return a / b - ((a % b != 0) && ((a < 0) != (b < 0))); }
 

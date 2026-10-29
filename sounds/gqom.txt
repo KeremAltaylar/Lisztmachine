@@ -1,11 +1,9 @@
 # Lisztmachine sound palette: Gqom (gqom at 118-124: broken kicks in threes, triplet toms, dark stabs).
-# Tracks: pad kick snare hats perc bass sub arp chord fx.
+# Tracks: pad pulse metal tick perc bass sub arp chord fx harm.
 # Patches from the earlier palettes, re-measured held at C4 (basses C3) with pure tuning, 2026-10-26: beating 1-15 %
 # (Semihaunt left out: 39 %, EP 1 left out: 43-51 %). Gain: a held note to -22 dB RMS (pads and chords -27, they play 3-4 notes).
 # part   gain   bright  patch
 
-pad      -1.0     582  Pads/Yeti Funeral
-pad       6.6     599  Pads/Still
 pulse    0.0      60  internal/none
 metal    4.2    1063  3rd/Malfunction/Drums/Tuning Drums
 metal    4.5     997  3rd/Malfunction/Drums/Inharmonic Attack 2
@@ -15,25 +13,33 @@ perc     -6.6    1486  3rd/Cybersoda/Drums/Perc 8
 perc     -3.0     431  3rd/Emu/Drums/Mort Noisey Drum
 fx       -5.7     286  FX/Unsettler
 
+# 2026-10-29 evening: this song's own synths (pitch-true, beating <= 15 %, none shared with another song)
+pad      -9.0     277  3rd/Nick Moritz/Pads/Nightmare
+pad     -14.7     654  3rd/Databroth/Pads/Feed
+chord    -5.6     268  3rd/Luna/Brass/Brassy Sync
+chord    -3.0    1040  Brass/Reso Brassy
+arp      -8.5    1807  3rd/Rozzer/Leads/Dark Heart
+arp       8.5     438  3rd/Nick Moritz/Synths/Mystery Grotto
+arp      -5.2     163  3rd/Nick Moritz/Synths/Regressive Notes
+bass    -17.0    1532  3rd/John Valentine/Basses/Distorted Power Bass Guitar
+bass     -6.3     239  3rd/Kinsey Dulcet/Bass/OJD Bass
+bass      5.4     613  3rd/Slowboat/Basses/Perc Bass 2
+chord    -7.1     879  3rd/Emu/Synths/Disto Brass Pass
+bass     -4.9    2207  3rd/Altenberg/Basses/Aggressive
+
 # Echoes: beats, feedback, mix
-arp      -9.5     948  Leads/Untamed
-arp      -8.6    2470  Leads/Nastyfication
-chord    -2.0    1428  Polysynths/Serious Distortion
-chord    -9.2     382  Pads/Smooth Dist
-bass     -8.8     554  Basses/Evilous
-bass     -7.2     557  Basses/Distorted Bass
 delay chord 1.5 0.40 0.20
 
 # Balance (to be measured in the mix)
 gain pulse   0.0
-gain metal  -6.0
+gain metal  -6.4
 gain tick   10.0
-gain perc   -9.8
-gain pad   -14.9
-gain bass   -3.2
+gain perc   -9.7
+gain pad   -12.0
+gain bass   -7.2
 gain sub   -14.6
-gain arp   -13.1
-gain chord   7.6
+gain arp   -13.2
+gain chord  -8.2
 gain fx     -6.9
 master 9.6
 drive bass  0.69 3500
@@ -56,11 +62,7 @@ metal    14.7     783  3rd/Malfunction/Drums/Gong
 perc     -6.1     287  3rd/Vospi/Drums/Modular Drum
 harm     -3.2     740  3rd/Giana Brotherz/Pads/Deep Choir
 harm    -10.6    3541  3rd/Bluelight/Vox/Gregorian Rant Poly
-arp     -10.1    1132  3rd/Nick Moritz/Leads/Demon Here
-chord    -7.1     879  3rd/Emu/Synths/Disto Brass Pass
-bass    -12.8     263  3rd/Nick Moritz/Basses/Black Betty
-bass     -4.9    2207  3rd/Altenberg/Basses/Aggressive
-gain harm   -9.1
+gain harm   -9.0
 drive harm 0.25 5000
 drive sub  0.55 2500
 duck sub 0.30

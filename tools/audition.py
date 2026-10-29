@@ -9,7 +9,7 @@ R = r"C:\Users\kerem\build\Lisztmachine\liszt_render_artefacts\Release\liszt_ren
 G = open(os.path.join(HERE, "..", "src", "core", "Genres.cpp"), encoding="utf8").read()
 out = sys.argv[1]
 seeds = [int(s) for s in (sys.argv[2] if len(sys.argv) > 2 else "1,2,3,4").split(",")]
-songs = sys.argv[3:] or ["jungle", "footwork", "ecstatic", "dubtechno", "glitch", "gqom", "deconstructed", "halftime"]
+songs = sys.argv[3:] or ["jungle", "triphop", "ecstatic", "dubtechno", "noir", "gqom", "deconstructed", "halftime"]
 os.makedirs(out, exist_ok=True)
 
 def window(scene):

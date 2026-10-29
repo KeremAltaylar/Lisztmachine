@@ -1,38 +1,42 @@
 # Lisztmachine sound palette: Halftime (halftime at 168-174: the snare on three, heavy bass, bells and choirs).
-# Tracks: pad kick snare hats perc bass sub arp chord fx.
+# Tracks: pad pulse metal tick perc bass sub arp chord fx harm.
 # Patches from the earlier palettes, re-measured held at C4 (basses C3) with pure tuning, 2026-10-26: beating 1-15 %
 # (Semihaunt left out: 39 %, EP 1 left out: 43-51 %). Gain: a held note to -22 dB RMS (pads and chords -27, they play 3-4 notes).
 # part   gain   bright  patch
 
-pad      -1.0     582  Pads/Yeti Funeral
-pad       6.6     599  Pads/Still
 pulse    0.0      60  internal/none
 metal    -2.9     997  3rd/Malfunction/Drums/Inharmonic Attack 2
 metal    7.8     783  3rd/Malfunction/Drums/Gong
 tick     0.0    6000  internal/click
 fx       -5.7     286  FX/Unsettler
 
+# 2026-10-29 evening: this song's own synths (pitch-true, beating <= 15 %, none shared with another song)
+pad       4.1     525  3rd/Inigo Kennedy/Pads/Deep Space 2
+pad      -3.1     839  3rd/Luna/Strings/Synthier Strings
+chord    -9.1     308  Plucks/Gliss Pluck Distorted
+chord     4.8    1043  3rd/Giana Brotherz/Keys/Glass Tick
+arp      10.3     289  3rd/Giana Brotherz/Leads/Ravin' Stalker
+arp       1.1    1222  3rd/Giana Brotherz/Leads/Tech Ring
+arp       0.6    2149  Leads/Smoothy Hollow
+bass      0.0     252  3rd/Luna/Basses/Basic Acid
+bass      4.0     504  3rd/Kinsey Dulcet/Basses/Wavetable FM Slapper
+bass     -1.8    1063  3rd/A.Liv/Basses/Sqweird
+arp     -10.1    1132  3rd/Nick Moritz/Leads/Demon Here
+bass     -2.4    1824  3rd/Giana Brotherz/Basses/Black Swarm
+
 # Echoes: beats, feedback, mix
-arp      -6.8     669  Leads/Resofest 2
-arp      -2.1    1944  Leads/Synth Guitar 2
-arp      -9.5     948  Leads/Untamed
-chord    -9.2     382  Pads/Smooth Dist
-chord    -3.8    1512  Polysynths/Hugeness
-bass     -8.8     554  Basses/Evilous
-bass     -8.3     410  Basses/Distorted MW
-bass     -7.2     557  Basses/Distorted Bass
 delay arp 1.5 0.45 0.25
 
 # Balance (to be measured in the mix)
 gain pulse   0.0
-gain metal  -1.7
-gain tick    6.2
-gain perc   -5.0
-gain pad   -12.0
-gain bass   -9.8
+gain metal  -1.1
+gain tick    5.9
+gain perc   -4.8
+gain pad    -9.9
+gain bass   -6.6
 gain sub   -14.0
 gain arp   -11.7
-gain chord -11.8
+gain chord -16.2
 gain fx     -6.0
 master 8.5
 drive bass  0.55 3500
@@ -54,12 +58,8 @@ sub      0.0      60  internal/808
 metal    -2.4    1063  3rd/Malfunction/Drums/Tuning Drums
 harm     -3.2     740  3rd/Giana Brotherz/Pads/Deep Choir
 harm      5.6    1136  3rd/Giana Brotherz/Pads/Dub Choir
-arp     -10.1    1132  3rd/Nick Moritz/Leads/Demon Here
-arp      -1.4    1218  3rd/Bluelight/Leads/Distorted Cello
-bass    -10.5     856  3rd/Cybersoda/Basses/Growl
-bass     -2.4    1824  3rd/Giana Brotherz/Basses/Black Swarm
 perc     -10.7     300  internal/deep
-gain harm  -11.6
+gain harm  -10.9
 drive harm 0.25 5000
 drive sub  0.55 2500
 duck sub 0.30

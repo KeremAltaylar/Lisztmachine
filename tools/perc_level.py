@@ -10,7 +10,7 @@ R = r"C:\Users\kerem\build\Lisztmachine\liszt_render_artefacts\Release\liszt_ren
 S = os.path.join(HERE, "..", "sounds")
 G = open(os.path.join(HERE, "..", "src", "core", "Genres.cpp"), encoding="utf8").read()
 REF = -30.0  # dBFS RMS every patch is brought to before the track gain
-songs = sys.argv[1:] or ["jungle", "footwork", "ecstatic", "dubtechno", "glitch", "gqom", "deconstructed", "halftime"]
+songs = sys.argv[1:] or ["jungle", "triphop", "ecstatic", "dubtechno", "noir", "gqom", "deconstructed", "halftime"]
 
 def summit(scene):
     block = G[G.index(f'.scene = "{scene}"'):]

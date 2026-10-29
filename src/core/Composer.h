@@ -106,10 +106,10 @@ protected:
 // A scene by name (kScenes); anything else is Berlin. The genre songs are named for their genre
 // until Kerem names them.
 std::unique_ptr<Composer> makeComposer(const std::string& scene, uint64_t seed);
-inline const char* kScenes[] = { "berlin", "chorale", "letallbeyours", "jungle", "footwork", "ecstatic", "dubtechno",
-                                 "glitch", "gqom", "deconstructed", "halftime" };
-inline const char* kSceneTitles[] = { "Berlin", "Chorale", "Let All Be Yours", "Jungle", "Footwork", "Ecstatic Arpeggios", "Dub Techno",
-                                      "Clicks & Glitch", "Gqom", "Deconstructed Club", "Halftime" };
+inline const char* kScenes[] = { "berlin", "chorale", "letallbeyours", "jungle", "triphop", "ecstatic", "dubtechno",
+                                 "noir", "gqom", "deconstructed", "halftime" };
+inline const char* kSceneTitles[] = { "Berlin", "Chorale", "Let All Be Yours", "Jungle", "Trip-Hop", "Ecstatic Arpeggios", "Dub Techno",
+                                      "Noir", "Gqom", "Deconstructed Club", "Halftime" };
 
 // Berlin-school scene: drone pad, sequenced bass, polymetric upper sequence and a
 // motif-based lead, over a slow modal progression shaped by a 10-minute energy arc.

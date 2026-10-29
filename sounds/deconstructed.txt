@@ -1,11 +1,9 @@
 # Lisztmachine sound palette: Deconstructed Club (deconstructed club at 128-136: shattered kicks, gaps, stutters, metal clicks, huge stabs).
-# Tracks: pad kick snare hats perc bass sub arp chord fx.
+# Tracks: pad pulse metal tick perc bass sub arp chord fx harm.
 # Patches from the earlier palettes, re-measured held at C4 (basses C3) with pure tuning, 2026-10-26: beating 1-15 %
 # (Semihaunt left out: 39 %, EP 1 left out: 43-51 %). Gain: a held note to -22 dB RMS (pads and chords -27, they play 3-4 notes).
 # part   gain   bright  patch
 
-pad      -1.0     582  Pads/Yeti Funeral
-pad      -2.4     999  Pads/Retro Choir
 pulse    0.0      60  internal/none
 metal    18.0     783  3rd/Malfunction/Drums/Gong
 metal    13.7     812  3rd/Malfunction/Drums/Inharmonic Attack 1
@@ -17,26 +15,33 @@ perc     15.7    2737  3rd/Cybersoda/Drums/Perc 6
 fx       -5.7     286  FX/Unsettler
 fx        4.0    4170  FX/Radio Noise
 
+# 2026-10-29 evening: this song's own synths (pitch-true, beating <= 15 %, none shared with another song)
+pad       4.6     821  3rd/Giana Brotherz/Organs/Late Night
+pad      -2.3     408  3rd/Jacky Ligon/Ambiance/Fade To Black
+chord     5.5     654  Polysynths/Noise Tone
+chord    -1.8    2043  3rd/Noisegeek/Keys/Kinda Fearless FM
+arp       1.2    1094  3rd/Noisegeek/Leads/Back To Tyrell
+arp      -3.4     373  3rd/Stefan Singer/Leads/FM Flute
+arp     -16.2     685  3rd/Zoozither/Leads/Frontal
+bass     -1.8     346  3rd/Luna/Basses/SK Acid
+bass     -4.0     612  3rd/Slowboat/Basses/Gigantic Bass 1
+bass    -10.3    1180  Basses/Static 2
+arp       1.4    4212  3rd/Bluelight/Leads/Crusher
+bass    -15.2    3468  3rd/Altenberg/Basses/Neuro
+
 # Echoes: beats, feedback, mix
-arp      -1.8    2174  Leads/Harsh
-arp      -8.6    2470  Leads/Nastyfication
-chord    -2.0    1428  Polysynths/Serious Distortion
-chord    -4.6    3502  Polysynths/Megasynth 1
-bass     -7.2     557  Basses/Distorted Bass
-bass     -8.6    2467  Basses/Saw Lo-Fi
-bass     -8.3     410  Basses/Distorted MW
 delay chord 0.75 0.40 0.22
 
 # Balance (to be measured in the mix)
 gain pulse   0.0
-gain metal -15.2
+gain metal -14.6
 gain tick    4.3
 gain perc  -16.7
-gain pad   -19.1
-gain bass   -7.6
-gain sub   -15.7
-gain arp   -13.0
-gain chord  -9.1
+gain pad   -18.1
+gain bass   -8.4
+gain sub   -15.6
+gain arp   -12.2
+gain chord -11.4
 gain fx     -9.2
 master 9.6
 drive bass  0.72 3500
@@ -58,11 +63,7 @@ sub      0.0      60  internal/808
 metal    7.2     997  3rd/Malfunction/Drums/Inharmonic Attack 2
 harm     -2.1    4204  3rd/Giana Brotherz/Pads/Dark Whisper
 harm    -10.6    3541  3rd/Bluelight/Vox/Gregorian Rant Poly
-arp      -2.8    2959  3rd/Argitoth/Leads/Screaming Saw
-arp       1.4    4212  3rd/Bluelight/Leads/Crusher
-bass    -15.2    3468  3rd/Altenberg/Basses/Neuro
-bass     -2.4    1824  3rd/Giana Brotherz/Basses/Black Swarm
-gain harm  -14.9
+gain harm  -13.8
 drive harm 0.25 5000
 drive sub  0.55 2500
 duck sub 0.30
