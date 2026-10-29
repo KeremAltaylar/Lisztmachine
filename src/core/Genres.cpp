@@ -35,9 +35,9 @@ const G::Spec kJungle {
     // slower than the dance floor's 170 so the live kit can play over it; dorian: the major IV in the minor
     .bpmLo = 158, .bpmHi = 162, .mode = &kDorian, .tonics = { 2, 9, 4, 11, 7 },
     .progs = { { { 0, 3, 0, 6 }, { 0, 2, 3, 6 }, { 0, 4, 3, 6 } } }, .preRoot = 3,
-    .form = { { { "Mist", 16, .15f, "PF" }, { "Signal", 16, .35f, "PAHF" }, { "First Break", 64, .65f, "PKSHCBUA" },
-                { "Undertow", 32, .45f, "PBUAD" }, { "Second Break", 64, .85f, "PKSHCBUAD" }, { "Void", 16, .30f, "PAF" },
-                { "Ascension", 80, 1.0f, "PKSHCBUADF" }, { "Rain", 32, .50f, "PKSHCAL" }, { "Tide", 16, .10f, "PF" } } },
+    .form = { { { "Mist", 16, .15f, "PFT" }, { "Signal", 16, .35f, "PAHFT" }, { "First Break", 64, .65f, "PKSHCBUATGYM" },
+                { "Undertow", 32, .45f, "PBUADT" }, { "Second Break", 64, .85f, "PKSHCBUADTGYMI" }, { "Void", 16, .30f, "PAFT" },
+                { "Ascension", 80, 1.0f, "PKSHCBUADFTGYMI" }, { "Rain", 32, .50f, "PKSHCALTGYM" }, { "Tide", 16, .10f, "PFT" } } },
     // the break's skeleton drives the pulse; the metal answers off the backbeat, the ticks run between
     .pulse = part("X.........X.....", "X.X.......XX....X.X.......X.....", "X.X.......XX....X.X.......X..X.."),
     .metal = part("..........1.....", "...1......2..3..", "...1..2...3..1.2..1...3.2...4..2"),
@@ -49,6 +49,10 @@ const G::Spec kJungle {
     .chord = part("", "x---------------................", "x---------------................"),
     // the 808 in halftime under the breaks, sliding up the octave into the turn
     .sub = part("x---------------", "x-----------x---x-------^-------", "x-------x---x---x-----5-^---x---"),
+    .ground = part("", "......1.........", "......1...........2.....3......."),
+    .body = part("", "..o..x.o..o..x.g", "..oxg..o..oxg.xo"),
+    .mallet = part("", "1.....3.....2...", "1..2..3..4..3.2."),
+    .texture = part("x---------------", "x-------x-------", "x---x---x---x---"),
     .percLo = 36, .percHi = 52,
     .chop = .35f,
 };
@@ -84,9 +88,9 @@ const G::Spec kEcstatic {
     .scene = "ecstatic", .title = "Ecstatic Arpeggios",
     .bpmLo = 136, .bpmHi = 142, .mode = &kLydian, .tonics = { 5, 10, 0, 3, 8 }, // lydian: the raised fourth, the major II: the sublime
     .progs = { { { 0, 1, 0, 1 }, { 5, 1, 0, 4 }, { 0, 4, 5, 1 } } }, .preRoot = 1,
-    .form = { { { "Dawn", 16, .15f, "PA" }, { "Spiral", 32, .35f, "PA" }, { "Lattice", 48, .55f, "PADH" },
-                { "Suspension", 32, .40f, "PAFS" }, { "Ecstasy", 64, .80f, "PADHSCBUL" }, { "Afterimage", 32, .45f, "PAS" },
-                { "Computation", 64, 1.0f, "PKSHCBUADF" }, { "Halo", 32, .20f, "PAD" } } },
+    .form = { { { "Dawn", 16, .15f, "PAT" }, { "Spiral", 32, .35f, "PAT" }, { "Lattice", 48, .55f, "PADHT" },
+                { "Suspension", 32, .40f, "PAFSTGYM" }, { "Ecstasy", 64, .80f, "PADHSCBULTGYMI" }, { "Afterimage", 32, .45f, "PASTGYM" },
+                { "Computation", 64, 1.0f, "PKSHCBUADFTGYMI" }, { "Halo", 32, .20f, "PADT" } } },
     // no break here: the arpeggio is the rhythm; the pulse only lands at the summit
     .pulse = part("", "", "X...X...X...X..."),
     .metal = part("", "", "......1.......2."),
@@ -96,6 +100,10 @@ const G::Spec kEcstatic {
     // the chords gated pointillistically: the trance without its kick
     .chord = part("x-------........", "x.x.x..x.x.x..x.", "x.xx.xx.x.xx.xx."),
     .sub = part("", "x---------------", "x-------x---^---"),
+    .ground = part("", "", "..........1....."),
+    .body = part("", "......o.......o.", "..o...o...o...o."),
+    .mallet = part("1.......3.......", "1..3..2..4..3...", "1.32.14.3.21.43."),
+    .texture = part("x---------------", "x---------------", "x-------x-------"),
     .arpRate = { 16, 16, 32 }, .arpLenLo = 7, .arpLenHi = 11, .arpDensLo = .60f, .arpDensHi = 1.0f, .arpGate = .7f,
     .arpLo = 60, .arpHi = 96, .percLo = 36, .percHi = 52, .hook = false,
 };
@@ -104,9 +112,9 @@ const G::Spec kDub {
     .scene = "dubtechno", .title = "Dub Techno",
     .bpmLo = 120, .bpmHi = 124, .mode = &kAeolian, .tonics = { 9, 2, 7, 0, 5 },
     .progs = { { { 0, 0, 3, 3 }, { 0, 5, 3, 0 }, { 0, 3, 0, 6 } } }, .preRoot = 3,
-    .form = { { { "Fog", 16, .15f, "PD" }, { "Current", 32, .35f, "PKHD" }, { "Depth", 48, .55f, "PKSHCBUDL" },
-                { "Haze", 32, .35f, "PDF" }, { "Pressure", 64, .80f, "PKSHCBUDF" }, { "Echo Chamber", 32, .45f, "PDHA" },
-                { "Submersion", 64, 1.0f, "PKSHCBUADF" }, { "Silt", 16, .15f, "PD" } } },
+    .form = { { { "Fog", 16, .15f, "PDT" }, { "Current", 32, .35f, "PKHDT" }, { "Depth", 48, .55f, "PKSHCBUDLTGYM" },
+                { "Haze", 32, .35f, "PDFT" }, { "Pressure", 64, .80f, "PKSHCBUDFTGYMI" }, { "Echo Chamber", 32, .45f, "PDHAT" },
+                { "Submersion", 64, 1.0f, "PKSHCBUADFTGYMI" }, { "Silt", 16, .15f, "PDT" } } },
     .pulse = part("X...x...x...x...", "X...x...x...x...", "X...x...x...x..."),
     .metal = part("", "......1.......1.", "......1....2..1."), // rimshots
     .tick = part("..o...o...o...o.", "g.2.g.2.g.2.g.2.", "g.2gg.2gg.2gg.2g"),
@@ -115,6 +123,10 @@ const G::Spec kDub {
     // the stab: a minor seventh, short, into a long echo; its filter breathes over minutes
     .chord = part("..x.............", "..x.....x.....x.", "..x..x....x..x.."),
     .sub = part("x---------------", "x-----------x---", "x-------x---^---"),
+    .ground = part("", "......1.........", "......1.......2."),
+    .body = part("", "...o.......o....", "...o..o....o..o."),
+    .mallet = part("", "..1.............", "..1.......3....."),
+    .texture = part("x---------------", "x---------------", "x-------x-------"),
     .percLo = 36, .percHi = 52, .ext = 1, .swing = .12f, .chordSweep = .55f,
 };
 
@@ -124,9 +136,9 @@ const G::Spec kNoir {
     // leading tone around a minor tonic), long chords, the hook alone in a big room
     .bpmLo = 72, .bpmHi = 80, .mode = &kHungarianMinor, .tonics = { 11, 6, 8, 1, 3 },
     .progs = { { { 0, 5, 4, 0 }, { 0, 5, 1, 4 }, { 0, 6, 5, 4 } } }, .preRoot = 4,
-    .form = { { { "Rain", 8, .15f, "PF" }, { "Cigarette", 16, .30f, "PHD" }, { "Roads", 24, .55f, "PKSHCBUDL" },
-                { "Hollow Hall", 16, .35f, "PDAF" }, { "Mezzanine", 32, .80f, "PKSHCBUAD" }, { "Teardrop", 8, .20f, "PA" },
-                { "Cathedral of Smoke", 32, 1.0f, "PKSHCBUADF" }, { "Last Light", 16, .25f, "PDAL" } } },
+    .form = { { { "Rain", 8, .15f, "PFT" }, { "Cigarette", 16, .30f, "PHDT" }, { "Roads", 24, .55f, "PKSHCBUDLTGYM" },
+                { "Hollow Hall", 16, .35f, "PDAFT" }, { "Mezzanine", 32, .80f, "PKSHCBUADTGYMI" }, { "Teardrop", 8, .20f, "PAT" },
+                { "Cathedral of Smoke", 32, 1.0f, "PKSHCBUADFTGYMI" }, { "Last Light", 16, .25f, "PDALT" } } },
     .pulse = part("X.........X.....", "X.......X.X.....", "X.....x.X.X....."),
     .metal = part("", "..........1.....", "......1...2...3."), // far bells
     .tick = part("..g...g...g...g.", "x.g.x.g.x.g.x.g2", "xgxgx2xgxgxgx2xg"),
@@ -134,6 +146,10 @@ const G::Spec kNoir {
     .bass = part("x---------------", "x-------5-------", "x-----5-x---3---"),
     .chord = part("x---------------", "x-------x-------", "x---..x-x---..x-"),
     .sub = part("x---------------", "x-------^-------", "x-----x-^---x---"),
+    .ground = part("", "..........1.....", "......1...3....."),
+    .body = part("", "......o.........", "..o...o...o..o.."),
+    .mallet = part("1...............", "1.......3.......", "1.......3...2..."),
+    .texture = part("x---------------", "x---------------", "x-------x-------"),
     .percLo = 36, .percHi = 52,
     .gap = .10f, .swing = .10f, .chordSweep = .45f,
 };
@@ -142,9 +158,9 @@ const G::Spec kGqom {
     .scene = "gqom", .title = "Gqom",
     .bpmLo = 118, .bpmHi = 124, .mode = &kPhrygian, .tonics = { 4, 11, 6, 1, 9 },
     .progs = { { { 0, 1, 0, 1 }, { 0, 5, 6, 1 }, { 0, 1, 5, 6 } } }, .preRoot = 1,
-    .form = { { { "Taxi Rank", 16, .15f, "PC" }, { "Gathering", 32, .35f, "PCH" }, { "Gqom", 48, .60f, "PKCHSU" },
-                { "Ghost", 32, .40f, "PCDF" }, { "Sgubhu", 64, .85f, "PKSHCBUD" }, { "Shadow", 16, .30f, "PF" },
-                { "Possessed", 64, 1.0f, "PKSHCBUADF" }, { "Embers", 32, .30f, "PKCL" } } },
+    .form = { { { "Taxi Rank", 16, .15f, "PCTGYM" }, { "Gathering", 32, .35f, "PCHTGYM" }, { "Gqom", 48, .60f, "PKCHSUTGYM" },
+                { "Ghost", 32, .40f, "PCDFTGYM" }, { "Sgubhu", 64, .85f, "PKSHCBUDTGYMI" }, { "Shadow", 16, .30f, "PFT" },
+                { "Possessed", 64, 1.0f, "PKSHCBUADFTGYMI" }, { "Embers", 32, .30f, "PKCLTGYM" } } },
     // no four on the floor: the pulse in threes against the bar, the percussion in triplets
     .pulse = part("X..x..x.........", "X..x..x...x.....", "X..x..x...x.x...X..x..x...x..x.x"),
     .metal = part("", "..........1.....", "..........1...2."),
@@ -153,6 +169,10 @@ const G::Spec kGqom {
     .bass = part("", "x---............", "x---......x-----"),
     .chord = part("x...............................", "x.........x.....", "x.....x...x....."),
     .sub = part("x---------------", "x-----x-----x---", "x--x--x---x-^---"),
+    .ground = part("1..2..3.........", "1..2..3...1..2..", "1..2..3...1..2..3..2..1...2..3.."),
+    .body = part("", "..o...o...o...o.", "..o..go...o..go."),
+    .mallet = part("", "......1.......2.", "..1...2...1...3."),
+    .texture = part("x---------------", "x-------x-------", "x---x---x---x---"),
     .percLo = 38, .percHi = 57, .swing = .08f,
 };
 
@@ -160,9 +180,9 @@ const G::Spec kDeconstructed {
     .scene = "deconstructed", .title = "Deconstructed Club",
     .bpmLo = 128, .bpmHi = 136, .mode = &kPhrygianDominant, .tonics = { 4, 9, 2, 11, 7 }, // the major third over the flat second
     .progs = { { { 0, 1, 5, 6 }, { 0, 3, 1, 0 }, { 0, 6, 5, 1 } } }, .preRoot = 1,
-    .form = { { { "Shatter", 16, .20f, "PDF" }, { "Glass", 32, .40f, "PCKD" }, { "Fracture", 48, .65f, "KSCBDUL" },
-                { "Cathedral", 32, .40f, "PDAF" }, { "Violence", 48, .85f, "PKSHCBUAD" }, { "Silence", 16, .15f, "P" },
-                { "Rebirth", 64, 1.0f, "PKSHCBUADF" }, { "Wound", 32, .30f, "PDA" } } },
+    .form = { { { "Shatter", 16, .20f, "PDFT" }, { "Glass", 32, .40f, "PCKDTGYM" }, { "Fracture", 48, .65f, "KSCBDULTGYM" },
+                { "Cathedral", 32, .40f, "PDAFT" }, { "Violence", 48, .85f, "PKSHCBUADTGYMI" }, { "Silence", 16, .15f, "PT" },
+                { "Rebirth", 64, 1.0f, "PKSHCBUADFTGYMI" }, { "Wound", 32, .30f, "PDAT" } } },
     .pulse = part("X.......X..x....", "X..x.....X.x..x.", "X..x.X...X.xx..xX....x..X..x.X.."),
     .metal = part("", "......1...2.1...", "...1..2...3.1.21"),
     .tick = part("", "x...x.x...x...x.", "x.xxx.x.x.xxx.xx"),
@@ -170,6 +190,10 @@ const G::Spec kDeconstructed {
     .bass = part("x---------------", "x-------x---5---", "x--x--x-x---8-5-"),
     .chord = part("X---------------", "X.......X..X....", "X..X..X.X.X..X.."),
     .sub = part("x---------------", "x-------x--x----", "x--x--x-x---^-5-"),
+    .ground = part("", "1.........2.....", "1..2......2..1.."),
+    .body = part("", "...o..o.....o...", ".o.o..o.o..o..o."),
+    .mallet = part("1...............", "1.....2...3.....", "1..3..2..4.1..3."),
+    .texture = part("x---------------", "x-------x-------", "x---x---x---x---"),
     .percLo = 60, .percHi = 90,
     .chop = .30f, .gap = .25f, .stutter = .20f, .stutterTrack = G::Metal, .stutterDiv = 32,
 };
@@ -178,9 +202,9 @@ const G::Spec kHalftime {
     .scene = "halftime", .title = "Halftime",
     .bpmLo = 168, .bpmHi = 174, .mode = &kHarmonicMinor, .tonics = { 7, 0, 5, 10, 2 }, // harmonic minor: the major V pulling home
     .progs = { { { 0, 5, 3, 4 }, { 0, 3, 4, 0 }, { 5, 3, 4, 4 } } }, .preRoot = 4,
-    .form = { { { "Smoke", 16, .15f, "PF" }, { "Weight", 32, .35f, "PHBU" }, { "Halftime", 64, .60f, "PKSHCBUD" },
-                { "Hollow", 32, .40f, "PAF" }, { "Mass", 64, .85f, "PKSHCBUAD" }, { "Breath", 16, .25f, "PA" },
-                { "Gravity", 64, 1.0f, "PKSHCBUADF" }, { "Fall", 32, .30f, "PKSCAL" } } },
+    .form = { { { "Smoke", 16, .15f, "PFT" }, { "Weight", 32, .35f, "PHBUT" }, { "Halftime", 64, .60f, "PKSHCBUDTGYM" },
+                { "Hollow", 32, .40f, "PAFT" }, { "Mass", 64, .85f, "PKSHCBUADTGYMI" }, { "Breath", 16, .25f, "PAT" },
+                { "Gravity", 64, 1.0f, "PKSHCBUADFTGYMI" }, { "Fall", 32, .30f, "PKSCALTGYM" } } },
     // halftime: the tempo is 170, the body feels 85 (the live snare on three); the metal answers around it
     .pulse = part("X...............", "X.........x.....", "X.........x...x.X......x..x....."),
     .metal = part("..........1.....", "......1...2.....", "......1...2...3.......1...2..1.3"),
@@ -189,6 +213,10 @@ const G::Spec kHalftime {
     .bass = part("x---------------", "x-------..x-----", "x-----x-..x---5-"),
     .chord = part("", "x---------------................", "x---------------................"),
     .sub = part("x---------------", "x---------x-----x-------^-------", "x-------x-x-----x-----5-^---x-x-"),
+    .ground = part("", "......1.........", "......1...3...........2...1....."),
+    .body = part("", "..o.....o.o...o.", "..o..g..o.o..go."),
+    .mallet = part("1...............", "1.......2.......", "1.....3...2....."),
+    .texture = part("x---------------", "x---------------", "x-------x-------"),
     .percLo = 36, .percHi = 52,
     .chop = .10f, .stutter = .25f, .stutterTrack = G::Tick, .stutterDiv = 32,
 };

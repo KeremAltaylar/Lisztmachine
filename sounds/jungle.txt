@@ -30,14 +30,14 @@ delay arp 0.75 0.45 0.25
 
 # Balance (to be measured in the mix)
 gain pulse   0.0
-gain metal   -4.1
+gain metal   -4.4
 gain tick    7.2
 gain perc    -1.1
-gain pad     -3.6
+gain pad     -2.3
 gain bass    -1.4
 gain sub     -12.0
 gain arp     0.2
-gain chord   -8.4
+gain chord   -7.4
 gain fx    -10.0
 master 8.0
 amp bass  0.63 1800 0.75
@@ -66,9 +66,25 @@ drive sub  0.55 2500
 duck sub 0.30
 lowcut bass 90
 
-# the percussion section's layers, not yet written for this song
-ground   0.0      60  internal/none
-body     0.0      60  internal/none
-mallet   0.0      60  internal/none
-texture  0.0      60  internal/none
-impact   0.0      60  internal/none
+# The percussion section (modal: struck and shaken objects, tuned to the chords)
+ground   0.0    1000  internal/modal-log
+body     0.0    1000  internal/modal-skin
+mallet   0.0    1000  internal/modal-glass
+texture  0.0    1000  internal/modal-rattle
+impact   0.0    1000  internal/modal-plate
+gain ground  -26.1
+gain body    -20.7
+gain mallet  -23.8
+gain texture -19.2
+gain impact -4.0
+comp body -24 3 8 90 0.35
+duck body 0.2
+duck mallet 0.15
+delay mallet 0.75 0.4 0.25
+delay impact 1.5 0.55 0.4 throws
+
+# Sampled instruments (CC0: Karoryfer, D. Smolken, VSCO 2 CE; jSteelDrum: Unlicense), played by sfizz
+bass     10.0    2593  sfz/Karoryfer.Growlybass.v1.002/Growlybass/growlybass_vicious.sfz
+chord    22.0    1100  sfz/Karoryfer_Black_And_Green_Guitars_1000/Programs/07-black_twang.sfz
+arp      13.5    2290  sfz/Karoryfer_Bigcat_cello.v1.001/Karoryfer_Bigcat_cello/Programs/02- Bowed (mod wheel).sfz
+pad      14.2     714  sfz/vsco2/FHorn-sus.sfz

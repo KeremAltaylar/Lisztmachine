@@ -33,14 +33,14 @@ delay arp 1.5 0.45 0.25
 
 # Balance (to be measured in the mix)
 gain pulse   0.0
-gain metal   0.7
+gain metal   1.0
 gain tick    11.9
 gain perc    -5.4
-gain pad     -5.3
+gain pad     -3.4
 gain bass    1.1
 gain sub     -9.9
-gain arp     -8.7
-gain chord   -10.8
+gain arp     -5.6
+gain chord   -10.7
 gain fx     -6.0
 master 8.5
 amp bass  0.63 1800 0.75
@@ -59,15 +59,33 @@ delay perc  1.0 0.5 0.3 throws
 
 # 2026-10-29: the 808, the choir, deep metal, darker synths
 sub      0.0      60  internal/808
-gain harm    -7.6
+gain harm    -6.5
 amp harm  0.32 2200 0.35
 drive sub  0.55 2500
 duck sub 0.30
 lowcut bass 90
 
-# the percussion section's layers, not yet written for this song
-ground   0.0      60  internal/none
-body     0.0      60  internal/none
-mallet   0.0      60  internal/none
-texture  0.0      60  internal/none
-impact   0.0      60  internal/none
+# The percussion section (modal: struck and shaken objects, tuned to the chords)
+ground   0.0    1000  internal/modal-log
+body     0.0    1000  internal/modal-skin
+mallet   0.0    1000  internal/modal-bowl
+texture  0.0    1000  internal/modal-chain
+impact   0.0    1000  internal/modal-plate
+gain ground  -15.6
+gain body    -13.1
+gain mallet  -29.3
+gain texture -22.1
+gain impact -4.0
+comp body -24 3 8 90 0.35
+duck body 0.2
+duck mallet 0.15
+delay mallet 0.75 0.4 0.25
+delay impact 1.5 0.55 0.4 throws
+
+# Sampled instruments (CC0: Karoryfer, D. Smolken, VSCO 2 CE; jSteelDrum: Unlicense), played by sfizz
+chord    20.2    1413  sfz/Karoryfer.Scarypiano.v1.002/Scarypiano/Programs/Scarypiano.sfz
+bass     16.2     624  sfz/DSmolken.double_bass.v1.001/dsmolken_double_bass/d_smolken_rubner_bass_arco.sfz
+arp      13.5    2290  sfz/Karoryfer_Bigcat_cello.v1.001/Karoryfer_Bigcat_cello/Programs/02- Bowed (mod wheel).sfz
+arp      26.9    2983  sfz/aliexpress-erhu_v1000/Programs/02-erhu_long.sfz
+pad      13.3     708  sfz/vsco2/Bassoon-sus.sfz
+harm     20.2    2361  sfz/vsco2/Clarinet-susLong.sfz

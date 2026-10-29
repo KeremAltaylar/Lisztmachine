@@ -34,14 +34,14 @@ delay chord 0.75 0.40 0.22
 
 # Balance (to be measured in the mix)
 gain pulse   0.0
-gain metal   -14.3
+gain metal   -14.8
 gain tick    4.3
 gain perc    -16.7
-gain pad     -15.7
+gain pad     -3.9
 gain bass    -2.3
 gain sub     -15.6
-gain arp     -5.8
-gain chord   -5.5
+gain arp     -9.8
+gain chord   -10.9
 gain fx     -9.2
 master 9.6
 amp bass  0.83 1800 0.75
@@ -63,15 +63,31 @@ sub      0.0      60  internal/808
 metal    7.2     997  3rd/Malfunction/Drums/Inharmonic Attack 2
 harm     -2.1    4204  3rd/Giana Brotherz/Pads/Dark Whisper
 harm    -10.6    3541  3rd/Bluelight/Vox/Gregorian Rant Poly
-gain harm    -11.1
+gain harm    -10.9
 amp harm  0.41 2200 0.35
 drive sub  0.55 2500
 duck sub 0.30
 lowcut bass 90
 
-# the percussion section's layers, not yet written for this song
-ground   0.0      60  internal/none
-body     0.0      60  internal/none
-mallet   0.0      60  internal/none
-texture  0.0      60  internal/none
-impact   0.0      60  internal/none
+# The percussion section (modal: struck and shaken objects, tuned to the chords)
+ground   0.0    1000  internal/modal-log
+body     0.0    1000  internal/modal-block
+mallet   0.0    1000  internal/modal-glass
+texture  0.0    1000  internal/modal-scrape
+impact   0.0    1000  internal/modal-plate
+gain ground  -30.6
+gain body    -13.7
+gain mallet  -29.3
+gain texture -39.8
+gain impact -4.0
+comp body -24 3 8 90 0.35
+duck body 0.2
+duck mallet 0.15
+delay mallet 0.75 0.4 0.25
+delay impact 1.5 0.55 0.4 throws
+
+# Sampled instruments (CC0: Karoryfer, D. Smolken, VSCO 2 CE; jSteelDrum: Unlicense), played by sfizz
+chord    19.2    2000  sfz/Karoryfer_Black_And_Green_Guitars_1000/Programs/08-black_staccato.sfz
+arp      26.9    2983  sfz/aliexpress-erhu_v1000/Programs/04-erhu_marcato.sfz
+bass     2.6    1500  sfz/Karoryfer.Growlybass.v1.002/Growlybass/growlybass_excessive.sfz
+pad      30.0    1019  sfz/vsco2/TenorTrombone-sus.sfz

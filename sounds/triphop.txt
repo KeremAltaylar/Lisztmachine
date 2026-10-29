@@ -36,7 +36,7 @@ delay arp 1.5 0.45 0.25
 
 # Balance (to be measured in the mix)
 gain pulse   0.0
-gain metal   2.5
+gain metal   2.0
 gain tick    12.1
 gain perc    -1.3
 gain pad     -4.1
@@ -62,7 +62,7 @@ delay perc  1.0 0.5 0.3 throws
 
 # 2026-10-29: the 808, the choir, deep metal, darker synths
 sub      0.0      60  internal/808
-gain harm    -6.5
+gain harm    -6.7
 amp harm  0.32 2200 0.35
 drive sub  0.55 2500
 duck sub 0.30
@@ -88,7 +88,7 @@ delay impact 1.5 0.55 0.4 throws
 # Sampled instruments (CC0: Karoryfer, D. Smolken, VSCO 2 CE; jSteelDrum: Unlicense), played by sfizz
 bass     14.0     321  sfz/DSmolken.double_bass.v1.001/dsmolken_double_bass/d_smolken_rubner_bass_pizz.sfz
 bass     12.2     407  sfz/Karoryfer.Growlybass.v1.002/Growlybass/growlybass_dirty.sfz
-chord    12.0    1413  sfz/Karoryfer.Scarypiano.v1.002/Scarypiano/Programs/Scarypiano.sfz
+chord    17.9    1413  sfz/Karoryfer.Scarypiano.v1.002/Scarypiano/Programs/Scarypiano.sfz
 chord    24.9    1018  sfz/Karoryfer_Black_And_Green_Guitars_1000/Programs/04-green_twang.sfz
 arp      34.0    1835  sfz/Karoryfer.Bear_Sax.v1.004/Bear_Sax/Programs/1-solo-mono.sfz
 arp      26.9    2983  sfz/aliexpress-erhu_v1000/Programs/02-erhu_long.sfz

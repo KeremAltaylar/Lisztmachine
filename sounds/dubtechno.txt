@@ -31,11 +31,11 @@ delay arp 1.5 0.45 0.25
 
 # Balance (to be measured in the mix)
 gain pulse   0.0
-gain metal   -5.2
+gain metal   -5.9
 gain tick    13.1
 gain perc    -5.1
-gain pad     -9.6
-gain bass    4.3
+gain pad     -9.9
+gain bass    2.2
 gain sub     -13.0
 gain arp     -13.8
 gain chord   -5.2
@@ -61,15 +61,31 @@ metal    13.7     783  3rd/Malfunction/Drums/Gong
 harm      5.6    1136  3rd/Giana Brotherz/Pads/Dub Choir
 harm     -3.2     740  3rd/Giana Brotherz/Pads/Deep Choir
 perc     -9.1     300  internal/deep
-gain harm    -8.7
+gain harm    -8.6
 amp harm  0.25 2200 0.35
 drive sub  0.55 2500
 duck sub 0.30
 lowcut bass 90
 
-# the percussion section's layers, not yet written for this song
-ground   0.0      60  internal/none
-body     0.0      60  internal/none
-mallet   0.0      60  internal/none
-texture  0.0      60  internal/none
-impact   0.0      60  internal/none
+# The percussion section (modal: struck and shaken objects, tuned to the chords)
+ground   0.0    1000  internal/modal-log
+body     0.0    1000  internal/modal-block
+mallet   0.0    1000  internal/modal-bowl
+texture  0.0    1000  internal/modal-scrape
+impact   0.0    1000  internal/modal-plate
+gain ground  -23.6
+gain body    -10.9
+gain mallet  -33.2
+gain texture -37.7
+gain impact -4.0
+comp body -24 3 8 90 0.35
+duck body 0.2
+duck mallet 0.15
+delay mallet 0.75 0.4 0.25
+delay impact 1.5 0.55 0.4 throws
+
+# Sampled instruments (CC0: Karoryfer, D. Smolken, VSCO 2 CE; jSteelDrum: Unlicense), played by sfizz
+chord    12.0    1413  sfz/Karoryfer.Scarypiano.v1.002/Scarypiano/Programs/Scarypiano.sfz
+bass     17.0     400  sfz/Karoryfer.Growlybass.v1.002/Growlybass/growlybass_clean.sfz
+pad      24.9     720  sfz/vsco2/Tuba-sus.sfz
+arp      34.0    1835  sfz/Karoryfer.Bear_Sax.v1.004/Bear_Sax/Programs/2-solo-poly.sfz

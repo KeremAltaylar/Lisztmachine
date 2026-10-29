@@ -33,11 +33,11 @@ gain pulse   0.0
 gain metal   -7.2
 gain tick    15.5
 gain perc    -4.0
-gain pad     -8.5
-gain bass    -1.9
+gain pad     -5.4
+gain bass    -2.0
 gain sub     -12.1
-gain arp     -1.5
-gain chord   -12.2
+gain arp     -1.7
+gain chord   -6.8
 gain fx     -2.9
 master 9.2
 amp bass  0.45 1800 0.75
@@ -59,15 +59,31 @@ sub      0.0      60  internal/808
 harm      5.6    1136  3rd/Giana Brotherz/Pads/Dub Choir
 harm     -2.1    4204  3rd/Giana Brotherz/Pads/Dark Whisper
 perc     -9.3     300  internal/deep
-gain harm    -8.4
+gain harm    -8.3
 amp harm  0.22 2200 0.35
 drive sub  0.55 2500
 duck sub 0.30
 lowcut bass 90
 
-# the percussion section's layers, not yet written for this song
-ground   0.0      60  internal/none
-body     0.0      60  internal/none
-mallet   0.0      60  internal/none
-texture  0.0      60  internal/none
-impact   0.0      60  internal/none
+# The percussion section (modal: struck and shaken objects, tuned to the chords)
+ground   0.0    1000  internal/modal-log
+body     0.0    1000  internal/modal-skin
+mallet   0.0    1000  internal/modal-kalimba
+texture  0.0    1000  internal/modal-scrape
+impact   0.0    1000  internal/modal-bowl
+gain ground  -18.6
+gain body    -17.4
+gain mallet  -31.3
+gain texture -37.3
+gain impact -4.0
+comp body -24 3 8 90 0.35
+duck body 0.2
+duck mallet 0.15
+delay mallet 0.75 0.4 0.25
+delay impact 1.5 0.55 0.4 throws
+
+# Sampled instruments (CC0: Karoryfer, D. Smolken, VSCO 2 CE; jSteelDrum: Unlicense), played by sfizz
+chord    15.2    1200  sfz/Karoryfer_Black_And_Green_Guitars_1000/Programs/05-green_staccato.sfz
+arp      10.1    1421  sfz/steel-drum/jSteelDrum.sfz
+pad      12.6    2361  sfz/vsco2/Clarinet-susLong.sfz
+harm     13.3     708  sfz/vsco2/Bassoon-sus.sfz
