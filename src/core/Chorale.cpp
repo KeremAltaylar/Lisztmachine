@@ -793,7 +793,7 @@ void ChoraleComposer::writeGuitar(Rng& r)
             for (size_t k = chords_.size(); k-- > 0;) if (chords_[k].start <= at) return k;
             return 0;
         };
-        auto power = [&](size_t k, bool tenth) {
+        auto power = [&](size_t k) {
             const auto& c = chords_[k];
             const auto pcs = chordPcs(c);
             const int rootPc = c.pedal ? pc(tonicPc_ + kDominant) : pcs[0];
@@ -802,13 +802,20 @@ void ChoraleComposer::writeGuitar(Rng& r)
             const bool perfectFifth = c.pedal || c.quality == Min || c.quality == Maj || c.quality == Min7 || c.quality == Dom7
                                    || c.quality == Maj7 || c.quality == MinAdd9 || c.quality == MajAdd9;
             if (perfectFifth) v.push_back(root + 7);          // a diminished fifth stays out: just the octave
-            if (tenth && !c.pedal) v.push_back(root + 12 + pc(pcs[1] - rootPc)); // the third, an octave up: a tenth
-            return v;
+            return v; // no third: through the fuzz it beats against the fifth (2026-10-30: the doom guitar)
         };
         // where the guitar attacks in this bar: the pattern, and every chord change
         std::vector<std::pair<int, char>> attacks;
         const bool drone = std::strcmp(sec.name, "Breakdown") == 0;
-        for (int s = 0; s < 16; ++s)
+        // A part's last bar prepares the next (2026-10-30, Kerem: "a part-ending attack for every part"):
+        // into a rise a figure that pushes, into a fall one that stops; every hit let ring to the next.
+        const bool ends = bar + 1 < totalBars() && bar + 1 == sec.startBar + sec.bars;
+        static const char* up[] = { "X.......x.x.xXXX", "X..x..x..x..x..x", "X.......x...X..." };
+        static const char* down[] = { "X..x..x.X.......", "X.x...x.x...X.X." };
+        const int si = sectionOfBar_[size_t(bar)];
+        const char* fig = !ends ? nullptr : sectionAt(bar + 1).energy > sec.energy ? up[si % 3] : down[si % 2];
+        for (int s = 0; fig && s < 16; ++s) if (fig[s] != '.') attacks.push_back({ s, 'L' });
+        for (int s = 0; !fig && s < 16; ++s)
         {
             char x = drone ? (s == 0 && inSec % 2 == 0 ? 'L' : '.') : e < .6f ? '.' : pattern[s];
             const int at = bar * 16 + s;
@@ -820,11 +827,11 @@ void ChoraleComposer::writeGuitar(Rng& r)
         {
             const int s = attacks[a].first, at = bar * 16 + s;
             const bool longNote = attacks[a].second == 'L';
-            const int next = a + 1 < attacks.size() ? attacks[a + 1].first : (drone ? 32 : 16);
+            const int next = a + 1 < attacks.size() ? attacks[a + 1].first : (drone && !fig ? 32 : 16);
             const int64_t t0 = int64_t(at) * k16;
             const int64_t t1 = longNote ? int64_t(bar * 16 + next) * k16 - 30 : t0 + k16 / 2;
             const float vel = drone ? .28f + .22f * float(inSec % 4) / 3 : longNote ? (s == 0 ? .85f : .76f) : .5f;
-            for (int p : power(chordAt16(at), longNote && e >= .9f))
+            for (int p : power(chordAt16(at)))
                 notes_.push_back({ Guitar, p, t0, t1, vel });
         }
     }

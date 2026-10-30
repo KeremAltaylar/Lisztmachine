@@ -11,10 +11,10 @@ constexpr int kSixteenth = kPPQ / 4;
 constexpr int kBarTicks = 4 * kPPQ;       // 4/4 throughout this scene
 
 // The Berlin scene's tracks. Other scenes name their own (see SceneInfo).
-enum Track : uint8_t { Pad, Bass, Seq, Lead, kNumTracks };
-inline const char* kTrackNames[kNumTracks] = { "pad", "bass", "seq", "lead" };
+enum Track : uint8_t { Pad, Bass, Seq, Lead, Guitar, kNumTracks };
+inline const char* kTrackNames[kNumTracks] = { "pad", "bass", "seq", "lead", "guitar" };
 
-constexpr int kMaxTracks = 16;
+constexpr int kMaxTracks = 20;
 
 // What a scene asks of the engine: its tracks by name, what each is to the visuals
 // (0 harmony, 1 bass and drums, 2 rhythm, 3 melody), its sends to the shared delay and
@@ -63,7 +63,7 @@ struct Section
     const char* name;
     int startBar, bars;
     float energy;   // reached halfway through the section
-    uint16_t layers; // bit per track
+    uint32_t layers; // bit per track
     bool restoreTheme; // the original sequences come back here
 };
 
@@ -106,13 +106,16 @@ protected:
 // A scene by name (kScenes); anything else is Berlin. The genre songs are named for their genre
 // until Kerem names them.
 std::unique_ptr<Composer> makeComposer(const std::string& scene, uint64_t seed);
-inline const char* kScenes[] = { "berlin", "chorale", "letallbeyours", "jungle", "triphop", "ecstatic", "dubtechno",
-                                 "noir", "gqom", "deconstructed", "halftime" };
-inline const char* kSceneTitles[] = { "Berlin", "Chorale", "Let All Be Yours", "Jungle", "Trip-Hop", "Ecstatic Arpeggios", "Dub Techno",
-                                      "Noir", "Gqom", "Deconstructed Club", "Halftime" };
+inline const char* kScenes[] = { "berlin", "chorale", "letallbeyours", "jungle", "ecstatic", "noir", "deconstructed", "halftime",
+                                 "doom", "blackgaze" };
+inline const char* kSceneTitles[] = { "Berlin", "Chorale", "Let All Be Yours", "Liquid", "Ecstatic Arpeggios", "Noir", "Deconstructed Club",
+                                      "Halftime", "Doom", "Blackgaze" };
 
 // Berlin-school scene: drone pad, sequenced bass, polymetric upper sequence and a
 // motif-based lead, over a slow modal progression shaped by a 10-minute energy arc.
+// 2026-10-30 (Kerem: "more melancholy and organic"): a minor home (aeolian or phrygian, the shift the
+// one lighter moment), slower, bowed and sampled instruments, a guitar's power chords let ring under
+// the sequences, and every part's end prepared by a figure the bass and the guitar play together.
 class BerlinComposer : public Composer
 {
 public:
@@ -125,7 +128,8 @@ public:
     int chordAt(int bar) const { return chordOfBar_[size_t(bar)]; }
 
     // Pitch ranges, also used by the tests.
-    static constexpr int kRange[kNumTracks][2] = { { 48, 76 }, { 28, 52 }, { 52, 81 }, { 60, 88 } };
+    static constexpr int kRange[kNumTracks][2] = { { 48, 76 }, { 28, 52 }, { 52, 81 }, { 60, 88 }, { 28, 64 } };
+    const char* endFigure(int bar) const;           // the part's end: the figure its last bar plays, or nullptr
 
 private:
     void planForm();
@@ -141,6 +145,7 @@ private:
     void emitPad(int bar, std::vector<Event>& out);
     void emitSequence(int track, int bar, std::vector<Event>& out);
     void emitLeadPhrase(int bar, std::vector<Event>& out);
+    void emitGuitar(int bar, std::vector<Event>& out);
     void emitAutomation(int bar, std::vector<Event>& out);
 
     int tonicPc_ = 4;

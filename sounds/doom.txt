@@ -1,21 +1,20 @@
-# Lisztmachine sound palette: Gqom (gqom at 118-124: broken kicks in threes, triplet toms, dark stabs).
+# Lisztmachine sound palette: Doom (after Sleep, Electric Wizard, Sunn O))) and Bell Witch: the riff is the song).
 # Tracks: pad pulse metal tick perc bass sub arp chord fx harm.
 # Patches from the earlier palettes, re-measured held at C4 (basses C3) with pure tuning, 2026-10-26: beating 1-15 %
 # (Semihaunt left out: 39 %, EP 1 left out: 43-51 %). Gain: a held note to -22 dB RMS (pads and chords -27, they play 3-4 notes).
 # part   gain   bright  patch
 
 pulse    0.0      60  internal/none
-metal    4.2    1063  3rd/Malfunction/Drums/Tuning Drums
-metal    4.5     997  3rd/Malfunction/Drums/Inharmonic Attack 2
+metal    -3.3    1063  3rd/Malfunction/Drums/Tuning Drums
+metal    -4.1     997  3rd/Malfunction/Drums/Inharmonic Attack 2
 tick     0.0    6000  internal/click
-perc     -5.0    4877  3rd/Emu/Drums/T8 Conga
-perc     -6.6    1486  3rd/Cybersoda/Drums/Perc 8
-perc     -3.0     431  3rd/Emu/Drums/Mort Noisey Drum
+perc     0.0    1486  3rd/Cybersoda/Drums/Perc 8
+perc     8.7     431  3rd/Emu/Drums/Mort Noisey Drum
 fx       -5.7     286  FX/Unsettler
 
 # 2026-10-29 evening: this song's own synths (pitch-true, beating <= 15 %, none shared with another song)
 pad      -9.0     277  3rd/Nick Moritz/Pads/Nightmare
-pad     -14.7     654  3rd/Databroth/Pads/Feed
+pad     -20.5     654  3rd/Databroth/Pads/Feed
 chord    -5.6     268  3rd/Luna/Brass/Brassy Sync
 chord    -3.0    1040  Brass/Reso Brassy
 arp      -8.5    1807  3rd/Rozzer/Leads/Dark Heart
@@ -32,14 +31,14 @@ delay chord 1.5 0.40 0.20
 
 # Balance (to be measured in the mix)
 gain pulse   0.0
-gain metal   -6.4
-gain tick    10.0
-gain perc    -9.7
-gain pad     -9.3
-gain bass    -4.5
-gain sub     -14.6
-gain arp     -17.0
-gain chord   -6.7
+gain metal   3.9
+gain tick    14.9
+gain perc    -4.0
+gain pad     -0.3
+gain bass    -0.8
+gain sub     -9.3
+gain arp     -11.6
+gain chord   -5.5
 gain fx     -6.9
 master 9.6
 amp bass  0.79 1800 0.75
@@ -58,11 +57,11 @@ delay perc  1.0 0.5 0.3 throws
 
 # 2026-10-29: the 808, the choir, deep metal, darker synths
 sub      0.0      60  internal/808
-metal    14.7     783  3rd/Malfunction/Drums/Gong
-perc     -6.1     287  3rd/Vospi/Drums/Modular Drum
+metal    9.5     783  3rd/Malfunction/Drums/Gong
+perc     -0.3     287  3rd/Vospi/Drums/Modular Drum
 harm     -3.2     740  3rd/Giana Brotherz/Pads/Deep Choir
 harm    -10.6    3541  3rd/Bluelight/Vox/Gregorian Rant Poly
-gain harm    -6.9
+gain harm    -4.4
 amp harm  0.40 2200 0.35
 drive sub  0.55 2500
 duck sub 0.30
@@ -71,13 +70,13 @@ lowcut bass 90
 # The percussion section (modal: struck and shaken objects, tuned to the chords)
 ground   0.0    1000  internal/modal-log
 body     0.0    1000  internal/modal-skin
-mallet   0.0    1000  internal/modal-block
-texture  0.0    1000  internal/modal-rattle
+mallet   0.0    1000  internal/modal-bowl
+texture  0.0    1000  internal/modal-chain
 impact   0.0    1000  internal/modal-plate
-gain ground  -29.1
-gain body    -18.6
-gain mallet  -14.8
-gain texture -20.1
+gain ground  -21.3
+gain body    -12.2
+gain mallet  -30.3
+gain texture -19.2
 gain impact -4.0
 comp body -24 3 8 90 0.35
 duck body 0.2
@@ -86,7 +85,13 @@ delay mallet 0.75 0.4 0.25
 delay impact 1.5 0.55 0.4 throws
 
 # Sampled instruments (CC0: Karoryfer, D. Smolken, VSCO 2 CE; jSteelDrum: Unlicense), played by sfizz
-chord    24.4    1019  sfz/vsco2/TenorTrombone-stac.sfz
-chord    16.0     714  sfz/vsco2/FHorn-stac.sfz
-bass     12.0     900  sfz/Karoryfer.Growlybass.v1.002/Growlybass/growlybass_angry.sfz
-arp      34.0    1835  sfz/Karoryfer.Bear_Sax.v1.004/Bear_Sax/Programs/3-duo-mono.sfz
+chord    29.3    1019  sfz/vsco2/TenorTrombone-stac.sfz
+pad      21.9     720  sfz/vsco2/Tuba-sus.sfz
+bass     24.5     900  sfz/Karoryfer.Growlybass.v1.002/Growlybass/growlybass_angry.sfz
+arp      13.5    2290  sfz/Karoryfer_Bigcat_cello.v1.001/Karoryfer_Bigcat_cello/Programs/02- Bowed (mod wheel).sfz
+
+# 2026-10-30: the riff (the engine's guitar: two takes, left and right, the fifths pure) into a fuzz and a cabinet
+riff     0.0    1000  internal/guitar
+gain riff    -8.2
+drive riff 0.85 2500
+amp riff  0.70 1800 1.0 45 -2 3600 6 1100

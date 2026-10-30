@@ -4,8 +4,8 @@
 
 namespace liszt {
 
-// Songs 4-11, one per genre (jungle, trip-hop, ecstatic arpeggios, dub techno, noir,
-// gqom, deconstructed club, halftime), each named for its genre until Kerem names it. One
+// The genre songs (liquid, ecstatic arpeggios, noir, deconstructed club, halftime, doom, blackgaze),
+// each named for its genre until Kerem names it. One
 // composer plays them all from a table per genre (Genres.cpp): the form, a drum machine of step
 // patterns per energy tier (each part on its own grid, so triplets run against sixteenths),
 // chopped breaks, gaps and stutters, a sub, a bass and chord line from patterns.
@@ -32,7 +32,17 @@ public:
     // ground (low strikes off his kick: log drums, deep metal), body (the groove: hand drums answering
     // his snare), mallet (tuned figures crossing the bar), texture (scrapes, rattles, crackle, held),
     // impact (one big hit where a section rises). Each one's rhythm develops phrase by phrase.
-    enum GTrack : uint8_t { Pad, Pulse, Metal, Tick, Perc, Bass, Sub, Arp, Chord, Fx, Harm, Ground, Body, Mallet, Texture, Impact, kGenreTracks };
+    // The riff (2026-10-30, Kerem: "gnarly guitar like stoner doom, think of it as rhythm guitar, that's my
+    // style, or industrial low hits"): a rhythm guitar (or struck iron) playing the song's riff.
+    enum GTrack : uint8_t { Pad, Pulse, Metal, Tick, Perc, Bass, Sub, Arp, Chord, Fx, Harm, Ground, Body, Mallet, Texture, Impact, Riff, kGenreTracks };
+    // How the riff is played: doom (power chords, long, the flat second and the tritone around them),
+    // chug (palm-muted sixteenths, chords on the syncopations), tremolo (blackgaze: every sixteenth
+    // picked, root, fifth and ninth), sludge (one huge chord a bar, let ring), drone (re-picked whole notes).
+    enum class RiffStyle : uint8_t { None, Doom, Chug, Tremolo, Sludge, Drone };
+    // How the summit establishes itself (not by transposing what came before): the theme comes home
+    // doubled; the riff, bass and 808 lock in unison; a pedal: the low end holds the tonic while the
+    // chords move over it; half time: everything at half speed, twice the weight; a new theme of its own.
+    enum class Summit : uint8_t { Theme, Unison, Pedal, Halftime, NewTheme };
 
     // A pattern: one character per step, perBar steps to the bar, as many bars as it is long.
     //   X x o g  a hit (accent, normal, soft, ghost) on the part's own pitch
@@ -43,7 +53,7 @@ public:
     struct Pat { const char* s = ""; int perBar = 16; };
     struct Part { Pat tier[3]; };                  // energy below .4, below .75, above
     // layers: P K S H C B U A D F (pad, pulse, metal, tick, perc, bass, sub, arp, chord, fx),
-    // G Y M T I (ground, body, mallet, texture, impact), and
+    // G Y M T I R (ground, body, mallet, texture, impact, riff), and
     // L: Kerem's drums lead here, the machine's percussion thins out. The harm sings wherever the pad
     // plays and the music has some motion (energy .4 and up).
     struct Sec { const char* name; int bars; float energy; const char* layers; };
@@ -68,6 +78,10 @@ public:
         int stutterTrack = Metal, stutterDiv = 32;
         float swing = 0;                           // the off sixteenths late, in sixteenths
         float chordSweep = .2f;                    // how far the chord's filter breathes
+        int arpMorph = 4;                          // the arpeggio changes a note every this many bars (at most)
+        RiffStyle riff = RiffStyle::None;
+        int riffLo = 33;                           // the riff's lowest root (the power chord stacks a fifth and an octave on it)
+        Summit summit = Summit::Theme;
     };
 
     static const Spec* find(const std::string& scene);
@@ -101,6 +115,22 @@ private:
     void emitPad(int bar, std::vector<Event>& out);
     void emitHarm(int bar, std::vector<Event>& out);
     void emitImpact(int bar, std::vector<Event>& out);
+    void makeRiff();
+    void emitRiff(int bar, std::vector<Event>& out);
+    void powerChord(int track, int64_t t, int64_t len, int root, int fifth, float vel, std::vector<Event>& out) const;
+    int over(int bar, int deg, int up) const;       // semitones from a degree to the degree `up` steps above it
+    int riffRoot(int bar, int deg) const;
+    // The part's end: the last bar of every section (two into a big rise) prepares the next one with
+    // a figure the low instruments play together; the drums stop around it.
+    void planEnds();
+    bool attackBar(int bar) const { return endFig_[size_t(bar)] >= 0; }
+    void emitAttack(int bar, std::vector<Event>& out);
+    bool summitHalftime(int bar) const;
+    bool summitUnison(int bar) const;
+    int lowRootAt(int bar) const;                   // the bass's root: the chord's, or the tonic under a pedal
+    int lowPitch(int bar, int deg, int lo, int hi, int base) const;
+    struct RHit { int64_t t, len; int deg; float vel; bool palm; };
+    std::vector<RHit> riffHits(int bar) const;
     int subPitch(int bar, char c) const;
     bool inMode(int bar, int pitch) const;
     void emitPart(int track, const Part& part, int bar, std::vector<Event>& out);
@@ -117,7 +147,11 @@ private:
     std::array<int, 4> home_ {}, away_ {};
     std::vector<bool> awayBar_;                     // the bars that play the breakdown's progression
     struct Note { int step, len, deg; float vel; }; // the hook: sixteenths over two bars, degrees above the chord's root
-    std::vector<Note> hook_, hookHome_;
+    std::vector<Note> hook_, hookHome_, hookSummit_;
+    struct RNote { int step, len, deg; float vel; bool palm; }; // the riff: two bars of sixteenths, degrees above the chord's root
+    std::vector<RNote> riff_;
+    std::vector<int> endFig_;                       // per bar: the end figure it plays, or -1
+    std::vector<int> chordsHeldRiff_;
     int fxHeld_ = -1;
     int percRot_ = 0;
     int64_t arpStep_ = 0;

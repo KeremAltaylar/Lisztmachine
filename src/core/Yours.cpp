@@ -232,47 +232,50 @@ void YoursComposer::emitDrums(int bar, std::vector<Event>& out)
         for (int b = 0; b < beats; ++b) hit(Kick, t0 + b * kPPQ, pitch, b == 0 ? 1.0f : .92f, kPPQ - 20);
     }
 
+    const char* fig = endFigure(bar);
     if (active(Hats, bar))
     {
+        // Ticks: a tuned metal tick, every third sixteenth accented so the accent wheels against the
+        // bar (three over sixteen); the off sixteenths fill in as it drives; the summit ratchets the
+        // last beat of every fourth bar in thirty-seconds. In a part's last bar they stop after a beat.
         const bool rise = is(sec, "Rise");
-        const bool ratchet = sec.restoreTheme && in % 4 == 3; // thirty-seconds on the last beat
-        for (int b = 0; b < 4; ++b)
+        const bool ratchet = sec.restoreTheme && in % 4 == 3;
+        const int tonicTick = foldInto(72 + tonicPc_, 72, 83);
+        for (int s = 0; s < (fig ? 4 : 16); ++s)
         {
-            const int64_t tb = t0 + b * kPPQ;
-            if (ratchet && b == 3)
+            const int64_t t = t0 + s * kSixteenth;
+            if (ratchet && s >= 12)
             {
-                for (int k = 0; k < 8; ++k) hit(Hats, tb + k * kSixteenth / 2, 42, .25f + .07f * k, 60);
+                for (int k = 0; k < 2; ++k) hit(Hats, t + k * kSixteenth / 2, tonicTick + 12, .25f + .07f * float(2 * (s - 12) + k), 50);
                 continue;
             }
-            hit(Hats, tb + 2 * kSixteenth, 46, .55f + .25f * e, 90); // the open hat between the kicks
-            if (rise)
-            {
-                const float up = .2f + .6f * float(in * 4 + b) / float(sec.bars * 4);
-                for (int s : { 0, 1, 3 }) hit(Hats, tb + s * kSixteenth, 42, up * (s == 0 ? .7f : 1.0f), 60);
-            }
-            else if (e >= .55f)
-            {
-                hit(Hats, tb + kSixteenth, 42, .30f, 60);
-                hit(Hats, tb + 3 * kSixteenth, 42, .48f, 60);
-                if (e >= .85f) hit(Hats, tb, 42, .22f, 60);
-            }
+            const bool acc = (int64_t(bar) * 16 + s) % 3 == 0;
+            if (!(acc || (s % 2 == 1 && (e >= .55f || rise)) || e >= .85f)) continue;
+            const float ramp = rise ? .3f + .7f * float(in * 16 + s) / float(sec.bars * 16) : 1.0f;
+            hit(Hats, t, acc ? tonicTick + 7 : tonicTick, (acc ? .55f + .3f * e : .28f) * ramp, 60);
         }
     }
 
     if (active(Clap, bar))
     {
+        const int iron = foldInto(24 + tonicPc_, 28, 39); // the tonic, low; the fifth on the bar's second half
         if (is(sec, "Rise") && in >= 8)
         {
             // the roll: eighths, then sixteenths, then thirty-seconds, louder all the way
             const int div = in < 12 ? 2 * kSixteenth : in < 15 ? kSixteenth : kSixteenth / 2;
             for (int64_t t = 0; t < kBarTicks; t += div)
-                hit(Clap, t0 + t, 39, .35f + .6f * float((in - 8) * kBarTicks + t) / float(8 * kBarTicks), 50);
+                hit(Clap, t0 + t, iron, .35f + .6f * float((in - 8) * kBarTicks + t) / float(8 * kBarTicks), 50);
         }
+        else if (fig)
+            for (int i = 0; i < 16; ++i) { if (fig[i] != '.') hit(Clap, t0 + i * kSixteenth, i >= 12 ? iron + 7 : iron, fig[i] == 'X' ? .95f : .75f, 90); }
         else
         {
-            hit(Clap, t0 + kPPQ, 39, .85f, 60);
-            hit(Clap, t0 + 3 * kPPQ, 39, .9f, 60);
-            if (sec.restoreTheme && rng_.chance(.3)) hit(Clap, t0 + 3 * kPPQ - kSixteenth, 39, .3f, 50);
+            // iron: industrial low hits off his kick and his backbeat, threes against the bar, growing
+            static const char* pats[] = { "......x.......x.", "...x..x....x..x.", "...x..x...x.x.xx" };
+            const char* p = pats[e < .5f ? 0 : e < .8f ? 1 : 2];
+            for (int i = 0; i < 16; ++i)
+                if (p[i] == 'x') hit(Clap, t0 + i * kSixteenth, i >= 10 ? iron + 7 : iron, i == 3 || i == 6 ? .9f : .7f, 90);
+            if (sec.restoreTheme && rng_.chance(.3)) hit(Clap, t0 + 13 * kSixteenth, iron + 12, .45f, 60);
         }
     }
 }
@@ -288,6 +291,17 @@ void YoursComposer::emitBass(int bar, std::vector<Event>& out)
         out.push_back({ t, Event::NoteOn, Bass, uint8_t(pitch), vel });
         out.push_back({ t + len, Event::NoteOff, Bass, uint8_t(pitch), 0 });
     };
+    if (const char* fig = endFigure(bar))
+    {
+        for (int i = 0; i < 16; ++i)
+        {
+            if (fig[i] == '.') continue;
+            int next = i + 1;
+            while (next < 16 && fig[next] == '.') ++next;
+            note(t0 + i * kSixteenth, p, fig[i] == 'X' ? .95f : .8f, std::min(next - i, 3) * kSixteenth - 20);
+        }
+        return;
+    }
     for (int b = 0; b < 4; ++b)
     {
         const int64_t tb = t0 + b * kPPQ;
@@ -342,6 +356,17 @@ void YoursComposer::emitStab(int bar, std::vector<Event>& out)
     std::vector<int> chord = { root, root + degreeSemis(kPhrygian, r + 2) - degreeSemis(kPhrygian, r),
                                root + degreeSemis(kPhrygian, r + 4) - degreeSemis(kPhrygian, r) };
     if (sec.restoreTheme) chord.push_back(root + 12);
+    if (const char* fig = endFigure(bar))
+    {
+        for (int i = 0; i < 16; ++i)
+            if (fig[i] == 'X')
+                for (int q : chord)
+                {
+                    out.push_back({ t0 + i * kSixteenth, Event::NoteOn, Stab, uint8_t(q), .9f });
+                    out.push_back({ t0 + i * kSixteenth + kSixteenth, Event::NoteOff, Stab, uint8_t(q), 0 });
+                }
+        return;
+    }
     for (int i = 0; i < 16; ++i)
     {
         const int s = (bar % 2) * 16 + i;
@@ -366,6 +391,16 @@ void YoursComposer::generateBar(int bar, std::vector<Event>& out)
     emitStab(bar, out);
     emitHeld(Sub, bar, out, subHeld_, active(Sub, bar) ? pitchOf(bar, 0, 24, 35, 24) : -1);
     emitHeld(Fx, bar, out, fxHeld_, active(Fx, bar) ? foldInto(48 + tonicPc_, 48, 59) : -1);
+}
+
+const char* YoursComposer::endFigure(int bar) const
+{
+    // The last bar of every part but the final one: into a rise a figure that pushes, into a fall one that stops.
+    if (bar + 1 >= totalBars() || sectionOfBar_[size_t(bar + 1)] == sectionOfBar_[size_t(bar)]) return nullptr;
+    static const char* up[] = { "X.......x.x.xXXX", "X..x..x..x..x..x", "X.......x...X..." };
+    static const char* down[] = { "X..x..x.X.......", "X.x...x.x...X.X." };
+    const int si = sectionOfBar_[size_t(bar)];
+    return sectionAt(bar + 1).energy > sectionAt(bar).energy ? up[si % 3] : down[si % 2];
 }
 
 std::string YoursComposer::describe() const

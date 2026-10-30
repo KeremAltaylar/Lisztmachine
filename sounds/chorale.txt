@@ -5,7 +5,9 @@
 # The voices play in pure tuning (the engine strips unison detune, drift and chorus-type
 # effects). Chosen by measuring a held note's beating with that applied (a sine reads 1 %):
 # Clarinet 2-9 %, Flute 2-6 %, Sunday 7-15 %, Organ 2 7-12 %, Retro Choir 8-13 %, Still 8-14 %,
-# Comb Strings 9-23 %. Left out: Ooh (35 %, a built-in tremolo), Pad 1 (43 %), Tragic Winds (33 cents
+# Comb Strings 9-23 %. 2026-10-30: Clarinet out (Kerem: "fix the detuned high-pitch synth"): even
+# pure it runs sharp as it climbs, +4 cents at C4, +33 at C5, +94 at G5, an octave off at C6.
+# Flute 1 out too: 19 cents sharp at C5 and C6 (against the detector's own offset, which every patch shares). Left out: Ooh (35 %, a built-in tremolo), Pad 1 (43 %), Tragic Winds (33 cents
 # sharp and a +11 dBFS transient), Synth Choir (pitch jumps by octaves), Piano Remains (pure
 # tuning puts them an octave off; the piano track is not purified).
 #
@@ -14,9 +16,7 @@
 #   bright   spectral centroid in Hz, measured (orders dark -> bright over the piece)
 voices  -11.1    300  Keys/Organ 2
 voices    0.0    400  Pads/Still
-voices  -12.6    500  Winds/Flute 1
 voices   -0.2   1000  Pads/Retro Choir
-voices  -11.0   1350  Winds/Clarinet
 voices   -3.6   1500  Pads/Sunday
 voices   -4.1   2700  Pads/Subtle Comb Strings
 
@@ -35,24 +35,9 @@ drums    -8.0    320  Percussion/Synth Tom 2
 micro    -4.0   8000  internal/click
 blips   -10.0   3000  internal/blip
 
-# Guitar: distorted patches playing the chords as power chords, pure-tuned like the voices.
-# Measured with --pure at note 45 (beating; most of these sound an octave down by design, the
-# same pitch class): Smooth Dist 4 %, Synth Guitar 1 and 2 5 %, Serious Distortion 6 %, Uni Saw FB
-# and Distorted Bass 9 %, Harsh 10 %, Hugeness 11 %. Left out: Lord Sawtooth (115 %), Dist Bass 1
-# (25 %), Megasynth 1 (23 %), Distortionworks (unstable pitch).
-# gain: to -22 dB for one note, minus 6 for the power chord
-guitar  -13.1    184  Pads/Smooth Dist
-guitar  -12.6    578  Basses/Distorted Bass
-guitar   -7.9    670  Polysynths/Hugeness
-guitar   -6.1    751  Polysynths/Uni Saw FB
-guitar   -8.8   1023  Leads/Harsh
-guitar   -4.2   1047  Polysynths/Serious Distortion
-guitar   -8.5   1125  Leads/Synth Guitar 2
-guitar  -11.1   1842  Leads/Synth Guitar 1
-
-# Piano, doubling the melody.
-piano    -4.3    587  Keys/Soft Suitcase
-piano    -0.4    594  Keys/EP 1
+# Piano, doubling the melody. 2026-10-30: Soft Suitcase (68 % beating at G5, its own tremolo) and EP 1
+# (45 %, wavering 28 cents) gave the high melody its detune: a sampled piano instead, and DX EP (9 %).
+piano    16.0    1413  sfz/Karoryfer.Scarypiano.v1.002/Scarypiano/Programs/Scarypiano.sfz
 piano     1.3   1765  Keys/DX EP
 
 # In-mix corrections from seed 1, per section (voices / guitar+drums, dB RMS): Clarinet in the Theme
@@ -77,9 +62,15 @@ delay alto    1.0  0.40 0.22
 delay tenor   1.5  0.38 0.20
 delay bass    2.0  0.30 0.15
 delay blips   0.75 0.35 0.20
-delay guitar  0.75 0.30 0.12
 master 6.8
 
 # 2026-10-29: an amp and its cabinet on the melodic parts (gain, presence Hz, mix)
-amp guitar 0.70 2400 0.85
 amp bass   0.40 1800 0.60
+
+# 2026-10-30: the guitar is the engine's (two takes, left and right, the fifths pure), the doom voicing
+# (Kerem: "more gnarly guitar, like stoner doom, in every song"); the Surge guitars above it are gone
+guitar   0.0    1000  internal/guitar
+gain guitar  -13.0
+drive guitar 0.85 2500
+amp guitar  0.70 1800 1.0 45 -2 3600 6 1100
+delay guitar  0.75 0.30 0.12

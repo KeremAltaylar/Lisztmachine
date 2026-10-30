@@ -5,19 +5,19 @@
 # part   gain   bright  patch
 
 pulse    0.0      60  internal/none
-metal    -0.7    2000  internal/metal
+metal    -1.9    2000  internal/metal
 tick     0.0    6000  internal/click
 fx       -5.7     286  FX/Unsettler
 fx        4.0    4170  FX/Radio Noise
 
 # 2026-10-29 evening: this song's own synths (pitch-true, beating <= 15 %, none shared with another song)
 pad      -5.3     768  3rd/Giana Brotherz/Pads/Digitized Choir
-pad      -5.5    1385  3rd/Kuniklo/Pads/After Warp
+pad      -10.0    1385  3rd/Kuniklo/Pads/After Warp
 chord    -4.7     356  3rd/Rozzer/Plucks/JP80x0 Pluck
 chord     -3.1    1582  Plucks/Lighter
 arp      -8.9     499  3rd/Bluelight/Leads/Lead 5
 arp      -8.8     787  3rd/Bluelight/Leads/Lead 4
-arp       2.1    2070  3rd/Bluelight/Leads/Lead 2
+arp       -2.3    2070  3rd/Bluelight/Leads/Lead 2
 bass     -2.0     172  3rd/Bluelight/Basses/Bass 7
 bass      4.0     466  3rd/Slowboat/Basses/Perc Bass 1
 bass      2.4    1138  3rd/A.Liv/Basses/Raspy Ring On It
@@ -30,14 +30,14 @@ delay chord 0.75 0.30 0.15
 
 # Balance (to be measured in the mix)
 gain pulse   0.0
-gain metal   -7.2
-gain tick    15.5
-gain perc    -4.0
-gain pad     -4.4
-gain bass    -1.7
-gain sub     -12.1
-gain arp     -1.7
-gain chord   -6.8
+gain metal   -2.8
+gain tick    16.6
+gain perc    -7.1
+gain pad     -3.0
+gain bass    -1.8
+gain sub     -11.8
+gain arp     1.0
+gain chord   -2.4
 gain fx     -2.9
 master 9.2
 amp bass  0.45 1800 0.75
@@ -58,8 +58,8 @@ delay perc  1.0 0.5 0.3 throws
 sub      0.0      60  internal/808
 harm      5.6    1136  3rd/Giana Brotherz/Pads/Dub Choir
 harm     -2.1    4204  3rd/Giana Brotherz/Pads/Dark Whisper
-perc     -9.3     300  internal/deep
-gain harm    -8.6
+perc     -3.0     300  internal/deep
+gain harm    -8.3
 amp harm  0.22 2200 0.35
 drive sub  0.55 2500
 duck sub 0.30
@@ -71,10 +71,10 @@ body     0.0    1000  internal/modal-skin
 mallet   0.0    1000  internal/modal-kalimba
 texture  0.0    1000  internal/modal-scrape
 impact   0.0    1000  internal/modal-bowl
-gain ground  -18.6
-gain body    -17.4
-gain mallet  -31.3
-gain texture -37.3
+gain ground  -15.2
+gain body    -16.6
+gain mallet  -31.0
+gain texture -34.8
 gain impact -4.0
 comp body -24 3 8 90 0.35
 duck body 0.2
@@ -84,6 +84,12 @@ delay impact 1.5 0.55 0.4 throws
 
 # Sampled instruments (CC0: Karoryfer, D. Smolken, VSCO 2 CE; jSteelDrum: Unlicense), played by sfizz
 chord    15.2    1200  sfz/Karoryfer_Black_And_Green_Guitars_1000/Programs/05-green_staccato.sfz
-arp      10.1    1421  sfz/steel-drum/jSteelDrum.sfz
+arp      5.2    1421  sfz/steel-drum/jSteelDrum.sfz
 pad      12.6    2361  sfz/vsco2/Clarinet-susLong.sfz
 harm     13.3     708  sfz/vsco2/Bassoon-sus.sfz
+
+# 2026-10-30: the riff (the engine's guitar: two takes, left and right, the fifths pure) into a fuzz and a cabinet
+riff     0.0    1000  internal/guitar
+gain riff    -15.9
+drive riff 0.85 2500
+amp riff  0.70 1800 1.0 45 -2 3600 6 1100

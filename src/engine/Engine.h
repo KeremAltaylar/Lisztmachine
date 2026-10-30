@@ -34,7 +34,11 @@ struct CompSpec { float thresholdDb = 0, ratio = 1, attackMs = 10, releaseMs = 1
 // A per-track drive, like an amp or a tape pushed hard: how hard (0..1) and where its top rolls off.
 struct DriveSpec { float amount = 0, toneHz = 6000; };
 // An amp: how hard (0..1), the cabinet's presence peak, how much of it against the dry track.
-struct AmpSpec { float gain = 0, presenceHz = 2500, mix = 0; };
+// tightHz: the high-pass before the clipping (110: tight, 40: the doom guitar's whole low end into the fuzz);
+// pushDb: the mids boosted into it (+7 drives the honk, +1 leaves the fuzz scooped)
+// cabHz, thumpDb: the cabinet's top and its thump at 110 Hz (a doom guitar's cabinet is darker and bigger)
+// scoopHz: where the cabinet's 5 dB scoop sits (450: metal; 1000: a fuzz's mid notch)
+struct AmpSpec { float gain = 0, presenceHz = 2500, mix = 0, tightHz = 110, pushDb = 7, cabHz = 5200, thumpDb = 3, scoopHz = 450; };
 struct Palette
 {
     std::string scene = "berlin";
@@ -44,7 +48,7 @@ struct Palette
     float masterDb = 0;                 // "master dB": drive into the master's soft clipper
     InsertDelay delays[kMaxTracks];     // "delay <track> beats feedback mix"
     DriveSpec drives[kMaxTracks];       // "drive <track> amount toneHz"
-    AmpSpec amps[kMaxTracks];           // "amp <track> gain presenceHz mix"
+    AmpSpec amps[kMaxTracks];           // "amp <track> gain presenceHz mix [tightHz pushDb cabHz thumpDb scoopHz]"
     CrushSpec crushes[kMaxTracks];      // "crush <track> bits hold mix"
     CompSpec comps[kMaxTracks];         // "comp <track> thresholdDb ratio attackMs releaseMs mix"
     float duckDepth[kMaxTracks];        // "duck <track> depth": over the mix stage's own; -1 keeps it
@@ -75,12 +79,12 @@ std::vector<SoundChange> planSounds(const Composer& composer, const Palette& pal
 class InternalSynth
 {
 public:
-    enum Kind { Click, Blip, Sub, Kick, Hat, Clap, Snare, Metal, Zap, None, Deep, Bass808, Modal };
+    enum Kind { Click, Blip, Sub, Kick, Hat, Clap, Snare, Metal, Zap, None, Deep, Bass808, Modal, Guitar };
     enum Excite { Strike, Scrape, Rattle, Crackle };
     struct Material { const char* name; std::array<float, 8> ratios; int modes; float tau, damp, exciteMs, slap; Excite excite; };
     void prepare(double sampleRate, Kind kind, const juce::String& material = {});
     void render(const juce::MidiBuffer& midi, float* left, float* right, int numSamples);
-    void allOff() { for (auto& v : voices_) v.note = -1; }
+    void allOff() { for (auto& v : voices_) v.note = -1; for (auto& st : strings_) st.held = false; }
 
 private:
     struct Voice { int note = -1; double phase = 0, phase2 = 0, phase3 = 0, inc = 0, env = 0, gain = 0, decay = 0, attack = 0, release = 0; double target = 0; float panL = 0.7f, panR = 0.7f;
@@ -91,6 +95,15 @@ private:
     void startModal(Voice& v, int note, float velocity);
     void runModal(Voice& v, float* l, float* r, int from, int to);
     std::array<Voice, 64> voices_;
+    // The guitar: plucked strings (Karplus-Strong, a fractional allpass keeping the pitch exact),
+    // two for every note, one each side, as a rhythm part is doubled: played twice, not detuned.
+    // A velocity under .5 is palm-muted. A fifth or a twelfth over a sounding root is tuned pure (3:2).
+    struct Str { std::vector<float> buf; int len = 1, w = 0, wait = 0, note = -1, side = 0; float a = 0, apX = 0, apY = 0, lpX = 0, g = 0, gOff = 0, s = .3f, hz = 0, dcX = 0, dcY = 0, env = 0;
+                 bool held = false; int64_t age = 0; };
+    std::vector<Str> strings_;
+    void startGuitar(int note, float velocity);
+    void pluck(Str& st, float velocity, bool palm, float pick);
+    void runGuitar(float* l, float* r, int from, int to);
     const Material* material_ = nullptr;
     double sr_ = 48000;
     Kind kind_ = Click;
@@ -312,7 +325,7 @@ public:
     PeakLimiter limiter;
     GlueBus glue;
     bool mixStage = true;          // false: no ducking, low cuts, width or glue (the renderer's --raw)
-    uint16_t enabledTracks = 0xFFFF; // bit per track; the renderer's --solo
+    uint32_t enabledTracks = 0xFFFFFFFF; // bit per track; the renderer's --solo
 
 private:
     // Each part has two instances: one live, the other loading the next sound or ringing out.

@@ -266,7 +266,7 @@ static int renderConcert(uint64_t seed, double seconds, const juce::File& out, i
     Engine engine;
     engine.scene = sceneName;
     if (auto e = engine.load(sr, block, palette); e.isNotEmpty()) { std::cerr << e << "\n"; return 1; }
-    if (solo >= 0) engine.enabledTracks = uint16_t(1 << solo);
+    if (solo >= 0) engine.enabledTracks = uint32_t(1u << solo);
     engine.feedbackOverride = feedbackOverride;
     engine.effects = !dry;
     engine.mixStage = !gRaw;

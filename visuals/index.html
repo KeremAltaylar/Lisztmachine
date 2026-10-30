@@ -69,22 +69,21 @@ nav button[aria-pressed="true"] { color: var(--ember); }
   <div class="card">
     <h1>Lisztmachine</h1>
     <p class="meta" id="meta">Choose a piece</p>
-    <p class="lede">Eleven pieces and eight generative light studies for projecting onto the drummer, blending into each other. Each one reads the music itself: every note, every chord and the level of each part, so the light lands exactly with the sound.</p>
+    <p class="lede">Ten pieces and eight generative light studies for projecting onto the drummer, blending into each other. Each one reads the music itself: every note, every chord and the level of each part, so the light lands exactly with the sound.</p>
     <div class="pieces" id="pieces">
       <button class="go" id="piece-chorale" data-piece="chorale" disabled>Chorale</button>
       <button class="go" id="piece-berlin" data-piece="berlin" disabled>Berlin</button>
       <button class="go" id="piece-yours" data-piece="yours" disabled>Let All Be Yours</button>
-      <button class="go" id="piece-jungle" data-piece="jungle" disabled>Jungle</button>
-      <button class="go" id="piece-triphop" data-piece="triphop" disabled>Trip-Hop</button>
+      <button class="go" id="piece-jungle" data-piece="jungle" disabled>Liquid</button>
       <button class="go" id="piece-ecstatic" data-piece="ecstatic" disabled>Ecstatic Arpeggios</button>
-      <button class="go" id="piece-dubtechno" data-piece="dubtechno" disabled>Dub Techno</button>
       <button class="go" id="piece-noir" data-piece="noir" disabled>Noir</button>
-      <button class="go" id="piece-gqom" data-piece="gqom" disabled>Gqom</button>
       <button class="go" id="piece-deconstructed" data-piece="deconstructed" disabled>Deconstructed Club</button>
       <button class="go" id="piece-halftime" data-piece="halftime" disabled>Halftime</button>
+      <button class="go" id="piece-doom" data-piece="doom" disabled>Doom</button>
+      <button class="go" id="piece-blackgaze" data-piece="blackgaze" disabled>Blackgaze</button>
     </div>
     <button class="go" id="go" hidden disabled>Loading…</button>
-    <p class="keys"><kbd>1</kbd>–<kbd>8</kbd> study · <kbd>G</kbd> new look · <kbd>Space</kbd> pause · <kbd>←</kbd><kbd>→</kbd> 10 s · <kbd>↑</kbd><kbd>↓</kbd> section · <kbd>S</kbd> strobe on/off · <kbd>B</kbd> feedback on/off · <kbd>K</kbd> test drum hit · <kbd>[</kbd><kbd>]</kbd> pad sensitivity · <kbd>,</kbd><kbd>.</kbd> pad effect · <kbd>H</kbd> hide controls · <kbd>F</kbd> full screen</p>
+    <p class="keys"><kbd>1</kbd>–<kbd>8</kbd> study · <kbd>G</kbd> new look · <kbd>Space</kbd> pause · <kbd>←</kbd><kbd>→</kbd> 10 s · <kbd>↑</kbd><kbd>↓</kbd> section · <kbd>S</kbd> strobe on/off · <kbd>B</kbd> feedback on/off · <kbd>K</kbd> test drum hit · <kbd>[</kbd><kbd>]</kbd> pad sensitivity · <kbd>,</kbd><kbd>.</kbd> pad effect · <kbd>P</kbd> hit layer on/off · <kbd>H</kbd> hide controls · <kbd>F</kbd> full screen</p>
     <p class="err" id="err" hidden></p>
   </div>
 </div>
@@ -113,6 +112,7 @@ nav button[aria-pressed="true"] { color: var(--ember); }
     <label for="pad-device" class="sr">Input device</label><select id="pad-device"><option value="">Default input</option></select>
     <label for="pad-ch" class="sr">Channel</label><select id="pad-ch"><option value="0">Input 1</option><option value="1">Input 2</option></select>
     <label class="amt" for="pad-amt">Pad effect <input id="pad-amt" type="range" min="0" max="100" step="1" value="50"> <span id="pad-amt-v">50</span></label>
+    <button id="pad-layer" aria-pressed="true" title="P">Hit layer on</button>
     <span id="pad-state">Off</span>
   </div>
 </div>
@@ -138,30 +138,27 @@ const PIECES = {
       palette: [[0.6, 1, 0.15], [0.62, 0.2, 1], [1, 0.08, 0.12], [1, 1, 1], [1, 0.15, 0.75], [0.85, 1, 0.3]] } },
   // The genre songs (named for their genre until Kerem names them). Ranges by role from the
   // composer's registers: harmony pad and chords, bass kick sub and bass, rhythm snare hats perc, melody the arpeggio.
-  jungle: { name: 'Jungle', study: 'tunnel', strobeBeats: 1, media: 'media/jungle1', ranges: [[36, 86], [22, 64], [42, 62], [60, 86]],
+  jungle: { name: 'Liquid', study: 'tunnel', strobeBeats: 1, media: 'media/jungle1', ranges: [[36, 86], [22, 64], [42, 62], [60, 86]],
     world: { name: 'Deep Rain', lo: [0.1, 0.45, 1.0], hi: [0.85, 1.0, 0.95],     // midnight blue, rain-white light
       palette: [[0.2, 0.8, 1], [0.9, 1, 1], [0.35, 0.4, 1], [0.1, 1, 0.75], [1, 1, 1], [1, 0.4, 0.25]] } },
-  triphop: { name: 'Trip-Hop', study: 'score', strobeBeats: 1, media: 'media/triphop1', ranges: [[36, 86], [22, 64], [38, 62], [60, 86]],
-    world: { name: 'Smoke Jazz', lo: [0.08, 0.35, 0.4], hi: [1.0, 0.72, 0.38],    // teal smoke, amber lamplight
-      palette: [[1, 0.65, 0.25], [0.2, 0.7, 0.75], [0.85, 0.2, 0.1], [1, 0.9, 0.75], [0.5, 0.35, 0.2], [1, 0.8, 0.5]] } },
   ecstatic: { name: 'Ecstatic Arpeggios', study: 'form', strobeBeats: 1, media: 'media/ecstatic1', ranges: [[36, 86], [22, 64], [42, 62], [60, 96]],
-    world: { name: 'Halo', lo: [0.7, 0.2, 1.0], hi: [1.0, 0.92, 0.7],            // magenta-violet shadows, white-gold light
-      palette: [[1, 0.85, 0.5], [1, 0.3, 0.85], [0.6, 0.4, 1], [1, 1, 1], [0.4, 0.9, 1], [1, 0.6, 0.3]] } },
-  dubtechno: { name: 'Dub Techno', study: 'dust', strobeBeats: 1, media: 'media/dubtechno1', ranges: [[36, 86], [22, 64], [42, 62], [60, 86]],
-    world: { name: 'Submarine', lo: [0.05, 0.4, 0.55], hi: [0.7, 1.0, 0.85],     // deep sea teal, sonar green
-      palette: [[0.2, 1, 0.8], [0.3, 0.6, 1], [0.6, 1, 0.9], [0.9, 1, 1], [0.1, 0.8, 0.6], [1, 0.6, 0.3]] } },
+    world: { name: 'Continuum', lo: [0.12, 0.16, 0.55], hi: [0.78, 0.84, 0.95],   // night-blue shadows, pale silver light: melancholic
+      palette: [[0.6, 0.7, 1], [0.85, 0.9, 1], [0.35, 0.3, 0.8], [1, 1, 1], [0.5, 0.85, 0.95], [0.75, 0.45, 0.9]] } },
   noir: { name: 'Noir', study: 'dust', strobeBeats: 1, media: 'media/noir1', ranges: [[36, 86], [22, 64], [36, 62], [60, 86]],
     world: { name: 'Black Rain', lo: [0.35, 0.38, 0.45], hi: [0.95, 0.95, 1.0],    // silver rain on black, one red light
       palette: [[1, 1, 1], [0.7, 0.75, 0.85], [0.9, 0.05, 0.08], [0.85, 0.9, 1], [0.4, 0.45, 0.55], [1, 0.2, 0.2]] } },
-  gqom: { name: 'Gqom', study: 'lumen', strobeBeats: 1, media: 'media/gqom1', ranges: [[36, 86], [22, 64], [38, 62], [60, 86]],
-    world: { name: 'Ember', lo: [0.55, 0.08, 0.04], hi: [1.0, 0.7, 0.35],         // coal shadows, fire light
-      palette: [[1, 0.45, 0.1], [1, 0.75, 0.3], [0.9, 0.1, 0.05], [1, 0.9, 0.7], [0.7, 0.2, 0.6], [1, 0.3, 0.15]] } },
   deconstructed: { name: 'Deconstructed Club', study: 'interference', strobeBeats: 1, media: 'media/deconstructed1', ranges: [[36, 86], [22, 64], [42, 90], [60, 86]],
     world: { name: 'Chrome Wound', lo: [0.45, 0.5, 0.6], hi: [1.0, 0.75, 0.85],   // chrome shadows, flesh-pink light, acid cuts
       palette: [[1, 0.5, 0.7], [0.8, 0.85, 1], [0.7, 1, 0.2], [1, 1, 1], [1, 0.1, 0.3], [0.5, 0.3, 1]] } },
   halftime: { name: 'Halftime', study: 'horizon', strobeBeats: 1, media: 'media/halftime1', ranges: [[36, 86], [22, 64], [42, 62], [60, 86]],
     world: { name: 'Gravity', lo: [0.25, 0.1, 0.7], hi: [0.95, 0.9, 1.0],         // indigo weight, pale light
       palette: [[0.5, 0.4, 1], [0.95, 0.9, 1], [1, 0.25, 0.4], [0.3, 0.8, 1], [1, 1, 1], [0.8, 0.3, 1]] } },
+  doom: { name: 'Doom', study: 'lumen', strobeBeats: 2, media: 'media/doom1', ranges: [[36, 86], [22, 64], [33, 62], [55, 80]],
+    world: { name: 'Pyre', lo: [0.35, 0.03, 0.02], hi: [1.0, 0.55, 0.25],          // coal-black and blood shadows, fire through smoke
+      palette: [[1, 0.35, 0.08], [0.9, 0.1, 0.05], [1, 0.7, 0.35], [1, 0.95, 0.85], [0.5, 0.05, 0.1], [1, 0.5, 0.15]] } },
+  blackgaze: { name: 'Blackgaze', study: 'score', strobeBeats: 1, media: 'media/blackgaze1', ranges: [[36, 86], [22, 66], [42, 62], [64, 88]],
+    world: { name: 'Sunbather', lo: [0.6, 0.15, 0.35], hi: [1.0, 0.8, 0.7],        // rose shadows on black, a pale gold dawn
+      palette: [[1, 0.6, 0.65], [1, 0.85, 0.6], [0.9, 0.3, 0.5], [1, 1, 1], [0.7, 0.5, 1], [1, 0.45, 0.35]] } },
 };
 let RANGE = PIECES.chorale.ranges;
 const TAU = [1.2, 0.28, 0.16, 0.4];                          // how long a note-on lights up, seconds
@@ -386,9 +383,167 @@ struct Post { a: vec4f, wb: vec4f, lo: vec4f, hi: vec4f };
 @group(0) @binding(4) var<uniform> post: Post;
 fn aces(x: vec3f) -> vec3f { return clamp((x * (2.51 * x + 0.03)) / (x * (2.43 * x + 0.59) + 0.14), vec3f(0.0), vec3f(1.0)); }
 fn oetf(c: vec3f) -> vec3f { return select(1.055 * pow(c, vec3f(1.0 / 2.4)) - 0.055, c * 12.92, c <= vec3f(0.0031308)); }
+
+// The hit layer: every drum hit drawn over the finished picture in its own colour and its own form, both
+// chosen per section on the CPU. padx.z: seconds per unit of pad age · padx.w: 0 off, else 1 + form + hue.
+fn padHue() -> vec3f {
+  let c = 0.5 + 0.5 * cos(6.2831853 * (fract(u.padx.w) - vec3f(0.0, 0.33333, 0.66667)));
+  let s = c * c * c;                                                         // pure, saturated
+  return s / max(max(s.r, max(s.g, s.b)), 1e-3);
+}
+fn padVel(w: f32) -> f32 {                                                   // undo the Pad effect scale: the layer answers the hit itself
+  let a = clamp((u.padx.z - 0.35) / 2.65, 0.0, 1.0);
+  return clamp(w / (0.05 + 1.95 * pow(a, 1.2)), 0.0, 1.0);
+}
+fn hl(d: f32, w: f32) -> f32 { return 1.0 - smoothstep(w, w + 1.5 / u.res.y, abs(d)); }   // a hairline
+fn hk(sd: u32, a: f32, b: f32) -> f32 { return rnd(sd ^ pcg((bitcast<u32>(i32(a)) * 73856093u) ^ (bitcast<u32>(i32(b)) * 19349663u))); }
+fn hitSeed(h: vec4f) -> u32 { return pcg(bitcast<u32>(h.x) ^ pcg(bitcast<u32>(h.y))); }   // a hit keeps its seed as it moves down the list
+fn padForm() -> i32 { return select(-1, i32(u.padx.w - 1.0), u.padx.w >= 1.0); }
+// Form 7 tears the picture itself: rows of the image around the hit slide sideways.
+fn padTear(uv: vec2f) -> vec2f {
+  if (padForm() != 7) { return vec2f(0.0); }
+  var o = vec2f(0.0);
+  for (var k = 0; k < 8; k++) {
+    let h = u.pad[k];
+    let ta = h.z * u.padx.z;
+    if (ta >= 0.4) { continue; }
+    let t = ta / 0.4; let env = (1.0 - t) * (1.0 - t);
+    let v = padVel(h.w); let sd = hitSeed(h);
+    let dy = uv.y - (0.5 - h.y * 0.45);
+    if (abs(dy) >= 0.04 + 0.22 * v) { continue; }
+    let row = floor(dy * (60.0 + 140.0 * rnd(sd)));
+    o.x += (hk(sd, row, floor(u.frame * 0.5)) - 0.5) * 0.3 * (0.3 + v) * env * step(0.35, hk(sd, row, 7.0));
+  }
+  return o;
+}
+// x: how much of the hit colour covers the pixel · y: white-hot core · z: darkening · w: inversion
+fn padLayer(uv: vec2f) -> vec4f {
+  var L = vec4f(0.0);
+  let form = padForm();
+  if (form < 0) { return L; }
+  var lives = array<f32, 8>(0.7, 0.55, 0.35, 0.45, 0.5, 0.6, 0.8, 0.4);
+  let life = lives[form];
+  let asp = u.res.x / u.res.y;
+  for (var k = 0; k < 8; k++) {
+    let h = u.pad[k];
+    let ta = h.z * u.padx.z;                                                 // seconds since the hit
+    if (ta >= life) { continue; }
+    let t = ta / life;
+    var env = (1.0 - t) * (1.0 - t);
+    let v = padVel(h.w);
+    let sd = hitSeed(h);
+    let hp = vec2f(0.5 + h.x * 0.45, 0.5 - h.y * 0.45);
+    let q = (uv - hp) * vec2f(asp, 1.0);
+    let r = length(q);
+    let a01 = atan2(q.y, q.x) / 6.2831853 + 0.5;
+    let w = (0.6 + 1.6 * v) / u.res.y;                                       // hairline half-width, thicker for harder hits
+    L.z += 0.55 * v * exp(-ta * 30.0);                                       // the room drops for an instant: the hit reads over any frame
+    var m = 0.0; var wc = 0.0;
+    if (form == 0) {                                                         // RINGS: three broken rings, coded in dashes, each its own speed
+      let R0 = (0.08 + 0.75 * v) * (1.0 - pow(1.0 - t, 2.0));
+      for (var j = 0; j < 3; j++) {
+        let fj = f32(j);
+        let R = (0.08 + 0.75 * v) * (1.0 - fj * 0.22) * (1.0 - pow(1.0 - t, 2.0 + fj * 2.0));
+        let n = 12.0 + floor(rnd(sd + u32(j)) * 52.0);
+        let spin = t * (0.05 + 0.1 * fj) * select(-1.0, 1.0, rnd(sd + 9u + u32(j)) > 0.5);
+        let seg = floor(fract(a01 + spin) * n);
+        m += hl(r - R, w * (1.0 + fj)) * step(0.4, hk(sd, seg, fj));
+      }
+      wc += hl(r - R0, w) * step(t, 0.12);
+      L.z += 0.5 * env * (1.0 - smoothstep(0.0, R0, r));
+    } else if (form == 1) {                                                  // SHARDS: zigzag cracks out of the impact, cross-cracks, shards inverting
+      let n = 7.0 + floor(rnd(sd) * 11.0);
+      let sk = round(a01 * n);
+      let skh = sk - n * floor(sk / n);
+      let ac = (sk + (hk(sd, skh, 1.0) - 0.5) * 0.7 + (hk(sd, skh, floor(r * 30.0)) - 0.5) * 0.25) / n * 6.2831853;
+      let d = r * sin(a01 * 6.2831853 - ac);
+      let Lk = (0.15 + 0.85 * hk(sd, skh, 2.0)) * (0.2 + 0.9 * v) * sqrt(min(t * 5.0, 1.0));
+      let rc = Lk * (0.3 + 0.5 * hk(sd, skh, 3.0));
+      m += hl(d, w) * step(r, Lk) + hl(r - rc, w) * step(0.5, hk(sd, skh, 4.0));
+      wc += hl(d, w * 0.5) * step(r, Lk) * step(t, 0.15);
+      L.w += step(r, rc) * step(0.6, hk(sd, skh, 5.0)) * step(t, 0.5);
+    } else if (form == 2) {                                                  // SLASH: a full-height scan line that drifts, shedding barcode rows
+      let dir = select(-1.0, 1.0, rnd(sd) > 0.5);
+      let dx = (uv.x - hp.x - dir * t * (0.05 + 0.2 * v)) * asp;
+      m += hl(dx, w * 1.5) + exp(-abs(dx) * 40.0 / (0.2 + v)) * 0.6;
+      wc += hl(dx, w * 0.7) * step(t, 0.3);
+      let row = floor(uv.y * 90.0);
+      let e = hk(sd, row, floor(u.frame * 0.5));
+      m += step(0.78, e) * step(abs(dx), (e - 0.78) * 2.0 * (0.2 + 0.8 * v)) * step(fract(uv.y * 90.0), 0.35);
+    } else if (form == 3) {                                                  // GRID: a square front of cells flickering inverted
+      let cs = 0.018 + 0.03 * rnd(sd);
+      let cid = floor(q / cs);
+      let F = sqrt(t) * (0.12 + 0.6 * v);
+      let inside = step(max(abs(cid.x + 0.5), abs(cid.y + 0.5)) * cs, F);
+      L.w += inside * step(hk(sd ^ u32(u.frame / 3.0), cid.x, cid.y), 0.25 + 0.4 * (1.0 - t)) * env;
+      let fq = fract(q / cs);
+      let dl = min(min(fq.x, 1.0 - fq.x), min(fq.y, 1.0 - fq.y)) * cs;
+      m += inside * (step(0.85, hk(sd, cid.x, cid.y + 999.0)) + 0.6 * hl(dl, w * 0.5));
+      let cq = max(abs(q.x), abs(q.y));
+      m += hl(cq - F, w * 1.5);
+      wc += hl(cq - F, w) * step(t, 0.2);
+    } else if (form == 4) {                                                  // SPOKES: a burst of radial hairlines around a widening black eye
+      let n = 40.0 + floor(rnd(sd) * 90.0);
+      let f = fract(a01 + (rnd(sd + 1u) - 0.5) * 0.08 * t) * n;
+      let si = round(f);
+      let sih = si - n * floor(si / n);
+      let da = abs(f - si) / n * 6.2831853 * r;
+      let Ls = (0.06 + 0.94 * pow(hk(sd, sih, 0.0), 3.0)) * (0.25 + 1.1 * v) * (1.0 - pow(1.0 - t, 4.0));
+      let r0 = 0.02 + 0.35 * t * t * (0.3 + v);
+      m += hl(da, w) * step(r0, r) * step(r, Ls);
+      wc += hl(da, w * 0.5) * step(r0, r) * step(r, Ls * 0.4) * step(t, 0.1);
+      L.z += 0.7 * env * (1.0 - smoothstep(r0, r0 + 0.02, r));
+    } else if (form == 5) {                                                  // SIGIL: a stamped frame of decoding bits, registration lines across the frame
+      env = 1.0 - step(0.8, t);                                              // held, then gone: a stamp, not a fade
+      let S = (0.05 + 0.1 * v) * (1.0 + 0.4 * exp(-ta * 40.0));
+      let cq = max(abs(q.x), abs(q.y));
+      m += hl(cq - S, w) + hl(cq - S * 1.15, w * 0.5) * step(0.5, fract(a01 * 32.0 + t));
+      let g6 = (q / S + 0.75) * 4.0;
+      let cell = floor(g6);
+      if (all(cell >= vec2f(0.0)) && all(cell < vec2f(6.0))) {
+        let fq = fract(g6);
+        m += step(0.5, hk(sd + u32(t * 10.0), cell.x, cell.y)) * step(0.12, min(fq.x, fq.y)) * step(max(fq.x, fq.y), 0.88);
+      }
+      m += 0.45 * (hl(q.x, w * 0.5) + hl(q.y, w * 0.5)) * step(S * 1.3, cq) * step(0.5, fract(r * 20.0 - t * 4.0));
+      wc += hl(cq - S, w) * step(t, 0.1);
+      L.z += 0.6 * env * step(cq, S * 1.15);
+    } else if (form == 6) {                                                  // COMET: a white-hot head on a curving path, shedding particles
+      let th = rnd(sd) * 6.2831853;
+      let bend = (rnd(sd + 1u) - 0.5) * 2.4;
+      let dir = vec2f(cos(th), sin(th));
+      let D = (0.25 + 0.9 * v) * (1.0 - pow(1.0 - t, 2.5));
+      let s = dot(q, dir);
+      let pp = dot(q, vec2f(-dir.y, dir.x)) - bend * s * s;
+      let along = (D - s) / max(D * (0.15 + 0.6 * t), 1e-3);                // 0 at the head, 1 at the end of the tail
+      if (along >= 0.0 && along <= 1.0) {
+        let cell = floor(s / 0.004);
+        let off = (hk(sd, cell, 0.0) - 0.5) * 0.18 * along * (0.5 + v);
+        m += (hl(pp - off, w * 2.0) * step(0.3, hk(sd, cell, 1.0)) * step(fract(s / 0.004), 0.6) + hl(pp, w * 0.8) + exp(-abs(pp) * 90.0) * 0.4) * (1.0 - along);
+      }
+      let hd = length(q - dir * D - vec2f(-dir.y, dir.x) * bend * D * D);
+      wc += exp(-hd * 120.0) * (0.5 + v);
+      m += exp(-hd * 30.0) * 0.7;
+    } else {                                                                 // TEAR: the picture shears in rows between two full-width cuts
+      let dy = uv.y - hp.y;
+      let H = 0.04 + 0.22 * v;
+      m += hl(abs(dy) - H, w);
+      wc += hl(abs(dy) - H, w * 0.5) * step(t, 0.15);
+      if (abs(dy) < H) {
+        let e = hk(sd, floor(dy * (60.0 + 140.0 * rnd(sd))), floor(u.frame * 0.5));
+        m += 0.35 * step(0.85, e);
+        L.w += step(0.93, e) * env;
+      }
+    }
+    L.x += m * env;
+    L.y += wc * (0.4 + 1.2 * u.padx.y);                                      // a bright hit burns whiter
+  }
+  return L;
+}
+
 @fragment fn composite(i: VO) -> @location(0) vec4f {
-  var c = tap(i.uv);
-  let b = min(textureSampleLevel(bloom, smp, i.uv, 0.0).rgb, vec3f(6e4));
+  let tuv = i.uv + padTear(i.uv);
+  var c = tap(tuv);
+  let b = min(textureSampleLevel(bloom, smp, tuv, 0.0).rgb, vec3f(6e4));
   c = mix(c, b, post.a.y) * post.a.x;
   c *= post.wb.rgb;                                                          // automatic white balance
   let l = luma(c);                                                           // the colour world: light by brightness
@@ -400,6 +555,11 @@ fn oetf(c: vec3f) -> vec3f { return select(1.055 * pow(c, vec3f(1.0 / 2.4)) - 0.
   c = oetf(c);
   c = mix(c, 1.0 - c, u.fx.y);                                               // inverted frames
   c = mix(c, mix(vec3f(1.0), u.col.rgb, 0.25), clamp(u.fx.x, 0.0, 1.0));   // strobe
+  let L = padLayer(i.uv);                                                    // the hit layer, over everything, strobe included
+  c = mix(c, 1.0 - c, clamp(L.w, 0.0, 1.0));
+  c *= 1.0 - clamp(L.z, 0.0, 0.85);
+  c = mix(c, padHue(), clamp(L.x, 0.0, 1.0));
+  c = min(c + vec3f(L.y), vec3f(1.0));
   let px = vec2u(i.pos.xy);
   let n0 = rnd(px.x + px.y * 7919u + u32(u.frame) * 104729u);
   let n1 = rnd(px.x * 3u + px.y * 6151u + u32(u.frame) * 15731u + 77u);
@@ -1893,6 +2053,7 @@ async function boot() {
     else if (e.key === 'k' || e.key === 'K') { padHit(0.4 + Math.random() * 0.6, Math.random()); }   // a pretend hit, for trying it without the pad
     else if (e.key === ',') { setAmt(pad.amt - 10); }
     else if (e.key === '.') { setAmt(pad.amt + 10); }
+    else if (e.key === 'p' || e.key === 'P') { setLayer(!pad.layer); }
     else if (e.key === '[') { setThr(1.25); }
     else if (e.key === ']') { setThr(0.8); }
     else if (e.key === 'g' || e.key === 'G') { roll(); }
@@ -1923,6 +2084,24 @@ async function boot() {
     try { localStorage.setItem('lisztmachine-pad-amt', pad.amt); } catch {}
   };
   window.__pad = pad;
+  // The hit layer: each section of each piece gets one of eight forms (adjacent sections always differ:
+  // the step 3 is coprime to 8) and a colour opposite the piece's colour world, turned ±54° per section.
+  pad.layer = true;
+  const setLayer = on => { pad.layer = on; $('pad-layer').textContent = 'Hit layer ' + (on ? 'on' : 'off'); $('pad-layer').setAttribute('aria-pressed', on); };
+  $('pad-layer').onclick = () => setLayer(!pad.layer);
+  const pieceHash = [...piece.name].reduce((a, ch) => (a * 31 + ch.charCodeAt(0)) >>> 0, 7);
+  const worldHue = (() => {
+    let x = 0, y = 0;
+    for (const [r, g, b] of [piece.world.lo, piece.world.hi]) { x += 2 * r - g - b; y += Math.sqrt(3) * (g - b); }
+    return Math.hypot(x, y) > 0.1 ? Math.atan2(y, x) / (2 * Math.PI) + 0.5 : (pieceHash % 997) / 997;   // + 0.5: the opposite hue
+  })();
+  const hitLayer = () => {
+    if (!pad.layer) return 0;
+    const si = F.si || 0;
+    const hue = (((worldHue + ((pieceHash * 0.618 + si * 0.382) % 1 - 0.5) * 0.3) % 1) + 1) % 1;
+    return 1 + (pieceHash + si * 3) % 8 + hue * 0.999;
+  };
+  window.__hitLayer = () => { const w = hitLayer(); return { form: Math.floor(w) - 1, hue: w % 1, section: F.si }; };
   const dB = x => 20 * Math.log10(Math.max(x, 1e-6));
   function padHit(vel, bright) {
     const ioi = visT - pad.last;
@@ -2251,7 +2430,7 @@ async function boot() {
       if (h) pad.kick += h.vel * PK.s * Math.exp(-age * 10);
     }
     pad.agit *= Math.exp(-dt / (2.5 * PK.dur));
-    padArr.set([pad.agit, pad.bright, 0, 0], 32);
+    padArr.set([pad.agit, pad.bright, PK.dur, hitLayer()], 32);
     if (frameNo % 15 === 0) padStatus();
     const blend = network(dt, visT, canvas.width / canvas.height);
     const enc = device.createCommandEncoder();

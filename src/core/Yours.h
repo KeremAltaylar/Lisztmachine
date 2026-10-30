@@ -10,6 +10,12 @@ namespace liszt {
 // Euclidean grid against the beat, hats and claps, a held drone, a sine sub and a riser.
 //
 // Nine tracks (see sceneInfo("letallbeyours")): drone, kick, bass, acid, stab, hats, clap, sub, fx.
+//
+// 2026-10-30 (Kerem: "in the style of Yanamaste, Marrøn or Ben Klock"; and no kick, snare or hi-hat,
+// he plays those): hypnotic techno. The kick is a silent ghost that only pumps the mix; the hats
+// track plays tuned metal ticks wheeling in threes against the bar; the clap track is iron:
+// industrial low hits off his backbeat. Every part's end is a figure the bass, the stabs and the
+// iron play together while the ticks stop.
 class YoursComposer : public Composer
 {
 public:
@@ -23,7 +29,7 @@ public:
     bool active(int track, int bar) const;
 
     static constexpr int kRange[kYoursTracks][2] = {
-        { 36, 76 }, { 24, 36 }, { 40, 64 }, { 33, 77 }, { 46, 74 }, { 42, 46 }, { 39, 39 }, { 22, 40 }, { 48, 72 },
+        { 36, 76 }, { 24, 36 }, { 40, 64 }, { 33, 77 }, { 46, 74 }, { 72, 95 }, { 28, 52 }, { 22, 40 }, { 48, 72 },
     };
 
 private:
@@ -41,6 +47,7 @@ private:
     void emitAcid(int bar, std::vector<Event>& out);
     void emitStab(int bar, std::vector<Event>& out);
     void emitHeld(int track, int bar, std::vector<Event>& out, int& held, int pitch);
+    const char* endFigure(int bar) const;
 
     int tonicPc_ = 5;
     std::vector<int> rootOfBar_;

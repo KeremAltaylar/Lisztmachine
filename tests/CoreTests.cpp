@@ -214,7 +214,7 @@ int main()
                 CHECK(x.value > 0 && x.value <= 1, "yours velocity %f", x.value);
                 CHECK(x.pitch >= Y::kRange[x.track][0] && x.pitch <= Y::kRange[x.track][1], "yours track %d pitch %d out of range", x.track, x.pitch);
                 // everything pitched stays in the tonic's phrygian: no note outside the key
-                if (x.track != Y::Hats && x.track != Y::Clap)
+                if (x.track != Y::Hats || x.pitch < 96) // the ticks and the iron are tuned too, to the tonic and its fifth
                     CHECK(inMode(kPhrygian, c.tonicPc(), x.pitch), "yours track %d pitch %d outside the key", x.track, x.pitch);
                 ++held[key];
                 onsets.insert({ int(x.track), x.tick });
@@ -273,9 +273,9 @@ int main()
             CHECK(notes[G::Harm] > 20, "%s: the choir never sings", spec->scene);
             // the fills throw their last hit into the echo
             CHECK(std::count_if(ev.begin(), ev.end(), [](auto& x) { return x.type == Event::Throw && x.value > 0; }) > 10, "%s: no echo throws", spec->scene);
-            // the summit plays the home progression, four bars a chord
+            // the summit plays the home progression, four bars a chord (a new theme brings its own)
             for (auto& s : c.sections())
-                if (s.restoreTheme)
+                if (s.restoreTheme && spec->summit != G::Summit::NewTheme)
                     for (int b = 0; b < s.bars; ++b)
                         CHECK(c.rootAt(s.startBar + b) == c.homeProgression()[size_t((b / 4) % 4)], "%s: the summit leaves the home progression at bar %d", spec->scene, s.startBar + b);
             // every track the form asks for actually plays

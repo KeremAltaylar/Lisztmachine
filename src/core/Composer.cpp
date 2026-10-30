@@ -12,7 +12,7 @@ namespace liszt {
 namespace {
 
 constexpr uint8_t bit(int t) { return uint8_t(1u << t); }
-constexpr uint8_t kAll = 0x0F;
+constexpr uint8_t kAll = 0x1F;
 
 // Chord-root transitions in the minor modes, rows/cols = i ii III iv v VI VII.
 // ii is never a target; its row only exists so every row is a distribution.
@@ -46,10 +46,10 @@ BerlinComposer::BerlinComposer(uint64_t seed) : Composer(seed)
 {
     static constexpr int tonics[] = { 4, 9, 2, 7, 0, 5 }; // E A D G C F
     tonicPc_ = tonics[rng_.range(0, 5)];
-    int m = rng_.weighted(std::array<double, 3> { .5, .3, .2 });
-    homeMode_ = m == 0 ? &kAeolian : m == 1 ? &kDorian : &kPhrygian;
-    shiftMode_ = homeMode_ == &kDorian ? &kAeolian : &kDorian;
-    bpm_ = 2.0 * rng_.range(54, 63); // 108..126
+    // a minor home, melancholic; the shift is the one lighter moment (aeolian to dorian, phrygian to aeolian)
+    homeMode_ = rng_.chance(.6) ? &kAeolian : &kPhrygian;
+    shiftMode_ = homeMode_ == &kAeolian ? &kDorian : &kAeolian;
+    bpm_ = 2.0 * rng_.range(51, 56); // 102..112: slower, so the sequences breathe
 
     planForm();
     planHarmony();
@@ -314,8 +314,24 @@ void BerlinComposer::emitSequence(int track, int bar, std::vector<Event>& out)
     const int len = int(pat.size());
     const int limit = std::max(1, int(std::lround((track == Bass ? .5 + .5 * e : .45 + .55 * e) * len)));
     const bool summit = std::strcmp(sectionAt(bar).name, "Summit") == 0;
+    const char* fig = endFigure(bar);
+    if (fig && track == Bass)
+    {
+        const int p = stepPitch(Bass, bar, 0);
+        for (int i = 0; i < 16; ++i)
+        {
+            if (fig[i] == '.') continue;
+            int next = i + 1;
+            while (next < 16 && fig[next] == '.') ++next;
+            const int64_t t = int64_t(bar) * kBarTicks + i * kSixteenth;
+            out.push_back({ t, Event::NoteOn, Bass, uint8_t(p), fig[i] == 'X' ? .95f : .8f });
+            out.push_back({ t + std::min(next - i, 3) * kSixteenth - 20, Event::NoteOff, Bass, uint8_t(p), 0 });
+        }
+        return;
+    }
+    const int stop = fig ? 4 : 16; // the upper sequence stops after the figure's first beat
 
-    for (int i = 0; i < 16; ++i)
+    for (int i = 0; i < stop; ++i)
     {
         // The upper sequence runs in its own length (10, 12, 14) against the 16-step bar.
         const auto& s = pat[size_t(track == Bass ? i : (bar * 16 + i) % len)];
@@ -403,6 +419,59 @@ void BerlinComposer::generateBar(int bar, std::vector<Event>& out)
     if (active(Bass, bar)) emitSequence(Bass, bar, out);
     if (active(Seq, bar)) emitSequence(Seq, bar, out);
     if (active(Lead, bar) && (bar - sec.startBar) % 4 == 0) emitLeadPhrase(bar, out);
+    emitGuitar(bar, out);
+}
+
+const char* BerlinComposer::endFigure(int bar) const
+{
+    // The last bar of every part but the final one; into a rise a figure that pushes, into a fall one
+    // that stops. All start on the downbeat (the bass keeps its spine), all on the chord they are in.
+    if (bar + 1 >= totalBars() || sectionOfBar_[size_t(bar + 1)] == sectionOfBar_[size_t(bar)]) return nullptr;
+    static const char* up[] = { "X.......x.x.xXXX", "X..x..x..x..x..x", "X.......x...X..." };
+    static const char* down[] = { "X..x..x.X.......", "X.x...x.x...X.X." };
+    const int si = sectionOfBar_[size_t(bar)];
+    return sectionAt(bar + 1).energy > sectionAt(bar).energy ? up[si % 3] : down[si % 2];
+}
+
+void BerlinComposer::emitGuitar(int bar, std::vector<Event>& out)
+{
+    // Power chords on the chord's root (the mode's own fifth over it), let ring: one every other bar
+    // while the music is calm, on one and three as it drives, and at the summit a muted pair leading
+    // into each bar. A part's last bar plays its figure. Under .5 the engine's guitar mutes the string.
+    if (!active(Guitar, bar)) return;
+    const int64_t t0 = int64_t(bar) * kBarTicks, six = kSixteenth;
+    auto& m = modeAt(bar);
+    const int c = chordAt(bar);
+    const int root = foldInto(24 + tonicPc_ + degreeSemis(m, c), 33, 44), fifth = degreeSemis(m, c + 4) - degreeSemis(m, c);
+    auto chord = [&](int64_t t, int64_t len, float vel) {
+        for (int iv : { 0, fifth, 12 })
+        {
+            if (vel < .5f && iv == 12) continue;
+            out.push_back({ t, Event::NoteOn, Guitar, uint8_t(root + iv), vel });
+            out.push_back({ t + len, Event::NoteOff, Guitar, uint8_t(root + iv), 0 });
+        }
+    };
+    if (const char* fig = endFigure(bar))
+    {
+        for (int i = 0; i < 16; ++i)
+        {
+            if (fig[i] == '.') continue;
+            int next = i + 1;
+            while (next < 16 && fig[next] == '.') ++next;
+            chord(t0 + i * six, std::min(next - i, 3) * six - 20, fig[i] == 'X' ? .95f : .8f);
+        }
+        return;
+    }
+    const float e = energyAt(bar);
+    const bool summit = std::strcmp(sectionAt(bar).name, "Summit") == 0;
+    const int in = bar - sectionAt(bar).startBar;
+    if (e < .7f) { if (in % 2 == 0 || (bar > 0 && chordAt(bar - 1) != c)) chord(t0, kBarTicks - 20, .55f + .3f * e); }
+    else
+    {
+        chord(t0, 2 * kPPQ - 20, .9f);
+        chord(t0 + 2 * kPPQ, (summit ? 6 : 8) * six - 20, .8f);
+        if (summit) { chord(t0 + 14 * six, six - 20, .38f); chord(t0 + 15 * six, six - 20, .42f); }
+    }
 }
 
 std::string BerlinComposer::describe() const
@@ -418,8 +487,8 @@ std::string BerlinComposer::describe() const
 const SceneInfo& sceneInfo(const std::string& scene)
 {
     static const SceneInfo berlin {
-        "berlin", 4, { "pad", "bass", "seq", "lead" }, { 0, 1, 2, 3 },
-        { { .15f, .35f }, { .05f, .15f }, { .35f, .25f }, { .30f, .35f } }, { -1, -1, -1, -1 }, {}, false,
+        "berlin", 5, { "pad", "bass", "seq", "lead", "guitar" }, { 0, 1, 2, 3, 1 },
+        { { .15f, .35f }, { .05f, .15f }, { .35f, .25f }, { .30f, .35f }, { .05f, .15f } }, { -1, -1, -1, -1, -1 }, {}, false,
     };
     // The chorale: each voice its own track (and its own delay), the voices change sound as one.
     static const SceneInfo chorale {

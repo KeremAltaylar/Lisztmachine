@@ -13,7 +13,7 @@ S = os.path.join(HERE, "..", "sounds")
 G = open(os.path.join(HERE, "..", "src", "core", "Genres.cpp"), encoding="utf8").read()
 TRACKS = ("pad", "chord", "arp", "bass", "harm", "metal", "perc")
 TARGET = dict(pad=-27, metal=-28, perc=-29, bass=-25, arp=-26, chord=-28, harm=-29)
-songs = sys.argv[1:] or ["jungle", "triphop", "ecstatic", "dubtechno", "noir", "gqom", "deconstructed", "halftime"]
+songs = sys.argv[1:] or ["jungle", "ecstatic", "noir", "deconstructed", "halftime", "doom", "blackgaze"]
 TMP = os.environ.get("TEMP", ".")
 
 def sections(scene):

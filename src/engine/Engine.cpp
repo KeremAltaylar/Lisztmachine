@@ -392,14 +392,14 @@ void Amp::prepare(double sr, const AmpSpec& s)
     g2_ = 1.5f + 5 * s.gain;
     for (int c = 0; c < 2; ++c)
     {
-        tight_[c].highpass(sr, 110);
-        push_[c].peak(sr, 850, 0.8, 7);
+        tight_[c].highpass(sr, s.tightHz);
+        push_[c].peak(sr, 850, 0.8, s.pushDb);
         inter_[c].highpass(2 * sr, 45);           // between the stages, at the doubled rate
         cab_[c][0].highpass(sr, 75);
-        cab_[c][1].peak(sr, 110, 1.2, 3);         // the cabinet's thump
-        cab_[c][2].peak(sr, 450, 0.9, -5);        // the scoop
+        cab_[c][1].peak(sr, 110, 1.2, s.thumpDb); // the cabinet's thump
+        cab_[c][2].peak(sr, s.scoopHz, 0.9, -5);  // the scoop
         cab_[c][3].peak(sr, s.presenceHz, 1.0, 4); // presence
-        cab_[c][4].lowpass(sr, 5200, 0.9);
+        cab_[c][4].lowpass(sr, s.cabHz, 0.9);
         last_[c] = low_[c] = lp_[c] = 0;
     }
     lpA_ = 1 - std::exp(-juce::MathConstants<float>::twoPi * 6500.0f / float(2 * sr)); // the speaker's second pole, at the doubled rate
@@ -536,6 +536,7 @@ TrackMix mixFor(const std::string& name)
         { "fx", { .5f, 1.6f, 0, 200 } },   { "harm", { .45f, 1.5f, 0, 180 } },
         { "ground", { .2f, 1.0f, 0, 35 } }, { "body", { .15f, 1.3f, .3f, 90 } }, { "mallet", { .15f, 1.4f, -.3f, 150 } },
         { "texture", { .05f, 1.8f, 0, 200 } }, { "impact", { .1f, 1.6f, 0, 40 } },
+        { "riff", { .35f, 1.0f, 0, 60 } }, // the guitar: doubled left and right by its own two takes
     };
     for (auto& [n, m] : table) if (name == n) return m;
     return { 0, 1, 0, 0 }; // the chorale's voices and anything else: as they are
@@ -580,7 +581,10 @@ juce::String Palette::load(const juce::File& file, const std::string& sceneName)
             else if (tokens[0] == "comp" && tokens.size() >= 7) comps[t] = { tokens[2].getFloatValue(), juce::jmax(1.0f, tokens[3].getFloatValue()), tokens[4].getFloatValue(), tokens[5].getFloatValue(), juce::jlimit(0.0f, 1.0f, tokens[6].getFloatValue()) };
             else if (tokens[0] == "duck") duckDepth[t] = juce::jlimit(0.0f, 1.0f, tokens[2].getFloatValue());
             else if (tokens[0] == "lowcut") lowCutHz[t] = juce::jmax(0.0f, tokens[2].getFloatValue());
-            else if (tokens[0] == "amp" && tokens.size() >= 5) amps[t] = { juce::jlimit(0.0f, 1.0f, tokens[2].getFloatValue()), tokens[3].getFloatValue(), juce::jlimit(0.0f, 1.0f, tokens[4].getFloatValue()) };
+            else if (tokens[0] == "amp" && tokens.size() >= 5) amps[t] = { juce::jlimit(0.0f, 1.0f, tokens[2].getFloatValue()), tokens[3].getFloatValue(), juce::jlimit(0.0f, 1.0f, tokens[4].getFloatValue()),
+                                                                     tokens.size() >= 6 ? tokens[5].getFloatValue() : 110.0f, tokens.size() >= 7 ? tokens[6].getFloatValue() : 7.0f,
+                                                                     tokens.size() >= 8 ? tokens[7].getFloatValue() : 5200.0f, tokens.size() >= 9 ? tokens[8].getFloatValue() : 3.0f,
+                                                                     tokens.size() >= 10 ? tokens[9].getFloatValue() : 450.0f };
             else if (tokens[0] == "drive") drives[t] = { juce::jlimit(0.0f, 1.0f, tokens[2].getFloatValue()), tokens.size() >= 4 ? tokens[3].getFloatValue() : 6000.0f };
             else if (tokens[0] == "delay" && tokens.size() >= 5) delays[t] = { tokens[2].getFloatValue(), juce::jlimit(0.0f, 0.95f, tokens[3].getFloatValue()), tokens[4].getFloatValue(), tokens[5] == "throws" };
             else if (tokens[0] == "delay") return where + "expected 'delay <track> beats feedback mix [throws]'";
@@ -716,7 +720,7 @@ juce::String Engine::load(double sampleRate, int maxBlock, const Palette& palett
                             : first.endsWith("clap") ? InternalSynth::Clap : first.endsWith("snare") ? InternalSynth::Snare
                             : first.endsWith("metal") ? InternalSynth::Metal
                             : first.endsWith("zap") ? InternalSynth::Zap : first.endsWith("none") ? InternalSynth::None
-                            : first.endsWith("deep") ? InternalSynth::Deep : first.endsWith("808") ? InternalSynth::Bass808 : InternalSynth::Click;
+                            : first.endsWith("guitar") ? InternalSynth::Guitar : first.endsWith("deep") ? InternalSynth::Deep : first.endsWith("808") ? InternalSynth::Bass808 : InternalSynth::Click;
             t.synth.prepare(sampleRate, kind, first.fromFirstOccurrenceOf("/modal-", false, false));
             for (auto& s : t.slots) { s.plugin.reset(); s.midi.ensureSize(8192); s.state = Idle; s.entry = 0; s.gain = juce::Decibels::decibelsToGain(palette.parts[i].front().gainDb); }
             t.buffer.setSize(2, maxBlock);
@@ -1245,7 +1249,6 @@ void Engine::renderChunk(float* const* out, int numChannels, int offset, int len
             juce::AudioBuffer<float> view(t.buffer.getArrayOfWritePointers(), t.buffer.getNumChannels(), len);
             slot.plugin->processBlock(view, slot.midi);
             slot.midi.clear();
-            if (t.hasEcho && view.getNumChannels() >= 2) t.echo.process(view.getWritePointer(0), view.getWritePointer(1), len);
 
             float slotPeak = 0;
             for (int c = 0; c < 2; ++c)
@@ -1267,6 +1270,9 @@ void Engine::renderChunk(float* const* out, int numChannels, int offset, int len
                 }
             }
         }
+        // The echo runs once on the track's sum: run per slot, a crossfade ran it twice a block (the old
+        // sound's slot then carried the echo, never fell quiet, and the track sat 11 dB hot for 20 s).
+        if (t.hasEcho) t.echo.process(t.mix.getWritePointer(0), t.mix.getWritePointer(1), len);
         mixTrack(i, t.mix.getReadPointer(0), t.mix.getReadPointer(1));
     }
 
@@ -1378,6 +1384,98 @@ void InternalSynth::prepare(double sampleRate, Kind kind, const juce::String& ma
     material_ = &kMaterials[0];
     for (auto& m : kMaterials) if (material == m.name) material_ = &m;
     for (auto& v : voices_) v.note = -1;
+    strings_.assign(kind == Guitar ? 24 : 0, {});
+    for (auto& st : strings_) st.buf.assign(size_t(sampleRate / 25) + 4, 0.0f); // down to 25 Hz
+}
+
+void InternalSynth::pluck(Str& st, float velocity, bool palm, float pick)
+{
+    // the pick: a burst of noise as long as the string, darker when soft or muted, with a notch
+    // comb where the pick strikes (a fraction of the way from the bridge)
+    const float dyn = palm ? juce::jlimit(0.1f, 1.0f, velocity / 0.45f) : juce::jlimit(0.1f, 1.0f, (velocity - 0.5f) / 0.5f);
+    const float bright = palm ? 0.25f + 0.25f * dyn : 0.45f + 0.5f * dyn, amp = 0.25f + 0.75f * dyn;
+    const int notch = juce::jmax(1, int(pick * float(st.len)));
+    std::vector<float> n(size_t(st.len));
+    float lp = 0;
+    for (auto& x : n) { seed_ = seed_ * 1664525u + 1013904223u; lp += (float(int32_t(seed_)) * (1.0f / 2147483648.0f) - lp) * bright; x = lp; }
+    for (int i = 0; i < st.len; ++i)
+        st.buf[size_t((st.w + i) % st.len)] += amp * (n[size_t(i)] - n[size_t((i + st.len - notch) % st.len)]);
+    // the decay: an open string rings for seconds (the low ones longest), a muted one thuds
+    const float t60 = palm ? 0.10f + 0.12f * dyn : juce::jlimit(1.5f, 8.0f, 9.0f - st.hz / 40.0f);
+    st.s = palm ? 0.45f : 0.22f;
+    const double w = juce::MathConstants<double>::twoPi * st.hz / sr_;
+    const double hmag = std::sqrt(juce::square(1.0 - st.s) + juce::square(double(st.s)) + 2 * st.s * (1 - st.s) * std::cos(w));
+    st.g = float(juce::jmin(0.99999, std::pow(10.0, -3.0 / (t60 * st.hz)) / hmag));
+    st.gOff = float(std::pow(10.0, -3.0 / (0.07 * st.hz)) / hmag); // a fretting hand lets go: 70 ms
+    st.held = true;
+    st.age = 0;
+    st.env = 1;
+}
+
+void InternalSynth::startGuitar(int note, float velocity)
+{
+    const bool palm = velocity < 0.5f;
+    double hz = 440.0 * std::pow(2.0, (note - 69) / 12.0);
+    for (int side = 0; side < 2; ++side)
+    {
+        // pure fifths: over a root struck with it (or just before), this string takes 3:2 (or 3:1) of it
+        for (auto& o : strings_)
+            if (o.note >= 0 && o.held && o.side == side && o.age < int64_t(0.03 * sr_) && (note - o.note == 7 || note - o.note == 19))
+                hz = o.hz * (note - o.note == 7 ? 1.5 : 3.0);
+        Str* st = nullptr;
+        for (auto& o : strings_) if (o.note == note && o.side == side) { st = &o; break; }  // the same string, picked again
+        if (!st) for (auto& o : strings_) if (o.note < 0) { st = &o; break; }
+        if (!st) { st = &strings_[0]; for (auto& o : strings_) if (o.age > st->age) st = &o; } // steal the oldest
+        if (st->note != note || st->side != side)
+        {
+            std::fill(st->buf.begin(), st->buf.end(), 0.0f);
+            st->apX = st->apY = st->lpX = st->dcX = st->dcY = 0;
+            st->w = 0;
+            // the delay: the loop's length, plus the lowpass's (s) and a fractional allpass for the rest
+            const double N = sr_ / hz;
+            st->hz = float(hz);
+            st->s = palm ? 0.45f : 0.22f;
+            st->len = juce::jlimit(2, int(st->buf.size()) - 1, int(N - st->s - 0.1));
+            const double d = N - st->s - st->len;
+            st->a = float((1 - d) / (1 + d));
+            st->note = note;
+            st->side = side;
+            // the second take, a little late: 6 to 18 ms, never the same twice
+            seed_ = seed_ * 1664525u + 1013904223u;
+            st->wait = side == 0 ? 0 : int((0.006 + 0.012 * double(seed_ >> 8) / 16777216.0) * sr_);
+        }
+        pluck(*st, velocity, palm, side == 0 ? 0.13f : 0.21f);
+    }
+}
+
+void InternalSynth::runGuitar(float* l, float* r, int from, int to)
+{
+    for (auto& st : strings_)
+    {
+        if (st.note < 0) continue;
+        const float g = st.held ? st.g : st.gOff, pl = st.side == 0 ? 0.88f : 0.12f, pr = 1 - pl;
+        float peak = 0;
+        for (int n = from; n < to; ++n)
+        {
+            if (st.wait > 0) { --st.wait; continue; }
+            const float out = st.buf[size_t(st.w)];
+            const float lp = (1 - st.s) * out + st.s * st.lpX;
+            st.lpX = out;
+            const float ap = st.a * lp + st.apX - st.a * st.apY;
+            st.apX = lp;
+            st.apY = ap;
+            st.buf[size_t(st.w)] = g * ap;
+            if (++st.w >= st.len) st.w = 0;
+            st.dcY = out - st.dcX + 0.995f * st.dcY;      // no DC into the amp
+            st.dcX = out;
+            l[n] += st.dcY * pl;
+            r[n] += st.dcY * pr;
+            peak = juce::jmax(peak, std::abs(out));
+            ++st.age;
+        }
+        st.env = peak;
+        if (st.age > int64_t(0.05 * sr_) && peak < 1e-5f) st.note = -1;
+    }
 }
 
 void InternalSynth::startModal(Voice& v, int note, float velocity)
@@ -1462,6 +1560,7 @@ void InternalSynth::runModal(Voice& v, float* l, float* r, int from, int to)
 void InternalSynth::start(int note, float velocity)
 {
     if (kind_ == None) return; // the silent pulse: its notes only duck the mix
+    if (kind_ == Guitar) { startGuitar(note, velocity); return; }
     if (kind_ == Modal)
     {
         Voice* v = &voices_[0];
@@ -1516,10 +1615,12 @@ void InternalSynth::start(int note, float velocity)
 void InternalSynth::stopNote(int note)
 {
     for (auto& v : voices_) if (v.note == note && v.held) v.held = false;
+    for (auto& st : strings_) if (st.note == note) st.held = false;
 }
 
 void InternalSynth::run(float* l, float* r, int from, int to)
 {
+    if (kind_ == Guitar) { runGuitar(l, r, from, to); return; }
     for (auto& v : voices_)
     {
         if (v.note < 0) continue;

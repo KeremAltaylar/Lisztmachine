@@ -6,11 +6,12 @@ from concurrent.futures import ThreadPoolExecutor
 R = r"C:\Users\kerem\build\Lisztmachine\liszt_render_artefacts\Release\liszt_render.exe"
 S = r"C:\Users\kerem\OneDrive\Desktop\Claude\Projects\Lisztmachine\sounds"
 G = open(r"C:\Users\kerem\OneDrive\Desktop\Claude\Projects\Lisztmachine\src\core\Genres.cpp", encoding="utf8").read()
-PEAK = dict(jungle="Ascension", triphop="Four Ton Mantis", ecstatic="Computation", dubtechno="Submersion", noir="Cathedral of Smoke",
-            gqom="Possessed", deconstructed="Rebirth", halftime="Gravity")
-BASE = dict(pad=-27, metal=-28, tick=-31, perc=-29, bass=-25, sub=-25, arp=-26, chord=-28, harm=-29, ground=-30, body=-29, mallet=-31, texture=-38)  # no pulse: it is silent  # no fx: a riser, quiet at the summit and loud before it, so one place cannot judge it
-OVER = dict(ecstatic=dict(arp=-23, chord=-26), dubtechno=dict(chord=-25),
-            gqom=dict(perc=-26), deconstructed=dict(chord=-25, perc=-28))
+PEAK = dict(jungle="Liquid Gold", ecstatic="Computation", noir="Cathedral of Smoke", deconstructed="Rebirth", halftime="Gravity",
+            doom="Monument", blackgaze="Sunbather")
+BASE = dict(pad=-27, metal=-28, tick=-31, perc=-29, bass=-25, sub=-25, arp=-26, chord=-28, harm=-29, ground=-30, body=-29, mallet=-31, texture=-38, riff=-26)  # no pulse: it is silent  # no fx: a riser, quiet at the summit and loud before it, so one place cannot judge it
+# the riff: the song itself in Doom, a wall in Blackgaze, a drone under the sequence in Ecstatic, colour in Liquid
+OVER = dict(ecstatic=dict(arp=-23, chord=-26, riff=-30), deconstructed=dict(chord=-25, perc=-28), doom=dict(riff=-23, pad=-29),
+            blackgaze=dict(riff=-24), jungle=dict(riff=-29))
 OFF = os.path.join(os.path.dirname(__file__), "balance-offsets.json")   # per song: how far everything went down for the limiter
 off = json.load(open(OFF)) if os.path.exists(OFF) else {}
 
@@ -19,7 +20,7 @@ def peakBar(scene):
     block = block[block.index(".form"):block.index(".pulse")]
     bar = 0
     for name, bars in re.findall(r'\{ "([^"]+)", (\d+),', block):
-        if name == PEAK[scene]: return bar + min(32, int(bars) // 2)  # past the lift, 16 bars inside the summit
+        if name == PEAK[scene]: return bar + min(32, int(bars) // 2)  # 16 bars inside the summit (a unison's end is at three quarters)
         bar += int(bars)
 
 def run(scene):
