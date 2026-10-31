@@ -1,0 +1,144 @@
+{
+ "sections": [
+  {
+   "name": "Haze",
+   "start": 0.0,
+   "end": 38.4,
+   "stems": [
+    "pad",
+    "fx",
+    "ground",
+    "texture",
+    "riff",
+    "delay",
+    "reverb"
+   ]
+  },
+  {
+   "name": "Rise",
+   "start": 38.4,
+   "end": 89.6,
+   "stems": [
+    "pad",
+    "perc",
+    "bass",
+    "sub",
+    "arp",
+    "harm",
+    "ground",
+    "body",
+    "texture",
+    "riff",
+    "delay",
+    "reverb"
+   ]
+  },
+  {
+   "name": "Storm",
+   "start": 89.6,
+   "end": 192.0,
+   "stems": [
+    "pad",
+    "metal",
+    "perc",
+    "bass",
+    "sub",
+    "chord",
+    "harm",
+    "ground",
+    "body",
+    "texture",
+    "impact",
+    "riff",
+    "delay",
+    "reverb"
+   ]
+  },
+  {
+   "name": "Clearing",
+   "start": 192.0,
+   "end": 243.2,
+   "stems": [
+    "pad",
+    "metal",
+    "perc",
+    "bass",
+    "sub",
+    "arp",
+    "chord",
+    "fx",
+    "harm",
+    "ground",
+    "body",
+    "texture",
+    "riff",
+    "delay",
+    "reverb"
+   ]
+  },
+  {
+   "name": "Ascent",
+   "start": 243.2,
+   "end": 294.4,
+   "stems": [
+    "pad",
+    "metal",
+    "perc",
+    "bass",
+    "sub",
+    "arp",
+    "chord",
+    "harm",
+    "ground",
+    "body",
+    "texture",
+    "riff",
+    "delay",
+    "reverb"
+   ]
+  },
+  {
+   "name": "Sunbather",
+   "start": 294.4,
+   "end": 396.8,
+   "stems": [
+    "pad",
+    "metal",
+    "perc",
+    "bass",
+    "sub",
+    "arp",
+    "chord",
+    "fx",
+    "harm",
+    "ground",
+    "body",
+    "texture",
+    "impact",
+    "riff",
+    "delay",
+    "reverb"
+   ]
+  },
+  {
+   "name": "Afterglow",
+   "start": 396.8,
+   "end": 422.4,
+   "stems": [
+    "pad",
+    "metal",
+    "perc",
+    "sub",
+    "arp",
+    "chord",
+    "harm",
+    "ground",
+    "body",
+    "texture",
+    "riff",
+    "delay",
+    "reverb"
+   ]
+  }
+ ]
+}

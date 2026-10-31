@@ -326,6 +326,7 @@ public:
     GlueBus glue;
     bool mixStage = true;          // false: no ducking, low cuts, width or glue (the renderer's --raw)
     uint32_t enabledTracks = 0xFFFFFFFF; // bit per track; the renderer's --solo
+    float* const* stemOut = nullptr;     // the renderer's --stems: 2 channels per track, then the delay and the reverb returns, before the glue
 
 private:
     // Each part has two instances: one live, the other loading the next sound or ringing out.

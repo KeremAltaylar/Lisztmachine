@@ -1128,6 +1128,9 @@ void Engine::renderChunk(float* const* out, int numChannels, int offset, int len
     juce::AudioBuffer<float> reverbIn(reverbBus_.getArrayOfWritePointers(), reverbBus_.getNumChannels(), len);
     delayIn.clear();
     reverbIn.clear();
+    float* st[2 * kMaxTracks + 4] = {};
+    if (stemOut)
+        for (int k = 0; k < 2 * numTracks_ + 4; ++k) st[k] = stemOut[k] + offset;
     auto runFx = [&](juce::AudioPluginInstance& fx, juce::AudioBuffer<float>& buf) {
         for (int c = 2; c < buf.getNumChannels(); ++c) buf.clear(c, 0, len); // a side-chain input hears nothing
         fx.processBlock(buf, noMidi_);
@@ -1185,6 +1188,7 @@ void Engine::renderChunk(float* const* out, int numChannels, int offset, int len
                 g *= 1 - t.duck * duckCurve_[size_t(n)];
             }
             const float x[2] = { l * g, r * g };
+            if (stemOut) { st[2 * i][n] = x[0]; st[2 * i + 1][n] = x[1]; }
             for (int c = 0; c < 2; ++c)
             {
                 pa[c][n] += x[c];
@@ -1301,12 +1305,16 @@ void Engine::renderChunk(float* const* out, int numChannels, int offset, int len
             juce::FloatVectorOperations::addWithMultiply(reverbIn.getWritePointer(c), delayIn.getReadPointer(c), kDelayToReverb, len);
         }
         meter(delayMeter, delayIn);
+        if (stemOut)
+            for (int c = 0; c < 2; ++c) juce::FloatVectorOperations::copy(st[2 * numTracks_ + c], delayIn.getReadPointer(c), len);
         runFx(*reverb_, reverbIn);
         duckReturn(reverbIn, 0.5f);
         if (mixStage)
             for (int c = 0; c < 2; ++c)
                 for (int n = 0; n < len; ++n) reverbIn.getWritePointer(c)[n] = reverbLowCut_[c].process(reverbIn.getReadPointer(c)[n]);
         meter(reverbMeter, reverbIn);
+        if (stemOut)
+            for (int c = 0; c < 2; ++c) juce::FloatVectorOperations::copy(st[2 * numTracks_ + 2 + c], reverbIn.getReadPointer(c), len);
         for (int c = 0; c < 2; ++c) juce::FloatVectorOperations::add(pa[c], reverbIn.getReadPointer(c), len);
     }
 

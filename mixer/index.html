@@ -1,0 +1,354 @@
+<title>Blackgaze Mixer</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500&display=swap">
+<style>
+/* A console at dusk: one row of channel strips under a section rail, the master at the end; the accent is Sunbather's pink. */
+:root {
+  --bg: #141216; --panel: #1d1a20; --well: #0d0b0e; --line: #2e2933; --ink: #ece6ee; --dim: #9a909f;
+  --accent: #e8909f; --accent-ink: #1b1013; --warn: #f2b45a; --meter: #8fd4a8; --hot: #f06a5a;
+  --display: "Barlow Condensed", "Arial Narrow", sans-serif; --body: "IBM Plex Sans", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+  color-scheme: dark;
+}
+@media (prefers-color-scheme: light) { :root:not([data-theme="dark"]) {
+  --bg: #f4eff2; --panel: #fbf8fa; --well: #e6dee3; --line: #d6cbd2; --ink: #221b24; --dim: #6c6070;
+  --accent: #b9475c; --accent-ink: #fff6f8; --warn: #a8650a; --meter: #2f8a55; --hot: #c4362a; color-scheme: light } }
+:root[data-theme="light"] {
+  --bg: #f4eff2; --panel: #fbf8fa; --well: #e6dee3; --line: #d6cbd2; --ink: #221b24; --dim: #6c6070;
+  --accent: #b9475c; --accent-ink: #fff6f8; --warn: #a8650a; --meter: #2f8a55; --hot: #c4362a; color-scheme: light }
+body { background: var(--bg); color: var(--ink); font: 14px/1.45 var(--body);
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 20px 32px; }
+main { max-width: 1280px; margin: 0 auto; display: grid; gap: 18px; }
+header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 16px; justify-content: space-between; }
+h1 { font: 600 30px/1 var(--display); letter-spacing: .02em; margin: 0; text-wrap: balance; }
+.lede { color: var(--dim); max-width: 62ch; margin: 4px 0 0; }
+.pill { font: 500 12px var(--mono); padding: 4px 10px; border-radius: 99px; border: 1px solid var(--line); color: var(--dim); white-space: nowrap; }
+.pill.ok { color: var(--meter); border-color: color-mix(in srgb, var(--meter) 40%, transparent); }
+.pill.bad { color: var(--warn); border-color: color-mix(in srgb, var(--warn) 40%, transparent); }
+.label { font: 600 12px var(--display); letter-spacing: .12em; text-transform: uppercase; color: var(--dim); }
+button { font: inherit; color: inherit; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 6px 12px; cursor: pointer; }
+button:hover { border-color: var(--dim); }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+button:disabled { opacity: .45; cursor: default; }
+.rail { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; }
+.rail button { display: grid; gap: 2px; text-align: left; min-width: 104px; padding: 8px 10px; }
+.rail b { font: 600 17px/1 var(--display); letter-spacing: .03em; }
+.rail small { font: 400 11px var(--mono); color: inherit; opacity: .75; }
+.energy { height: 3px; border-radius: 2px; background: currentColor; opacity: .55; }
+.transport { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+#play { min-width: 92px; font-weight: 500; }
+.clock { font: 500 15px var(--mono); font-variant-numeric: tabular-nums; min-width: 15ch; }
+#timeline { flex: 1 1 240px; min-width: 0; height: 30px; background: var(--well); border-radius: 6px; position: relative; cursor: pointer; overflow: hidden; }
+#timeline .fill { position: absolute; inset: 0 auto 0 0; background: color-mix(in srgb, var(--accent) 28%, transparent); }
+#timeline .head { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--accent); }
+#timeline .tick { position: absolute; top: 0; bottom: 0; width: 1px; background: var(--line); }
+.desk { display: flex; gap: 8px; align-items: stretch; }
+.strips { display: flex; gap: 6px; overflow-x: auto; flex: 1; min-width: 0; padding-bottom: 6px; }
+.strip { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 10px 8px; display: grid; justify-items: center; gap: 8px; width: 74px; flex: 0 0 auto; }
+.strip.rest { opacity: .38; }
+.strip.master { border-color: color-mix(in srgb, var(--accent) 50%, var(--line)); width: 96px; }
+.name { font: 600 16px/1 var(--display); letter-spacing: .03em; text-align: center; }
+.code { font: 400 10px var(--mono); color: var(--dim); margin-top: -6px; }
+.well { display: flex; gap: 6px; align-items: stretch; height: 170px; }
+canvas.meter { width: 8px; height: 170px; background: var(--well); border-radius: 2px; }
+input[type=range].fader { writing-mode: vertical-lr; direction: rtl; width: 22px; height: 170px; margin: 0; accent-color: var(--accent); }
+.db { font: 500 12px var(--mono); font-variant-numeric: tabular-nums; }
+.db.moved { color: var(--accent); }
+.ms { display: flex; gap: 4px; }
+.ms button { padding: 3px 7px; font: 600 12px var(--display); letter-spacing: .06em; }
+.ms button.s[aria-pressed="true"] { background: var(--warn); border-color: var(--warn); color: var(--accent-ink); }
+.lc { display: grid; justify-items: center; gap: 2px; width: 100%; }
+.lc input { width: 58px; accent-color: var(--accent); }
+.lc span { font: 400 10px var(--mono); color: var(--dim); }
+.gr { font: 400 11px var(--mono); color: var(--dim); text-align: center; }
+.out { display: grid; gap: 8px; grid-template-columns: minmax(0, 1fr); }
+.out-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+pre { margin: 0; background: var(--well); border-radius: 8px; padding: 12px 14px; font: 13px/1.6 var(--mono); overflow-x: auto; color: var(--ink); }
+.note { color: var(--dim); font-size: 13px; max-width: 70ch; margin: 0; }
+#status { min-height: 1.4em; color: var(--dim); font: 400 13px var(--mono); }
+#status.err { color: var(--hot); }
+@media (max-width: 640px) { .desk { flex-direction: column; } .strip.master { width: 100%; grid-template-columns: auto 1fr; justify-items: start; } }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<main>
+  <header>
+    <div>
+      <h1>Blackgaze Mixer</h1>
+      <p class="lede">Mix the song yourself. 0 dB is the engine's mix. Your settings save by themselves, and Claude reads them back into the palette.</p>
+    </div>
+    <span id="saved" class="pill">Not saved yet</span>
+  </header>
+
+  <section aria-label="Sections">
+    <div class="label" style="margin-bottom:6px">Section, looped</div>
+    <div class="rail" id="rail"></div>
+  </section>
+
+  <div class="transport">
+    <button id="play" type="button">▶ Play</button>
+    <button id="ab" type="button" aria-pressed="false" title="Hold your settings and hear the engine's own mix">Engine mix</button>
+    <span class="clock" id="clock">bar —</span>
+    <div id="timeline" role="slider" aria-label="Position in section" tabindex="0"><div class="fill"></div><div class="head"></div></div>
+  </div>
+  <div id="status">Press Play to load Haze.</div>
+
+  <div class="desk">
+    <div class="strips" id="strips"></div>
+    <div class="strip master" id="masterStrip">
+      <div class="name">Master</div>
+      <div class="code">glue + drive</div>
+      <div class="well"><canvas class="meter" id="mMeter" width="8" height="170"></canvas><input class="fader" id="mFader" type="range" min="-12" max="6" step="0.1" value="0" aria-label="Master drive"></div>
+      <div class="db" id="mDb">0.0 dB</div>
+      <div class="gr" id="gr">glue 0.0 dB</div>
+    </div>
+  </div>
+
+  <section class="out">
+    <div class="out-head">
+      <div class="label">Your mix as palette lines (sounds/blackgaze.txt)</div>
+      <div style="display:flex;gap:8px"><button id="copy" type="button">Copy</button><button id="reset" type="button">Reset all to engine</button></div>
+    </div>
+    <pre id="lines">No changes yet. Move a fader.</pre>
+    <p class="note">Faders and low cuts change each part after its own effects. The Echo and Reverb strips are the shared buses: they hold every part's sends, so lowering a part does not lower its reverb here. Meters show each part before the master glue.</p>
+  </section>
+</main>
+
+<script>
+const BPM = 150, BAR = 4 * 60 / BPM;
+// The palette's current balance (sounds/blackgaze.txt); a fader adds to it.
+const BASE = { pad: -5.0, metal: 3.1, tick: 6.3, perc: -9.0, bass: 0.8, sub: -11.6, arp: 20.7, chord: -4.9, fx: -11.7, harm: -5.7,
+  ground: -17.1, body: -19.3, mallet: -25.5, texture: -35.3, impact: -4.0, riff: -8.9 };
+const MASTER = 9.3;
+const LABEL = { pad: "Pads", metal: "Metal", perc: "Perc", bass: "Bass", sub: "808", arp: "Lead", chord: "Keys", fx: "Noise", harm: "Choir",
+  ground: "Iron", body: "Plate", mallet: "Glass", texture: "Scrape", impact: "Impact", riff: "Guitar", delay: "Echo", reverb: "Reverb", pulse: "Pulse", tick: "Tick" };
+const ORDER = ["riff", "arp", "chord", "pad", "harm", "bass", "sub", "ground", "body", "metal", "perc", "impact", "texture", "fx", "mallet", "pulse", "tick", "delay", "reverb"];
+
+const $ = id => document.getElementById(id);
+let man = null, cur = 0, ctx = null, glue = null, sum = null, mAn = null, buffers = {}, sources = [], strips = {};
+let playing = false, startedAt = 0, offset = 0, engineMix = false, glueDb = 0;
+const mix = { tracks: {}, master: 0 }; // what Kerem set: dB per strip, mute, low cut Hz
+const tr = s => (mix.tracks[s] ??= { db: 0, mute: false, lowcut: 0 });
+const solos = new Set();
+
+function status(t, err) { $("status").textContent = t; $("status").className = err ? "err" : ""; }
+const fmt = d => (d > 0 ? "+" : "") + d.toFixed(1) + " dB";
+const clockOf = t => { const s = man.sections[cur], abs = s.start + t, bar = Math.floor(abs / BAR) + 1, beat = Math.floor((abs % BAR) / (BAR / 4)) + 1;
+  return `bar ${bar}.${beat} · ${Math.floor(abs / 60)}:${String(Math.floor(abs % 60)).padStart(2, "0")}`; };
+
+async function boot() {
+  try { man = await (await fetch("manifest.json")).json(); }
+  catch { status("Could not load the song's stems list. Reload the page.", true); return; }
+  const allStems = ORDER.filter(s => man.sections.some(x => x.stems.includes(s)));
+  $("rail").innerHTML = man.sections.map((s, k) => `<button type="button" data-k="${k}" aria-pressed="${k === 0}">
+    <b>${s.name}</b><small>bars ${Math.round(s.start / BAR) + 1}–${Math.round(s.end / BAR)}</small></button>`).join("");
+  $("rail").onclick = e => { const b = e.target.closest("button"); if (b) loadSection(+b.dataset.k); };
+  $("strips").innerHTML = allStems.map(s => `<div class="strip" id="st-${s}">
+    <div class="name">${LABEL[s] ?? s}</div><div class="code">${s}</div>
+    <div class="well"><canvas class="meter" width="8" height="170"></canvas>
+      <input class="fader" id="f-${s}" type="range" min="-24" max="12" step="0.1" value="0" aria-label="${LABEL[s] ?? s} level"></div>
+    <div class="db">0.0 dB</div>
+    <div class="ms"><button type="button" class="m" aria-pressed="false" title="Mute">M</button><button type="button" class="s" aria-pressed="false" title="Solo">S</button></div>
+    <div class="lc"><input id="lc-${s}" type="range" min="0" max="400" step="10" value="0" aria-label="${LABEL[s] ?? s} low cut"><span>low cut off</span></div>
+  </div>`).join("");
+  for (const s of allStems) {
+    const el = $("st-" + s);
+    strips[s] = { el, meter: el.querySelector("canvas"), fader: el.querySelector(".fader"), db: el.querySelector(".db"),
+      m: el.querySelector(".m"), so: el.querySelector(".s"), lc: el.querySelector(".lc input"), lcText: el.querySelector(".lc span") };
+    const st = strips[s];
+    st.fader.oninput = () => { tr(s).db = +st.fader.value; changed(); };
+    st.fader.ondblclick = () => { tr(s).db = 0; changed(); };
+    st.m.onclick = () => { tr(s).mute = !tr(s).mute; changed(); };
+    st.so.onclick = () => { solos.has(s) ? solos.delete(s) : solos.add(s); apply(); };
+    st.lc.oninput = () => { tr(s).lowcut = +st.lc.value; changed(); };
+  }
+  $("mFader").oninput = () => { mix.master = +$("mFader").value; changed(); };
+  $("mFader").ondblclick = () => { mix.master = 0; changed(); };
+  $("play").onclick = toggle;
+  $("ab").onclick = () => { engineMix = !engineMix; apply(); };
+  $("reset").onclick = () => { for (const s in mix.tracks) mix.tracks[s] = { db: 0, mute: false, lowcut: 0 }; mix.master = 0; solos.clear(); changed(); };
+  $("copy").onclick = async () => { try { await navigator.clipboard.writeText($("lines").textContent); $("copy").textContent = "Copied"; }
+    catch { getSelection().selectAllChildren($("lines")); $("copy").textContent = "Selected"; } setTimeout(() => $("copy").textContent = "Copy", 1500); };
+  $("timeline").onclick = e => { const r = e.currentTarget.getBoundingClientRect(); seek((e.clientX - r.left) / r.width * dur()); };
+  $("timeline").onkeydown = e => { if (e.key === "ArrowRight") seek(pos() + BAR); if (e.key === "ArrowLeft") seek(pos() - BAR); };
+  marks();
+  apply();
+  requestAnimationFrame(draw);
+  connectDb();
+}
+
+// Saving: one document, read back by Claude with ArtifactData (mixes/blackgaze).
+let doc = null, saveTimer = 0;
+async function connectDb() {
+  const db = await window.claude?.use("db");
+  if (!db) { $("saved").textContent = "Not saving: copy the lines below"; $("saved").className = "pill bad"; return; }
+  doc = db.doc("mixes/blackgaze");
+  try {
+    const snap = await doc.get();
+    if (snap.exists) { const d = snap.data(); Object.assign(mix.tracks, d.tracks || {}); mix.master = d.master || 0; apply(); lines();
+      $("saved").textContent = "Your saved mix is loaded"; $("saved").className = "pill ok"; }
+  } catch (e) { $("saved").textContent = "Could not read your saved mix"; $("saved").className = "pill bad"; }
+}
+function save() {
+  clearTimeout(saveTimer);
+  if (!doc) return;
+  $("saved").textContent = "Saving…"; $("saved").className = "pill";
+  saveTimer = setTimeout(async () => {
+    try { await doc.set({ tracks: mix.tracks, master: mix.master, base: BASE, baseMaster: MASTER, savedAt: new Date().toISOString() });
+      $("saved").textContent = "Saved"; $("saved").className = "pill ok"; }
+    catch (e) { $("saved").textContent = e?.code === "not_granted" ? "Saving was not allowed" : "Not saved: try again"; $("saved").className = "pill bad"; }
+  }, 1200);
+}
+function changed() { apply(); lines(); save(); }
+
+function lines() {
+  const out = [];
+  for (const s of ORDER) {
+    const t = mix.tracks[s]; if (!t) continue;
+    if (s === "delay" || s === "reverb") { if (t.db || t.mute) out.push(`# ${s} bus ${t.mute ? "muted" : fmt(t.db)} (a new palette line)`); if (t.lowcut) out.push(`# ${s} bus low cut ${t.lowcut} Hz`); continue; }
+    if (t.mute) out.push(`# ${s} muted (${LABEL[s]})`);
+    else if (t.db) out.push(`gain ${s.padEnd(8)}${(BASE[s] + t.db).toFixed(1).padStart(6)}   # was ${BASE[s].toFixed(1)}, ${LABEL[s]} ${fmt(t.db)}`);
+    if (t.lowcut) out.push(`lowcut ${s} ${t.lowcut}`);
+  }
+  if (mix.master) out.push(`master ${(MASTER + mix.master).toFixed(1)}   # was ${MASTER}`);
+  $("lines").textContent = out.length ? out.join("\n") : "No changes yet. Move a fader.";
+}
+
+function apply() {
+  for (const s in strips) {
+    const st = strips[s], t = tr(s);
+    st.fader.value = t.db; st.db.textContent = t.mute ? "muted" : fmt(t.db); st.db.classList.toggle("moved", !!t.db || t.mute);
+    st.m.setAttribute("aria-pressed", t.mute); st.so.setAttribute("aria-pressed", solos.has(s));
+    st.lc.value = t.lowcut; st.lcText.textContent = t.lowcut ? `low cut ${t.lowcut} Hz` : "low cut off";
+    st.el.classList.toggle("rest", !man.sections[cur].stems.includes(s));
+    if (st.gain) {
+      const on = !(solos.size && !solos.has(s)) && !(t.mute && !engineMix);
+      st.gain.gain.setTargetAtTime(on ? 10 ** ((engineMix ? 0 : t.db) / 20) : 0, ctx.currentTime, 0.015);
+      st.hp.frequency.setTargetAtTime(!engineMix && t.lowcut ? t.lowcut : 10, ctx.currentTime, 0.015);
+    }
+  }
+  $("mFader").value = mix.master; $("mDb").textContent = fmt(mix.master); $("mDb").classList.toggle("moved", !!mix.master);
+  if (glue) glue.parameters.get("makeup").setTargetAtTime(MASTER + (engineMix ? 0 : mix.master), ctx.currentTime, 0.015);
+  $("ab").setAttribute("aria-pressed", engineMix);
+  $("ab").textContent = engineMix ? "Engine mix (on)" : "Engine mix";
+}
+
+// The engine's master glue (GlueBus): 2:1 above -18 dB, 6 dB knee, 10/150 ms, makeup into a tanh at -1 dBFS.
+const GLUE = `class Glue extends AudioWorkletProcessor {
+  static get parameterDescriptors() { return [{ name: "makeup", defaultValue: ${MASTER} }]; }
+  constructor() { super(); this.e = 0; this.a = 1 - Math.exp(-1 / (0.010 * sampleRate)); this.r = 1 - Math.exp(-1 / (0.150 * sampleRate)); this.red = 0; this.n = 0; }
+  process(inputs, outputs, p) {
+    const i = inputs[0], o = outputs[0];
+    if (!i.length) return true;
+    const L = i[0], R = i[1] || i[0], mk = Math.pow(10, p.makeup[0] / 20);
+    for (let n = 0; n < L.length; n++) {
+      const pk = Math.max(Math.abs(L[n]), Math.abs(R[n]));
+      this.e += (pk - this.e) * (pk > this.e ? this.a : this.r);
+      const over = 20 * Math.log10(Math.max(this.e, 1e-6)) + 18;
+      const cut = over <= -3 ? 0 : over >= 3 ? over / 2 : 0.5 * (over + 3) * (over + 3) / 12;
+      this.red = Math.max(this.red, cut);
+      const g = Math.pow(10, -cut / 20) * mk;
+      o[0][n] = 0.89 * Math.tanh(L[n] * g / 0.89); o[1][n] = 0.89 * Math.tanh(R[n] * g / 0.89);
+    }
+    if (++this.n % 8 === 0) { this.port.postMessage(this.red); this.red = 0; }
+    return true;
+  }
+}
+registerProcessor("glue", Glue);`;
+
+async function audio() {
+  if (ctx) return;
+  ctx = new AudioContext({ sampleRate: 48000, latencyHint: "playback" });
+  await ctx.audioWorklet.addModule(URL.createObjectURL(new Blob([GLUE], { type: "text/javascript" })));
+  glue = new AudioWorkletNode(ctx, "glue", { outputChannelCount: [2] });
+  glue.port.onmessage = e => glueDb = Math.max(e.data, glueDb * 0.9);
+  sum = new GainNode(ctx, { channelCount: 2, channelCountMode: "explicit" });
+  mAn = new AnalyserNode(ctx, { fftSize: 1024 });
+  sum.connect(glue).connect(mAn).connect(ctx.destination);
+  for (const s in strips) {
+    const st = strips[s];
+    st.hp = new BiquadFilterNode(ctx, { type: "highpass", frequency: 10, Q: -3.01 }); // Q in dB: -3 dB is Butterworth, like the engine's low cut
+    st.gain = new GainNode(ctx);
+    st.an = new AnalyserNode(ctx, { fftSize: 1024 });
+    st.hp.connect(st.gain).connect(st.an).connect(sum);
+  }
+  apply();
+}
+
+async function loadSection(k) {
+  stopSources(); playing = false; offset = 0;
+  cur = k;
+  [...$("rail").children].forEach((b, i) => b.setAttribute("aria-pressed", i === k));
+  apply(); marks();
+  if (!ctx) { status(`Press Play to load ${man.sections[k].name}.`); return; }
+  buffers = {};
+  const sec = man.sections[k], names = sec.stems;
+  let done = 0;
+  status(`Loading ${sec.name}: 0 of ${names.length} parts`);
+  try {
+    await Promise.all(names.map(async s => {
+      const b = await (await fetch(`media/${k}_${s}.mp3`)).arrayBuffer();
+      buffers[s] = await ctx.decodeAudioData(b);
+      status(`Loading ${sec.name}: ${++done} of ${names.length} parts`);
+    }));
+  } catch (e) { status(`Could not load ${sec.name}. Pick the section again to retry.`, true); return; }
+  if (cur !== k) return;
+  status(`${sec.name}: ${names.length} parts playing, looped. Double-click a fader to reset it.`);
+  start(0);
+}
+
+const dur = () => { const v = Object.values(buffers)[0]; return v ? v.duration : man.sections[cur].end - man.sections[cur].start; };
+const pos = () => playing ? (ctx.currentTime - startedAt) % dur() : offset;
+function stopSources() { for (const x of sources) try { x.stop(); } catch {} sources = []; }
+function start(at) {
+  stopSources();
+  const when = ctx.currentTime + 0.08;
+  for (const s in buffers) {
+    const src = new AudioBufferSourceNode(ctx, { buffer: buffers[s], loop: true });
+    src.connect(strips[s].hp); src.start(when, at % buffers[s].duration);
+    sources.push(src);
+  }
+  startedAt = when - at; playing = true;
+  $("play").textContent = "❚❚ Pause";
+}
+function seek(t) { t = Math.max(0, Math.min(dur() - 0.01, t)); if (playing) start(t); else offset = t; }
+async function toggle() {
+  try { await audio(); await ctx.resume(); }
+  catch { status("This browser could not start the audio. Try Chrome or Safari, up to date.", true); return; }
+  if (!Object.keys(buffers).length) return loadSection(cur);
+  if (playing) { offset = pos(); stopSources(); playing = false; $("play").textContent = "▶ Play"; }
+  else start(offset);
+}
+function marks() { // a line at every 4 bars of the section
+  const tl = $("timeline"); tl.querySelectorAll(".tick").forEach(x => x.remove());
+  const s = man.sections[cur], len = s.end - s.start;
+  for (let t = 4 * BAR; t < len; t += 4 * BAR) { const d = document.createElement("div"); d.className = "tick"; d.style.left = (t / len * 100) + "%"; tl.prepend(d); }
+}
+
+const tmp = new Float32Array(1024);
+function meter(cv, an) {
+  const g = cv.getContext("2d"), h = cv.height, css = getComputedStyle(document.documentElement);
+  g.clearRect(0, 0, 8, h);
+  if (!an) return;
+  an.getFloatTimeDomainData(tmp);
+  let pk = 0, sq = 0; for (const v of tmp) { pk = Math.max(pk, Math.abs(v)); sq += v * v; }
+  const y = d => h * Math.min(1, Math.max(0, -d / 60));
+  const rms = 20 * Math.log10(Math.sqrt(sq / tmp.length) + 1e-9), p = 20 * Math.log10(pk + 1e-9);
+  g.fillStyle = css.getPropertyValue("--meter"); g.fillRect(0, y(rms), 8, h - y(rms));
+  g.fillStyle = p > -1 ? css.getPropertyValue("--hot") : css.getPropertyValue("--dim"); g.fillRect(0, y(p), 8, 2);
+}
+function draw() {
+  for (const s in strips) meter(strips[s].meter, playing ? strips[s].an : null);
+  meter($("mMeter"), playing ? mAn : null);
+  $("gr").textContent = `glue −${glueDb.toFixed(1)} dB`;
+  if (man) {
+    const t = pos(), f = t / dur() * 100;
+    $("timeline").querySelector(".fill").style.width = f + "%"; $("timeline").querySelector(".head").style.left = f + "%";
+    $("clock").textContent = clockOf(t);
+  }
+  requestAnimationFrame(draw);
+}
+boot();
+</script>

@@ -251,6 +251,7 @@ static void writeShow(uint64_t seed, double blockRate, const std::vector<std::ar
 static juce::String paletteName = "berlin"; // --palette <name>: sounds/<name>.txt
 static float feedbackOverride = -1;            // --feedback 0..0.95: every track's echo
 static bool gRaw = false;                      // --raw: without the mix stage (ducking, low cuts, width, glue)
+static bool gStems = false;                    // --stems: also <out>.<track>.wav per track and <out>.delay/.reverb.wav, before the glue
 
 static int renderConcert(uint64_t seed, double seconds, const juce::File& out, int solo, const juce::StringArray& patches, bool dry,
                          const juce::String& from, int bars)
@@ -310,6 +311,22 @@ static int renderConcert(uint64_t seed, double seconds, const juce::File& out, i
     engine.render(preRoll.getArrayOfWritePointers(), 2, preRoll.getNumSamples());
 
     juce::AudioBuffer<float> buf(2, block);
+    juce::AudioBuffer<float> stemBuf;
+    std::vector<std::unique_ptr<juce::AudioFormatWriter>> stemWriters;
+    if (gStems)
+    {
+        stemBuf.setSize(2 * info.numTracks + 4, block);
+        for (int k = 0; k < info.numTracks + 2; ++k)
+        {
+            const juce::String name = k < info.numTracks ? juce::String(info.trackNames[k]) : k == info.numTracks ? "delay" : "reverb";
+            auto f = out.getSiblingFile(out.getFileNameWithoutExtension() + "." + name + ".wav");
+            f.deleteFile();
+            std::unique_ptr<juce::OutputStream> s = std::make_unique<juce::FileOutputStream>(f);
+            stemWriters.push_back(juce::WavAudioFormat().createWriterFor(
+                s, juce::AudioFormatWriterOptions {}.withSampleRate(sr).withNumChannels(2).withBitsPerSample(24)));
+        }
+        engine.stemOut = stemBuf.getArrayOfWritePointers();
+    }
     const int64_t total = seconds > 0 ? int64_t(seconds * sr) : std::numeric_limits<int64_t>::max();
     const auto t0 = juce::Time::getMillisecondCounterHiRes();
     int64_t done = 0;
@@ -318,8 +335,14 @@ static int renderConcert(uint64_t seed, double seconds, const juce::File& out, i
     while (done < total && !engine.isFinished())
     {
         engine.service(); // what the app's timer does: load each part's next sound ahead
+        stemBuf.clear();
         engine.render(buf.getArrayOfWritePointers(), 2, block);
         writer->writeFromAudioSampleBuffer(buf, 0, block);
+        for (size_t k = 0; k < stemWriters.size(); ++k)
+        {
+            const float* ch[2] = { stemBuf.getReadPointer(int(2 * k)), stemBuf.getReadPointer(int(2 * k + 1)) };
+            stemWriters[k]->writeFromFloatArrays(ch, 2, block);
+        }
         // The visuals' four roles (harmony, bass and drums, rhythm, melody), each the power sum of its tracks.
         std::array<float, 7> lv {};
         double rolePower[4] = {};
@@ -339,6 +362,7 @@ static int renderConcert(uint64_t seed, double seconds, const juce::File& out, i
         done += block;
     }
     writer.reset();
+    stemWriters.clear();
     writeMidi(seed, out.withFileExtension("mid"));
     if (startBar == 0) writeShow(seed, sr / block, levels, out.withFileExtension("show.json"));
 
@@ -365,6 +389,7 @@ int main(int argc, char** argv)
     setOfflineRendering(true); // a render is not live: sfizz may wait for its disk streaming
     juce::StringArray args(argv + 1, argc - 1);
     gRaw = args.contains("--raw");
+    gStems = args.contains("--stems");
     if (args[0] == "--probe") return probe(args[1], args[2], args[3]); // --probe <vst3> [names,to,match] [Category/Patch]
     if (args[0] == "--test-echo") // one impulse through a track's echo: where each repeat lands and how loud
     {

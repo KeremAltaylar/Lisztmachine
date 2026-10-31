@@ -4,3 +4,4 @@ build/
 *.mid
 visuals/media/
 plugins/
+mixer/media/
