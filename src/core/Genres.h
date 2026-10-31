@@ -34,7 +34,7 @@ public:
     // impact (one big hit where a section rises). Each one's rhythm develops phrase by phrase.
     // The riff (2026-10-30, Kerem: "gnarly guitar like stoner doom, think of it as rhythm guitar, that's my
     // style, or industrial low hits"): a rhythm guitar (or struck iron) playing the song's riff.
-    enum GTrack : uint8_t { Pad, Pulse, Metal, Tick, Perc, Bass, Sub, Arp, Chord, Fx, Harm, Ground, Body, Mallet, Texture, Impact, Riff, kGenreTracks };
+    enum GTrack : uint8_t { Pad, Pulse, Metal, Tick, Perc, Bass, Sub, Arp, Chord, Fx, Harm, Ground, Body, Mallet, Texture, Impact, Riff, Drone, kGenreTracks };
     // How the riff is played: doom (power chords, long, the flat second and the tritone around them),
     // chug (palm-muted sixteenths, chords on the syncopations), tremolo (blackgaze: every sixteenth
     // picked, root, fifth and ninth), sludge (one huge chord a bar, let ring), drone (re-picked whole notes).
@@ -83,6 +83,7 @@ public:
         int riffLo = 33;                           // the riff's lowest root (the power chord stacks a fifth and an octave on it)
         Summit summit = Summit::Theme;
         bool ends = true;                          // end figures into the parts that are not big arrivals
+        bool legato = false;                       // every riff and bass note rings into the next one (no muted notes, no gaps)
         bool gaze = false;                         // the choir holds open intervals (root, fifth, ninth) instead of the chord
     };
 
@@ -116,6 +117,7 @@ private:
     void emitAutomation(int bar, std::vector<Event>& out);
     void emitPad(int bar, std::vector<Event>& out);
     void emitHarm(int bar, std::vector<Event>& out);
+    void emitDrone(int bar, std::vector<Event>& out);
     void emitImpact(int bar, std::vector<Event>& out);
     void makeRiff();
     void emitRiff(int bar, std::vector<Event>& out);
@@ -145,7 +147,7 @@ private:
     std::vector<int> rootOfBar_;
     std::vector<int> arp_, arpHome_;                // ladder indices
     std::vector<int> arpRank_;
-    std::vector<int> padHeld_, padVoices_, chordVoices_, harmHeld_, harmVoices_;
+    std::vector<int> padHeld_, padVoices_, chordVoices_, harmHeld_, harmVoices_, droneHeld_;
     std::array<int, 4> home_ {}, away_ {};
     std::vector<bool> awayBar_;                     // the bars that play the breakdown's progression
     struct Note { int step, len, deg; float vel; }; // the hook: sixteenths over two bars, degrees above the chord's root

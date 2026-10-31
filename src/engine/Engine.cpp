@@ -216,7 +216,7 @@ float Engine::OctaveUp::process(float x)
         if (p >= 1) p -= 1;
         float pos = float(at) - (1 - p) * float(n);
         if (pos < 0) pos += float(size);
-        const int i = int(pos);
+        const int i = int(pos) % size; // pos can round up to size (at 0, the head about to jump): that read past the end once blew up the reverb
         const float f = pos - float(i);
         const float s = buf[size_t(i)] + f * (buf[size_t((i + 1) % size)] - buf[size_t(i)]);
         const float w = std::sin(juce::MathConstants<float>::pi * p);
@@ -579,7 +579,10 @@ juce::String Palette::load(const juce::File& file, const std::string& sceneName)
     for (auto& p : parts) p.clear();
     for (auto& g : trackGainDb) g = 0;
     masterDb = 0;
-    returnDb[0] = returnDb[1] = 0;
+    returnDb[0] = returnDb[1] = returnDb[2] = 0;
+    for (auto& f : feeds) f = 0;
+    fbBeats = 0.75f;
+    fbAmount = 0;
     for (auto& d : drives) d = {};
     for (auto& a : amps) a = {};
     for (auto& c : crushes) c = {};
@@ -611,8 +614,10 @@ juce::String Palette::load(const juce::File& file, const std::string& sceneName)
                 if (k == t || t < 0) sends[k][tokens[2] == "reverb"] = juce::jmax(0.0f, tokens[3].getFloatValue());
             continue;
         }
-        if (tokens[0] == "return" && tokens.size() >= 3 && (tokens[1] == "delay" || tokens[1] == "reverb")) { returnDb[tokens[1] == "reverb"] = tokens[2].getFloatValue(); continue; }
-        if (tokens[0] == "gain" || tokens[0] == "delay" || tokens[0] == "drive" || tokens[0] == "crush" || tokens[0] == "comp" || tokens[0] == "duck" || tokens[0] == "lowcut" || tokens[0] == "amp" || tokens[0] == "release")
+        if (tokens[0] == "return" && tokens.size() >= 3 && (tokens[1] == "delay" || tokens[1] == "reverb" || tokens[1] == "feedback"))
+        { returnDb[tokens[1] == "reverb" ? 1 : tokens[1] == "feedback" ? 2 : 0] = tokens[2].getFloatValue(); continue; }
+        if (tokens[0] == "feedback" && tokens.size() >= 3) { fbBeats = tokens[1].getFloatValue(); fbAmount = tokens[2].getFloatValue(); continue; }
+        if (tokens[0] == "gain" || tokens[0] == "delay" || tokens[0] == "drive" || tokens[0] == "crush" || tokens[0] == "comp" || tokens[0] == "duck" || tokens[0] == "lowcut" || tokens[0] == "amp" || tokens[0] == "release" || tokens[0] == "feed")
         {
             const int t = info->trackOf(tokens[1].toStdString());
             if (t < 0) return where + "no track '" + tokens[1] + "' in the " + juce::String(scene) + " scene";
@@ -620,6 +625,7 @@ juce::String Palette::load(const juce::File& file, const std::string& sceneName)
             else if (tokens[0] == "crush" && tokens.size() >= 5) crushes[t] = { tokens[2].getFloatValue(), tokens[3].getFloatValue(), juce::jlimit(0.0f, 1.0f, tokens[4].getFloatValue()) };
             else if (tokens[0] == "comp" && tokens.size() >= 7) comps[t] = { tokens[2].getFloatValue(), juce::jmax(1.0f, tokens[3].getFloatValue()), tokens[4].getFloatValue(), tokens[5].getFloatValue(), juce::jlimit(0.0f, 1.0f, tokens[6].getFloatValue()) };
             else if (tokens[0] == "duck") duckDepth[t] = juce::jlimit(0.0f, 1.0f, tokens[2].getFloatValue());
+            else if (tokens[0] == "feed") feeds[t] = juce::jmax(0.0f, tokens[2].getFloatValue());
             else if (tokens[0] == "release") releaseS[t] = juce::jmax(0.0f, tokens[2].getFloatValue());
             else if (tokens[0] == "lowcut") lowCutHz[t] = juce::jmax(0.0f, tokens[2].getFloatValue());
             else if (tokens[0] == "amp" && tokens.size() >= 5) amps[t] = { juce::jlimit(0.0f, 1.0f, tokens[2].getFloatValue()), tokens[3].getFloatValue(), juce::jlimit(0.0f, 1.0f, tokens[4].getFloatValue()),
@@ -788,6 +794,8 @@ juce::String Engine::load(double sampleRate, int maxBlock, const Palette& palett
     if (!reverb_) return "reverb bus: " + err;
     auto busChannels = [](juce::AudioPluginInstance& p) { return juce::jmax(2, p.getTotalNumInputChannels(), p.getTotalNumOutputChannels()); };
     delayBus_.setSize(busChannels(*delay_), maxBlock);
+    fbBuf_.setSize(2, maxBlock);
+    fbBus_.prepare(sampleRate);
     reverbBus_.setSize(busChannels(*reverb_), maxBlock);
 
     limiter.prepare(sampleRate, -1.0f, 150.0f);
@@ -956,6 +964,7 @@ void Engine::start(uint64_t seed, int startBar)
     const double beat = 60.0 / next->bpm();
     delaySeconds_[0] = float(0.75 * beat);
     delaySeconds_[1] = float(beat);
+    fbBus_.set(palette_.fbBeats * beat, palette_.fbAmount);
     if (delay_ && reverb_)
     {
         // Their pitch modulation (the delay's tape wobble, the reverb's chorus) reads as detune
@@ -1180,9 +1189,12 @@ void Engine::renderChunk(float* const* out, int numChannels, int offset, int len
     juce::AudioBuffer<float> reverbIn(reverbBus_.getArrayOfWritePointers(), reverbBus_.getNumChannels(), len);
     delayIn.clear();
     reverbIn.clear();
-    float* st[2 * kMaxTracks + 4] = {};
+    float* st[2 * kMaxTracks + 6] = {};
     if (stemOut)
-        for (int k = 0; k < 2 * numTracks_ + 4; ++k) st[k] = stemOut[k] + offset;
+        for (int k = 0; k < 2 * numTracks_ + 6; ++k) st[k] = stemOut[k] + offset;
+    fbBuf_.clear(0, len);
+    fbBuf_.clear(1, len);
+    float* fbIn[2] = { fbBuf_.getWritePointer(0), fbBuf_.getWritePointer(1) };
     auto runFx = [&](juce::AudioPluginInstance& fx, juce::AudioBuffer<float>& buf) {
         for (int c = 2; c < buf.getNumChannels(); ++c) buf.clear(c, 0, len); // a side-chain input hears nothing
         fx.processBlock(buf, noMidi_);
@@ -1247,6 +1259,7 @@ void Engine::renderChunk(float* const* out, int numChannels, int offset, int len
                 pa[c][n] += x[c];
                 delayIn.getWritePointer(c)[n] += x[c] * sends[0];
                 reverbIn.getWritePointer(c)[n] += x[c] * sends[1];
+                fbIn[c][n] += x[c] * palette_.feeds[i];
                 peak = juce::jmax(peak, std::abs(x[c]));
                 sq += double(x[c]) * x[c];
             }
@@ -1373,6 +1386,17 @@ void Engine::renderChunk(float* const* out, int numChannels, int offset, int len
         if (stemOut)
             for (int c = 0; c < 2; ++c) juce::FloatVectorOperations::copyWithMultiply(st[2 * numTracks_ + 2 + c], reverbIn.getReadPointer(c), returnGain[1], len);
         for (int c = 0; c < 2; ++c) juce::FloatVectorOperations::addWithMultiply(pa[c], reverbIn.getReadPointer(c), returnGain[1], len);
+    }
+
+    if (effects) // the feedback bus (silent unless something feeds it)
+    {
+        fbBus_.process(fbIn[0], fbIn[1], len);
+        const float g = juce::Decibels::decibelsToGain(palette_.returnDb[2]);
+        for (int c = 0; c < 2; ++c)
+        {
+            if (stemOut) juce::FloatVectorOperations::copyWithMultiply(st[2 * numTracks_ + 4 + c], fbIn[c], g, len);
+            juce::FloatVectorOperations::addWithMultiply(pa[c], fbIn[c], g, len);
+        }
     }
 
     if (mixStage && numChannels > 1) glue.process(pa[0], pa[1], len);
@@ -1858,6 +1882,35 @@ void FeedbackDelay::process(float* left, float* right, int n)
         w_ = (w_ + 1) % size;
     }
     if (throwAt_ >= 0) throwAt_ = 0; // a throw still open carries into the next block from its start
+}
+
+void FeedbackBus::prepare(double sr)
+{
+    sr_ = sr;
+    l_.assign(size_t(sr * 4.5) + 8, 0.0f);
+    r_.assign(l_.size(), 0.0f);
+    w_ = 0;
+    lpA_ = 1.0f - std::exp(-juce::MathConstants<float>::twoPi * 3500.0f / float(sr));
+    hpA_ = 1.0f - std::exp(-juce::MathConstants<float>::twoPi * 70.0f / float(sr));
+    lpL_ = lpR_ = hpL_ = hpR_ = 0;
+}
+
+void FeedbackBus::process(float* left, float* right, int n)
+{
+    const int size = int(l_.size());
+    auto clip = [](float x) { return 0.5f * std::tanh(2.0f * x); }; // gain 1 when quiet, never past 0.5
+    for (int i = 0; i < n; ++i)
+    {
+        const int rd = (w_ - d_ + size) % size;
+        const float el = l_[size_t(rd)], er = r_[size_t(rd)];
+        lpL_ += (er - lpL_) * lpA_;  lpR_ += (el - lpR_) * lpA_;
+        hpL_ += (lpL_ - hpL_) * hpA_; hpR_ += (lpR_ - hpR_) * hpA_;
+        l_[size_t(w_)] = 0.5f * (left[i] + right[i]) + clip(fb_ * (lpL_ - hpL_)); // ping-pong: left feeds right feeds left
+        r_[size_t(w_)] = clip(fb_ * (lpR_ - hpR_));
+        left[i] = el;
+        right[i] = er;
+        w_ = (w_ + 1) % size;
+    }
 }
 
 } // namespace liszt

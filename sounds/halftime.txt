@@ -93,6 +93,7 @@ pad      20.8     714  sfz/vsco2/FHorn-sus.sfz
 
 # 2026-10-30: the riff (the engine's guitar: two takes, left and right, the fifths pure) into a fuzz and a cabinet
 riff     0.0    1000  internal/guitar
+drone    0.0       0  internal/none  # the second guitar: only Doom has one so far
 gain riff    -13.1
 drive riff 0.85 2500
 amp riff  0.70 1800 1.0 45 -2 3600 6 1100

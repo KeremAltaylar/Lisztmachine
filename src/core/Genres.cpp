@@ -21,7 +21,7 @@ G::Part none() { return part("", "", ""); }
 
 uint32_t layersOf(const char* s)
 {
-    static const char* letters = "PKSHCBUADF_GYMTIR"; // in GTrack order (the harm has no letter: it follows the pad)
+    static const char* letters = "PKSHCBUADF_GYMTIRW"; // in GTrack order (the harm has no letter: it follows the pad)
     uint32_t m = 0;
     for (; *s; ++s)
         if (const char* p = std::strchr(letters, *s)) m |= bit(int(p - letters));
@@ -163,11 +163,11 @@ const G::Spec kDoom {
     // after Sleep, Electric Wizard, Sunn O))) and Bell Witch: slow, phrygian (the flat second against
     // the root), power chords tuned down; the riff is the song. It starts alone, the band joins it,
     // and the summit is all of the low end playing it as one.
-    .bpmLo = 62, .bpmHi = 68, .mode = &kPhrygian, .tonics = { 1, 2, 11, 9, 4 },
+    .bpmLo = 74, .bpmHi = 78, .mode = &kPhrygian, .tonics = { 1, 2, 11, 9, 4 }, // 2026-10-31 (Kerem): a little faster
     .progs = { { { 0, 1, 0, 5 }, { 0, 5, 3, 1 }, { 0, 3, 1, 0 } } }, .preRoot = 1,
-    .form = { { { "Feedback", 8, .15f, "RFT" }, { "Procession", 16, .45f, "PRBUTG" }, { "Monolith", 24, .70f, "PRBUDCKSTGYM" },
-                { "Shroud", 16, .40f, "PAFT" }, { "Funeral", 24, .85f, "PRBUDCKSTGYMAI" }, { "Ash", 8, .25f, "PAT" },
-                { "Monument", 32, 1.0f, "PRBUDCKSTGYMAFI" }, { "Dust", 8, .15f, "RFT" } } },
+    .form = { { { "Feedback", 8, .15f, "RFTW" }, { "Procession", 16, .45f, "PRBUTGW" }, { "Monolith", 24, .70f, "PRBUDCKSTGYMW" },
+                { "Shroud", 16, .40f, "PAFTW" }, { "Funeral", 24, .85f, "PRBUDCKSTGYMAIW" }, { "Ash", 8, .25f, "PATW" },
+                { "Monument", 32, 1.0f, "PRBUDCKSTGYMAFIW" }, { "Dust", 8, .15f, "RFTW" } } },
     .pulse = part("X...............", "X.......X.......", "X.......X...x..."),
     .metal = part("", "..........1.....", "......1.......2."), // far bells, chains
     .tick = part("", "", ""),
@@ -182,7 +182,7 @@ const G::Spec kDoom {
     .mallet = part("", "1...............", "1.......3......."),
     .texture = part("x---------------", "x---------------", "x-------x-------"),
     .arpLo = 55, .arpHi = 79, .percLo = 33, .percHi = 48, .ext = 0,
-    .riff = G::RiffStyle::Sludge, .riffLo = 30, .summit = G::Summit::Unison, .gaze = true,
+    .riff = G::RiffStyle::Sludge, .riffLo = 30, .summit = G::Summit::Unison, .legato = true, .gaze = true,
 };
 
 const G::Spec kBlackgaze {
@@ -239,13 +239,13 @@ const SceneInfo* genreSceneInfo(const std::string& scene)
     static const std::vector<SceneInfo> infos = [] {
         std::vector<SceneInfo> v;
         for (auto* s : G::all())
-            v.push_back({ s->scene, 17, { "pad", "pulse", "metal", "tick", "perc", "bass", "sub", "arp", "chord", "fx", "harm",
-                                          "ground", "body", "mallet", "texture", "impact", "riff" },
-                          { 0, 1, 2, 2, 2, 1, 1, 3, 0, 0, 0, 1, 2, 2, 2, 1, 1 },
+            v.push_back({ s->scene, 18, { "pad", "pulse", "metal", "tick", "perc", "bass", "sub", "arp", "chord", "fx", "harm",
+                                          "ground", "body", "mallet", "texture", "impact", "riff", "drone" },
+                          { 0, 1, 2, 2, 2, 1, 1, 3, 0, 0, 0, 1, 2, 2, 2, 1, 1, 0 },
                           { { 0, .30f }, { 0, .02f }, { .05f, .12f }, { .03f, .08f }, { .10f, .15f }, { 0, .03f }, { 0, 0 }, { .20f, .20f }, { .20f, .25f }, { .10f, .35f }, { .08f, .40f },
-                            { 0, .10f }, { .05f, .12f }, { .20f, .25f }, { 0, .20f }, { .10f, .45f }, { .03f, .10f } },
-                          { -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1 },
-                          { 1, 0, 0, 0, 0, 1, 0, 1, 1, 0, 1, 0, 0, 0, 0, 0, 0 }, true });
+                            { 0, .10f }, { .05f, .12f }, { .20f, .25f }, { 0, .20f }, { .10f, .45f }, { .03f, .10f }, { .05f, .30f } },
+                          { -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1 },
+                          { 1, 0, 0, 0, 0, 1, 0, 1, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0 }, true });
         return v;
     }();
     for (auto& i : infos) if (scene == i.name) return &i;
@@ -523,6 +523,7 @@ std::array<int, 2> GenreComposer::range(int track) const
         case Texture: return { 48, 84 };
         case Impact: return { 30, 50 };
         case Riff: return { 24, 76 };
+        case Drone: return { 40, 67 };
         default: return { 48, 72 };
     }
 }
@@ -686,6 +687,32 @@ void GenreComposer::emitHarm(int bar, std::vector<Event>& out)
     {
         for (int p : harmHeld_) out.push_back({ t0 + kBarTicks, Event::NoteOff, Harm, uint8_t(p), 0 });
         harmHeld_.clear();
+    }
+}
+
+void GenreComposer::emitDrone(int bar, std::vector<Event>& out)
+{
+    // The second guitar: the chord held as long as it lasts (root, fifth, octave, and the ninth
+    // where it is a whole step), notes it shares with the next chord ringing on, into the feedback.
+    const int64_t t0 = int64_t(bar) * kBarTicks;
+    std::vector<int> want;
+    if (active(Drone, bar))
+    {
+        const auto& m = *spec_.mode;
+        const int r = rootAt(bar), root = 40 + ((tonicAt(bar) + degreeSemis(m, r)) % 12 - 40 % 12 + 12) % 12;
+        const int fifth = (degreeSemis(m, r + 4) - degreeSemis(m, r) + 24) % 12, ninth = (degreeSemis(m, r + 1) - degreeSemis(m, r) + 24) % 12;
+        want = { root, root + fifth, root + 12 };
+        if (ninth == 2) want.push_back(root + 14);
+    }
+    for (int p : droneHeld_)
+        if (std::find(want.begin(), want.end(), p) == want.end()) out.push_back({ t0, Event::NoteOff, Drone, uint8_t(p), 0 });
+    for (int p : want)
+        if (std::find(droneHeld_.begin(), droneHeld_.end(), p) == droneHeld_.end()) out.push_back({ t0, Event::NoteOn, Drone, uint8_t(p), .8f });
+    droneHeld_ = want;
+    if (bar + 1 == totalBars())
+    {
+        for (int p : droneHeld_) out.push_back({ t0 + kBarTicks, Event::NoteOff, Drone, uint8_t(p), 0 });
+        droneHeld_.clear();
     }
 }
 
@@ -854,7 +881,7 @@ void GenreComposer::emitPart(int track, const Part& part, int bar, std::vector<E
             hit(t, drumPitch(c, i), vel, std::min<int64_t>(stepT / 2, kPPQ - 20)); // short: the swing must not reach the next hit
             continue;
         }
-        const int64_t noteLen = cap(t0 + i * stepT, int64_t(double(stepT * hm * (1 + holds)) * (holds ? .95 : .7)));
+        const int64_t noteLen = cap(t0 + i * stepT, int64_t(double(stepT * hm * (1 + holds)) * (spec_.legato ? 1.0 : holds ? .95 : .7)) - (spec_.legato ? 10 : 0));
         if (track == Sub)
         {
             // Legato into a different note: the next one starts before this one ends, and the 808 slides.
@@ -1120,8 +1147,11 @@ std::vector<GenreComposer::RHit> GenreComposer::riffHits(int bar) const
         if (tr == 0 && n.step != 0) continue;                    // the calm: only its first chord, ringing on
         if (tr == 1 && in % 4 == 3 && n.step != from) continue;  // every fourth bar a breath: only the bar's first chord
         const int64_t len = tr == 0 ? kBarTicks : int64_t(n.len) * kSixteenth * mul;
+        if (spec_.legato && n.palm) continue;
         h.push_back({ t0 + int64_t(n.step - from) * kSixteenth * mul, len - 12, n.deg, n.vel, n.palm });
     }
+    if (spec_.legato) // each chord rings into the next, the last to the bar line
+        for (size_t k = 0; k < h.size(); ++k) h[k].len = (k + 1 < h.size() ? h[k + 1].t : t0 + kBarTicks) - h[k].t - 12;
     return h;
 }
 
@@ -1303,6 +1333,7 @@ void GenreComposer::generateBar(int bar, std::vector<Event>& out)
     else emitArp(bar, out);
     emitPart(Sub, spec_.sub, bar, out);
     emitHarm(bar, out);
+    emitDrone(bar, out);
     emitPart(Ground, spec_.ground, bar, out);
     emitPart(Body, spec_.body, bar, out);
     emitPart(Mallet, spec_.mallet, bar, out);

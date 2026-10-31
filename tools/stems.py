@@ -7,7 +7,7 @@ CHECK = "--check" in sys.argv  # only the rebuild check, no mp3s
 base = wav[:-4]
 names = [l.split()[2] for l in open(base + ".sections.txt").read().splitlines()[1:]]
 times = [float(l.split()[0]) for l in open(base + ".sections.txt").read().splitlines()[1:]]
-stems = [s for s in "pad pulse metal tick perc bass sub arp chord fx harm ground body mallet texture impact riff delay reverb".split()
+stems = [s for s in "pad pulse metal tick perc bass sub arp chord fx harm ground body mallet texture impact riff drone delay reverb feedback".split()
          if os.path.exists(f"{base}.{s}.wav")]
 os.makedirs(f"{page}/media", exist_ok=True)
 
@@ -31,13 +31,17 @@ man = {"song": song, "title": song.title(), "bpm": float(open(base + ".sections.
        "labels": LABELS.get(song, {}), "sections": [], "master": master,  # the palette's balance, which the page's faders add to
        "base": {t: float(g) for t, g in re.findall(r"^gain (\w+)\s+([-\d.]+)", pal, re.M)},
        "returns": {t: float(g) for t, g in re.findall(r"^return (\w+)\s+([-\d.]+)", pal, re.M)}}
+fb = re.search(r"^feedback\s+([\d.]+)\s+([\d.]+)", pal, re.M)
+if fb:  # the page rebuilds the feedback bus live from the parts that feed it: no stem for it
+    man["feedback"] = {"beats": float(fb[1]), "amount": float(fb[2]),
+                       "feeds": {t: float(g) for t, g in re.findall(r"^feed (\w+)\s+([\d.]+)", pal, re.M)}}
 for k, name in enumerate(names[:-1]):
     a, b = int(times[k] * sr), int(times[k + 1] * sr)
     present = []
     for s in stems:
         x = data[s][a:b]
         if np.sqrt((x ** 2).mean()) < 10 ** (-70 / 20): continue
-        if not CHECK: sf.write(f"{page}/media/{k}_{s}.mp3", x, sr, format="MP3", compression_level=0.3)
+        if not CHECK and not (fb and s == "feedback"): sf.write(f"{page}/media/{k}_{s}.mp3", x, sr, format="MP3", compression_level=0.3)
         present.append(s)
     man["sections"].append({"name": name, "start": times[k], "end": times[k + 1], "stems": present})
     rebuilt = glue(sum(data[s][a:b] for s in stems), sr)[:-LOOK]

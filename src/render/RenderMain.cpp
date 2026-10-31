@@ -315,10 +315,10 @@ static int renderConcert(uint64_t seed, double seconds, const juce::File& out, i
     std::vector<std::unique_ptr<juce::AudioFormatWriter>> stemWriters;
     if (gStems)
     {
-        stemBuf.setSize(2 * info.numTracks + 4, block);
-        for (int k = 0; k < info.numTracks + 2; ++k)
+        stemBuf.setSize(2 * info.numTracks + 6, block);
+        for (int k = 0; k < info.numTracks + 3; ++k)
         {
-            const juce::String name = k < info.numTracks ? juce::String(info.trackNames[k]) : k == info.numTracks ? "delay" : "reverb";
+            const juce::String name = k < info.numTracks ? juce::String(info.trackNames[k]) : k == info.numTracks ? "delay" : k == info.numTracks + 1 ? "reverb" : "feedback";
             auto f = out.getSiblingFile(out.getFileNameWithoutExtension() + "." + name + ".wav");
             f.deleteFile();
             std::unique_ptr<juce::OutputStream> s = std::make_unique<juce::FileOutputStream>(f);

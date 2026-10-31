@@ -1,186 +1,7 @@
 {
  "song": "doom",
  "title": "Doom",
- "bpm": 68.0,
- "sections": [
-  {
-   "name": "Feedback",
-   "start": 0.0,
-   "end": 28.2353,
-   "stems": [
-    "fx",
-    "texture",
-    "riff",
-    "delay",
-    "reverb"
-   ]
-  },
-  {
-   "name": "Procession",
-   "start": 28.2353,
-   "end": 84.7059,
-   "stems": [
-    "pad",
-    "bass",
-    "sub",
-    "fx",
-    "harm",
-    "ground",
-    "texture",
-    "riff",
-    "delay",
-    "reverb"
-   ]
-  },
-  {
-   "name": "Monolith",
-   "start": 84.7059,
-   "end": 169.412,
-   "stems": [
-    "pad",
-    "metal",
-    "perc",
-    "bass",
-    "sub",
-    "chord",
-    "harm",
-    "ground",
-    "body",
-    "mallet",
-    "texture",
-    "riff",
-    "delay",
-    "reverb"
-   ]
-  },
-  {
-   "name": "Shroud",
-   "start": 169.412,
-   "end": 225.882,
-   "stems": [
-    "pad",
-    "bass",
-    "sub",
-    "arp",
-    "chord",
-    "fx",
-    "harm",
-    "ground",
-    "body",
-    "mallet",
-    "texture",
-    "riff",
-    "delay",
-    "reverb"
-   ]
-  },
-  {
-   "name": "Funeral",
-   "start": 225.882,
-   "end": 310.588,
-   "stems": [
-    "pad",
-    "metal",
-    "perc",
-    "bass",
-    "sub",
-    "arp",
-    "chord",
-    "fx",
-    "harm",
-    "ground",
-    "body",
-    "mallet",
-    "texture",
-    "impact",
-    "riff",
-    "delay",
-    "reverb"
-   ]
-  },
-  {
-   "name": "Ash",
-   "start": 310.588,
-   "end": 338.824,
-   "stems": [
-    "pad",
-    "arp",
-    "harm",
-    "mallet",
-    "texture",
-    "delay",
-    "reverb"
-   ]
-  },
-  {
-   "name": "Monument",
-   "start": 338.824,
-   "end": 451.765,
-   "stems": [
-    "pad",
-    "metal",
-    "perc",
-    "bass",
-    "sub",
-    "arp",
-    "chord",
-    "fx",
-    "harm",
-    "ground",
-    "body",
-    "mallet",
-    "texture",
-    "impact",
-    "riff",
-    "delay",
-    "reverb"
-   ]
-  },
-  {
-   "name": "Dust",
-   "start": 451.765,
-   "end": 480.0,
-   "stems": [
-    "pad",
-    "bass",
-    "sub",
-    "arp",
-    "chord",
-    "fx",
-    "harm",
-    "ground",
-    "body",
-    "mallet",
-    "texture",
-    "riff",
-    "delay",
-    "reverb"
-   ]
-  }
- ],
- "master": 9.6,
- "base": {
-  "pulse": 0.0,
-  "metal": 6.0,
-  "tick": 14.9,
-  "perc": -3.4,
-  "pad": -0.5,
-  "bass": -0.7,
-  "sub": -8.3,
-  "arp": -11.3,
-  "chord": -5.1,
-  "fx": -6.9,
-  "harm": -4.2,
-  "ground": -21.6,
-  "body": -12.5,
-  "mallet": -29.9,
-  "texture": -19.2,
-  "impact": -4.0,
-  "riff": -8.1
- },
- "returns": {
-  "reverb": 7.5
- },
+ "bpm": 76.0,
  "labels": {
   "ground": "Log",
   "body": "Skin",
@@ -188,5 +9,212 @@
   "texture": "Chain",
   "chord": "Brass",
   "fx": "Unsettler"
+ },
+ "sections": [
+  {
+   "name": "Feedback",
+   "start": 0.0,
+   "end": 25.2632,
+   "stems": [
+    "fx",
+    "texture",
+    "riff",
+    "drone",
+    "delay",
+    "reverb",
+    "feedback"
+   ]
+  },
+  {
+   "name": "Procession",
+   "start": 25.2632,
+   "end": 75.7895,
+   "stems": [
+    "pad",
+    "bass",
+    "sub",
+    "fx",
+    "harm",
+    "ground",
+    "texture",
+    "riff",
+    "drone",
+    "delay",
+    "reverb",
+    "feedback"
+   ]
+  },
+  {
+   "name": "Monolith",
+   "start": 75.7895,
+   "end": 151.579,
+   "stems": [
+    "pad",
+    "metal",
+    "perc",
+    "bass",
+    "sub",
+    "chord",
+    "harm",
+    "ground",
+    "body",
+    "mallet",
+    "texture",
+    "riff",
+    "drone",
+    "delay",
+    "reverb",
+    "feedback"
+   ]
+  },
+  {
+   "name": "Shroud",
+   "start": 151.579,
+   "end": 202.105,
+   "stems": [
+    "pad",
+    "bass",
+    "sub",
+    "arp",
+    "chord",
+    "fx",
+    "harm",
+    "ground",
+    "body",
+    "mallet",
+    "texture",
+    "riff",
+    "drone",
+    "delay",
+    "reverb",
+    "feedback"
+   ]
+  },
+  {
+   "name": "Funeral",
+   "start": 202.105,
+   "end": 277.895,
+   "stems": [
+    "pad",
+    "metal",
+    "perc",
+    "bass",
+    "sub",
+    "arp",
+    "chord",
+    "fx",
+    "harm",
+    "ground",
+    "body",
+    "mallet",
+    "texture",
+    "impact",
+    "riff",
+    "drone",
+    "delay",
+    "reverb",
+    "feedback"
+   ]
+  },
+  {
+   "name": "Ash",
+   "start": 277.895,
+   "end": 303.158,
+   "stems": [
+    "pad",
+    "arp",
+    "harm",
+    "mallet",
+    "texture",
+    "drone",
+    "delay",
+    "reverb",
+    "feedback"
+   ]
+  },
+  {
+   "name": "Monument",
+   "start": 303.158,
+   "end": 404.211,
+   "stems": [
+    "pad",
+    "metal",
+    "perc",
+    "bass",
+    "sub",
+    "arp",
+    "chord",
+    "fx",
+    "harm",
+    "ground",
+    "body",
+    "mallet",
+    "texture",
+    "impact",
+    "riff",
+    "drone",
+    "delay",
+    "reverb",
+    "feedback"
+   ]
+  },
+  {
+   "name": "Dust",
+   "start": 404.211,
+   "end": 429.474,
+   "stems": [
+    "pad",
+    "bass",
+    "sub",
+    "arp",
+    "chord",
+    "fx",
+    "harm",
+    "ground",
+    "body",
+    "mallet",
+    "texture",
+    "riff",
+    "drone",
+    "delay",
+    "reverb",
+    "feedback"
+   ]
+  }
+ ],
+ "master": 4.0,
+ "base": {
+  "pulse": 0.0,
+  "metal": 6.0,
+  "tick": 14.9,
+  "perc": -3.4,
+  "pad": 11.0,
+  "bass": -0.7,
+  "sub": -8.3,
+  "arp": -11.3,
+  "chord": -5.1,
+  "fx": -6.9,
+  "harm": -0.1,
+  "ground": -21.6,
+  "body": -12.5,
+  "mallet": -29.9,
+  "texture": -19.2,
+  "impact": -4.0,
+  "riff": -1.8,
+  "drone": -1.0
+ },
+ "returns": {
+  "reverb": 17.6,
+  "delay": 12.0,
+  "feedback": 0.0
+ },
+ "feedback": {
+  "beats": 0.75,
+  "amount": 0.85,
+  "feeds": {
+   "riff": 0.35,
+   "bass": 0.2,
+   "drone": 0.5
+  }
  }
 }

@@ -67,6 +67,12 @@ input[type=range].fader { writing-mode: vertical-lr; direction: rtl; width: 22px
 .out-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
 pre { margin: 0; background: var(--well); border-radius: 8px; padding: 12px 14px; font: 13px/1.6 var(--mono); overflow-x: auto; color: var(--ink); }
 .note { color: var(--dim); font-size: 13px; max-width: 70ch; margin: 0; }
+.fbk { display: flex; flex-wrap: wrap; align-items: end; gap: 10px 22px; padding: 12px 14px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; }
+.fbk[hidden] { display: none; }
+.fbk label { display: grid; gap: 4px; font: 400 12px var(--mono); color: var(--dim); }
+.fbk input[type=range] { width: 140px; accent-color: var(--accent); }
+.fbk output { color: var(--ink); }
+.fbk select { font: inherit; color: var(--ink); background: var(--well); border: 1px solid var(--line); border-radius: 6px; padding: 4px 6px; }
 #status { min-height: 1.4em; color: var(--dim); font: 400 13px var(--mono); }
 #status.err { color: var(--hot); }
 @media (max-width: 640px) { .desk { flex-direction: column; } .strip.master { width: 100%; grid-template-columns: auto 1fr; justify-items: start; } }
@@ -95,6 +101,13 @@ pre { margin: 0; background: var(--well); border-radius: 8px; padding: 12px 14px
   </div>
   <div id="status">Press Play to load Haze.</div>
 
+  <section class="fbk" id="fbk" hidden aria-label="Feedback bus">
+    <div class="label" style="flex-basis:100%">Feedback bus · the guitars and the bass into a ping-pong echo, live</div>
+    <label>Time <select id="fbBeats"><option value="0.25">1/16</option><option value="0.5">1/8</option><option value="0.75">1/8 dotted</option><option value="1">1/4</option><option value="1.5">1/4 dotted</option><option value="2">1/2</option></select></label>
+    <label>Feedback <output id="fbAmtV"></output><input id="fbAmt" type="range" min="0" max="1.5" step="0.01" aria-label="Feedback amount"></label>
+    <div id="fbFeeds" style="display:contents"></div>
+  </section>
+
   <div class="desk">
     <div class="strips" id="strips"></div>
     <div class="strip master" id="masterStrip">
@@ -118,15 +131,15 @@ pre { margin: 0; background: var(--well); border-radius: 8px; padding: 12px 14px
 
 <script>
 let BPM = 150, BAR = 4 * 60 / BPM, SONG = "blackgaze"; // the song, from the manifest
-let BASE = {}, MASTER = 9.3, RETURNS = {}; // the palette's balance (from the manifest); a fader adds to it
+let BASE = {}, MASTER = 9.3, RETURNS = {}, FB = null; // FB: the song's feedback bus (beats, amount, feeds), if it has one // the palette's balance (from the manifest); a fader adds to it
 let LABEL = { pad: "Pads", metal: "Metal", perc: "Perc", bass: "Bass", sub: "808", arp: "Lead", chord: "Keys", fx: "Noise", harm: "Choir",
-  ground: "Iron", body: "Plate", mallet: "Glass", texture: "Scrape", impact: "Impact", riff: "Guitar", delay: "Echo", reverb: "Reverb", pulse: "Pulse", tick: "Tick" };
-const ORDER = ["riff", "arp", "chord", "pad", "harm", "bass", "sub", "ground", "body", "metal", "perc", "impact", "texture", "fx", "mallet", "pulse", "tick", "delay", "reverb"];
+  ground: "Iron", body: "Plate", mallet: "Glass", texture: "Scrape", impact: "Impact", riff: "Guitar", delay: "Echo", reverb: "Reverb", pulse: "Pulse", tick: "Tick", drone: "Drone", feedback: "Feedback" };
+const ORDER = ["riff", "drone", "feedback", "arp", "chord", "pad", "harm", "bass", "sub", "ground", "body", "metal", "perc", "impact", "texture", "fx", "mallet", "pulse", "tick", "delay", "reverb"];
 
 const $ = id => document.getElementById(id);
 let man = null, cur = 0, ctx = null, glue = null, sum = null, mAn = null, buffers = {}, sources = [], strips = {};
 let playing = false, startedAt = 0, offset = 0, engineMix = false, glueDb = 0;
-const mix = { tracks: {}, master: 0 }; // what Kerem set: dB per strip, mute, low cut Hz
+const mix = { tracks: {}, master: 0, fb: null }; // fb: { beats, amount, feeds } over FB // what Kerem set: dB per strip, mute, low cut Hz
 const tr = s => (mix.tracks[s] ??= { db: 0, mute: false, lowcut: 0 });
 const solos = new Set();
 
@@ -142,6 +155,16 @@ async function boot() {
   if (man.song) { SONG = man.song; BPM = man.bpm; BAR = 4 * 60 / BPM; $("song").textContent = SONG;
     $("title").textContent = document.title = man.title + " Mixer"; Object.assign(LABEL, man.labels || {}); }
   status(`Press Play to load ${man.sections[0].name}.`);
+  if (man.feedback) { // built live here from the dry parts, so it answers the knobs: every section has it
+    FB = man.feedback; RETURNS.feedback ??= 0;
+    for (const x of man.sections) if (!x.stems.includes("feedback")) x.stems.push("feedback");
+    mix.fb = { beats: FB.beats, amount: FB.amount, feeds: { ...FB.feeds } };
+    $("fbk").hidden = false;
+    $("fbFeeds").innerHTML = Object.keys(FB.feeds).map(s => `<label>Feed ${LABEL[s] ?? s} <output id="fdV-${s}"></output><input id="fd-${s}" type="range" min="0" max="1" step="0.01" aria-label="Feed ${LABEL[s] ?? s}"></label>`).join("");
+    $("fbBeats").onchange = () => { mix.fb.beats = +$("fbBeats").value; changed(); };
+    $("fbAmt").oninput = () => { mix.fb.amount = +$("fbAmt").value; changed(); };
+    for (const s in FB.feeds) $("fd-" + s).oninput = () => { mix.fb.feeds[s] = +$("fd-" + s).value; changed(); };
+  }
   const allStems = ORDER.filter(s => man.sections.some(x => x.stems.includes(s)));
   $("rail").innerHTML = man.sections.map((s, k) => `<button type="button" data-k="${k}" aria-pressed="${k === 0}">
     <b>${s.name}</b><small>bars ${Math.round(s.start / BAR) + 1}–${Math.round(s.end / BAR)}</small></button>`).join("");
@@ -188,7 +211,8 @@ async function connectDb() {
   doc = db.doc("mixes/" + SONG);
   try {
     const snap = await doc.get();
-    if (snap.exists) { const d = snap.data(); Object.assign(mix.tracks, d.tracks || {}); mix.master = d.master || 0; apply(); lines();
+    if (snap.exists) { const d = snap.data(); Object.assign(mix.tracks, d.tracks || {}); mix.master = d.master || 0;
+      if (FB && d.fb) mix.fb = { beats: d.fb.beats, amount: d.fb.amount, feeds: { ...FB.feeds, ...d.fb.feeds } }; apply(); lines();
       $("saved").textContent = "Your saved mix is loaded"; $("saved").className = "pill ok"; }
   } catch (e) { $("saved").textContent = "Could not read your saved mix"; $("saved").className = "pill bad"; }
 }
@@ -197,7 +221,7 @@ function save() {
   if (!doc) return;
   $("saved").textContent = "Saving…"; $("saved").className = "pill";
   saveTimer = setTimeout(async () => {
-    try { await doc.set({ tracks: mix.tracks, master: mix.master, base: BASE, baseMaster: MASTER, savedAt: new Date().toISOString() });
+    try { await doc.set({ tracks: mix.tracks, master: mix.master, ...(FB ? { fb: mix.fb, baseFb: FB } : {}), base: BASE, baseMaster: MASTER, savedAt: new Date().toISOString() });
       $("saved").textContent = "Saved"; $("saved").className = "pill ok"; }
     catch (e) { $("saved").textContent = e?.code === "not_granted" ? "Saving was not allowed" : "Not saved: try again"; $("saved").className = "pill bad"; }
   }, 1200);
@@ -208,10 +232,14 @@ function lines() {
   const out = [];
   for (const s of ORDER) {
     const t = mix.tracks[s]; if (!t) continue;
-    if (s === "delay" || s === "reverb") { if (t.mute) out.push(`# ${s} bus muted`); else if (t.db) out.push(`return ${s.padEnd(7)}${((RETURNS[s] || 0) + t.db).toFixed(1).padStart(6)}   # was ${(RETURNS[s] || 0).toFixed(1)}`); if (t.lowcut) out.push(`# ${s} bus low cut ${t.lowcut} Hz`); continue; }
+    if (s === "delay" || s === "reverb" || s === "feedback") { if (t.mute) out.push(`# ${s} bus muted`); else if (t.db) out.push(`return ${s.padEnd(7)}${((RETURNS[s] || 0) + t.db).toFixed(1).padStart(6)}   # was ${(RETURNS[s] || 0).toFixed(1)}`); if (t.lowcut) out.push(`# ${s} bus low cut ${t.lowcut} Hz`); continue; }
     if (t.mute) out.push(`# ${s} muted (${LABEL[s]})`);
     else if (t.db) out.push(`gain ${s.padEnd(8)}${(BASE[s] + t.db).toFixed(1).padStart(6)}   # was ${BASE[s].toFixed(1)}, ${LABEL[s]} ${fmt(t.db)}`);
     if (t.lowcut) out.push(`lowcut ${s} ${t.lowcut}`);
+  }
+  if (FB) {
+    if (mix.fb.beats !== FB.beats || mix.fb.amount !== FB.amount) out.push(`feedback ${mix.fb.beats} ${mix.fb.amount.toFixed(2)}   # was ${FB.beats} ${FB.amount}`);
+    for (const s in FB.feeds) if (mix.fb.feeds[s] !== FB.feeds[s]) out.push(`feed ${s.padEnd(8)}${mix.fb.feeds[s].toFixed(2)}   # was ${FB.feeds[s]}`);
   }
   if (mix.master) out.push(`master ${(MASTER + mix.master).toFixed(1)}   # was ${MASTER}`);
   $("lines").textContent = out.length ? out.join("\n") : "No changes yet. Move a fader.";
@@ -228,6 +256,17 @@ function apply() {
       const on = !(solos.size && !solos.has(s)) && !(t.mute && !engineMix);
       st.gain.gain.setTargetAtTime(on ? 10 ** ((engineMix ? 0 : t.db) / 20) : 0, ctx.currentTime, 0.015);
       st.hp.frequency.setTargetAtTime(!engineMix && t.lowcut ? t.lowcut : 10, ctx.currentTime, 0.015);
+    }
+  }
+  if (FB) {
+    const f = engineMix ? FB : mix.fb;
+    $("fbBeats").value = String(mix.fb.beats); $("fbAmt").value = mix.fb.amount; $("fbAmtV").textContent = mix.fb.amount.toFixed(2);
+    for (const s in FB.feeds) { $("fd-" + s).value = mix.fb.feeds[s]; $("fdV-" + s).textContent = mix.fb.feeds[s].toFixed(2); }
+    if (fbNodes) {
+      const t = ctx.currentTime;
+      for (const d of fbNodes.delays) d.delayTime.setTargetAtTime(f.beats * 60 / BPM, t, 0.05);
+      for (const g of fbNodes.amounts) g.gain.setTargetAtTime(f.amount * 0.25, t, 0.015);
+      for (const s in fbNodes.sends) fbNodes.sends[s].gain.setTargetAtTime(f.feeds[s] ?? 0, t, 0.015);
     }
   }
   $("mFader").value = mix.master; $("mDb").textContent = fmt(mix.master); $("mDb").classList.toggle("moved", !!mix.master);
@@ -275,7 +314,36 @@ async function audio() {
     st.an = new AnalyserNode(ctx, { fftSize: 1024 });
     st.hp.connect(st.gain).connect(st.an).connect(sum);
   }
+  if (FB && strips.feedback) fbNodes = feedbackBus(strips.feedback.hp);
   apply();
+}
+
+// The engine's FeedbackBus, node for node: the feeds summed to mono into the left line; each line's
+// echo through darker (3.5 kHz) and thinner (70 Hz) one-pole filters, times the amount, through
+// 0.5 tanh(2x), into the other line. A delay in a loop is allowed here (it is over 128 samples).
+let fbNodes = null;
+function feedbackBus(out) {
+  const sr = ctx.sampleRate, a = 1 - Math.exp(-2 * Math.PI * 3500 / sr), h = 1 - Math.exp(-2 * Math.PI * 70 / sr);
+  const curve = new Float32Array(4097);
+  for (let i = 0; i < curve.length; i++) curve[i] = 0.5 * Math.tanh(8 * (i / 2048 - 1)); // its input is scaled by 1/4
+  const feed = new GainNode(ctx, { channelCount: 1, channelCountMode: "explicit", channelInterpretation: "speakers" });
+  const dL = new DelayNode(ctx, { maxDelayTime: 5 }), dR = new DelayNode(ctx, { maxDelayTime: 5 });
+  const amounts = [];
+  const arm = (from, to) => {
+    const g = new GainNode(ctx); amounts.push(g);
+    from.connect(new IIRFilterNode(ctx, { feedforward: [a], feedback: [1, -(1 - a)] }))
+      .connect(new IIRFilterNode(ctx, { feedforward: [1 - h, -(1 - h)], feedback: [1, -(1 - h)] }))
+      .connect(g).connect(new WaveShaperNode(ctx, { curve })).connect(to);
+  };
+  feed.connect(dL);
+  arm(dR, dL); arm(dL, dR);
+  const merge = new ChannelMergerNode(ctx, { numberOfInputs: 2 });
+  dL.connect(merge, 0, 0); dR.connect(merge, 0, 1);
+  const ret = new GainNode(ctx, { gain: 10 ** ((RETURNS.feedback || 0) / 20) });
+  merge.connect(ret).connect(out);
+  const sends = {};
+  for (const s in FB.feeds) if (strips[s]) { sends[s] = new GainNode(ctx, { gain: 0 }); strips[s].gain.connect(sends[s]).connect(feed); }
+  return { delays: [dL, dR], amounts, sends };
 }
 
 async function loadSection(k) {
@@ -289,7 +357,7 @@ async function loadSection(k) {
   let done = 0;
   status(`Loading ${sec.name}: 0 of ${names.length} parts`);
   try {
-    await Promise.all(names.map(async s => {
+    await Promise.all(names.filter(s => !(FB && s === "feedback")).map(async s => {
       const b = await (await fetch(`media/${k}_${s}.mp3`)).arrayBuffer();
       buffers[s] = await ctx.decodeAudioData(b);
       status(`Loading ${sec.name}: ${++done} of ${names.length} parts`);

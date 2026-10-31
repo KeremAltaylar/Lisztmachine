@@ -46,7 +46,9 @@ struct Palette
     std::vector<PaletteEntry> parts[kMaxTracks];
     float trackGainDb[kMaxTracks] = {}; // "gain <track> dB": the balance between tracks
     float masterDb = 0;                 // "master dB": drive into the master's soft clipper
-    float returnDb[2] = {};             // "return delay|reverb dB": the shared buses' level in the mix (their sends unchanged)
+    float returnDb[3] = {};             // "return delay|reverb|feedback dB": the shared buses' level in the mix (their sends unchanged)
+    float feeds[kMaxTracks] = {};       // "feed <track> amount": into the feedback bus
+    float fbBeats = 0.75f, fbAmount = 0; // "feedback beats amount": its echo time and how much comes round (over 1: it swells and holds)
     InsertDelay delays[kMaxTracks];     // "delay <track> beats feedback mix"
     DriveSpec drives[kMaxTracks];       // "drive <track> amount toneHz"
     AmpSpec amps[kMaxTracks];           // "amp <track> gain presenceHz mix [tightHz pushDb cabHz thumpDb scoopHz]"
@@ -132,6 +134,24 @@ private:
     bool throwsOnly_ = false;
     float send_ = 1, sendStep_ = 0.01f;
     int throwAt_ = -1, throwLeft_ = 0;
+};
+
+// The feedback bus (Kerem's "feedback amount channel"): a ping-pong echo the guitars and the bass
+// feed, darker and thinner each time round, through a soft clip, so a feedback over 1 swells into a
+// held howl that cannot run away. Only the echoes come out. The mixer page rebuilds it in Web Audio
+// from the same numbers (one-pole filters as IIR filters, the clip as a wave shaper).
+class FeedbackBus
+{
+public:
+    void prepare(double sampleRate);
+    void set(double seconds, float feedback) { d_ = juce::jlimit(1, int(l_.size()) - 1, int(std::lround(seconds * sr_))); fb_ = juce::jlimit(0.0f, 1.5f, feedback); }
+    void process(float* left, float* right, int numSamples);
+
+private:
+    std::vector<float> l_, r_;
+    double sr_ = 48000;
+    int w_ = 0, d_ = 1;
+    float fb_ = 0, lpL_ = 0, lpR_ = 0, hpL_ = 0, hpR_ = 0, lpA_ = 0.4f, hpA_ = 0.02f;
 };
 
 // The shared buses. Delay times are set from the tempo when a concert starts.
@@ -395,7 +415,8 @@ private:
     Palette palette_;
     std::vector<SoundChange> plan_;
     std::unique_ptr<juce::AudioPluginInstance> delay_, reverb_;
-    juce::AudioBuffer<float> delayBus_, reverbBus_;
+    juce::AudioBuffer<float> delayBus_, reverbBus_, fbBuf_;
+    FeedbackBus fbBus_;
     Biquad reverbLowCut_[2]; // the reverb's lows smear the kick and the bass, and spread them wide
     // The shimmer: what goes into the reverb, also an octave up (fed back from the reverb's output it ran
     // away: a 7 s reverb gains more than the loop can lose)
