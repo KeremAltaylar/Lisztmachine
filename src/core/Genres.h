@@ -83,6 +83,7 @@ public:
         int riffLo = 33;                           // the riff's lowest root (the power chord stacks a fifth and an octave on it)
         Summit summit = Summit::Theme;
         bool ends = true;                          // end figures into the parts that are not big arrivals
+        bool gaze = false;                         // the choir holds open intervals (root, fifth, ninth) instead of the chord
     };
 
     static const Spec* find(const std::string& scene);

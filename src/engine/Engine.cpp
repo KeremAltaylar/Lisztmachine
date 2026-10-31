@@ -203,6 +203,32 @@ std::unique_ptr<juce::AudioPluginInstance> createSfz(double sampleRate, int maxB
     return p;
 }
 
+// Two read heads sweep a 60 ms window at twice the writing speed (an octave up), each faded in and
+// out by a Hann window half a sweep apart, so their jumps back cancel; then a 5 kHz pole.
+float Engine::OctaveUp::process(float x)
+{
+    const int size = int(buf.size());
+    buf[size_t(at)] = x;
+    float y = 0;
+    for (float off : { 0.0f, 0.5f })
+    {
+        float p = phase + off;
+        if (p >= 1) p -= 1;
+        float pos = float(at) - (1 - p) * float(n);
+        if (pos < 0) pos += float(size);
+        const int i = int(pos);
+        const float f = pos - float(i);
+        const float s = buf[size_t(i)] + f * (buf[size_t((i + 1) % size)] - buf[size_t(i)]);
+        const float w = std::sin(juce::MathConstants<float>::pi * p);
+        y += s * w * w;
+    }
+    at = (at + 1) % size;
+    phase += 1.0f / float(n);
+    if (phase >= 1) phase -= 1;
+    lp += (y - lp) * 0.48f;
+    return lp;
+}
+
 juce::String setParameterText(juce::AudioPluginInstance& plugin, const juce::String& name, const juce::String& value)
 {
     juce::AudioProcessorParameter* p = nullptr;
@@ -561,6 +587,9 @@ juce::String Palette::load(const juce::File& file, const std::string& sceneName)
     for (auto& d : duckDepth) d = -1;
     for (auto& d : lowCutHz) d = -1;
     for (auto& d : delays) d = {};
+    for (auto& r : releaseS) r = 0;
+    for (auto& t : sends) t[0] = t[1] = -1;
+    shimmer = 0;
     if (!file.existsAsFile()) return "no palette at " + file.getFullPathName();
 
     juce::StringArray lines;
@@ -573,8 +602,17 @@ juce::String Palette::load(const juce::File& file, const std::string& sceneName)
         tokens.removeEmptyStrings();
         const auto where = file.getFileName() + " line " + juce::String(n + 1) + ": ";
         if (tokens[0] == "master" && tokens.size() >= 2) { masterDb = tokens[1].getFloatValue(); continue; }
+        if (tokens[0] == "shimmer" && tokens.size() >= 2) { shimmer = juce::jlimit(0.0f, 0.9f, tokens[1].getFloatValue()); continue; }
+        if (tokens[0] == "send" && tokens.size() >= 4 && (tokens[2] == "delay" || tokens[2] == "reverb"))
+        {
+            const int t = info->trackOf(tokens[1].toStdString());
+            if (t < 0 && tokens[1] != "all") return where + "no track '" + tokens[1] + "' in the " + juce::String(scene) + " scene";
+            for (int k = 0; k < info->numTracks; ++k)
+                if (k == t || t < 0) sends[k][tokens[2] == "reverb"] = juce::jmax(0.0f, tokens[3].getFloatValue());
+            continue;
+        }
         if (tokens[0] == "return" && tokens.size() >= 3 && (tokens[1] == "delay" || tokens[1] == "reverb")) { returnDb[tokens[1] == "reverb"] = tokens[2].getFloatValue(); continue; }
-        if (tokens[0] == "gain" || tokens[0] == "delay" || tokens[0] == "drive" || tokens[0] == "crush" || tokens[0] == "comp" || tokens[0] == "duck" || tokens[0] == "lowcut" || tokens[0] == "amp")
+        if (tokens[0] == "gain" || tokens[0] == "delay" || tokens[0] == "drive" || tokens[0] == "crush" || tokens[0] == "comp" || tokens[0] == "duck" || tokens[0] == "lowcut" || tokens[0] == "amp" || tokens[0] == "release")
         {
             const int t = info->trackOf(tokens[1].toStdString());
             if (t < 0) return where + "no track '" + tokens[1] + "' in the " + juce::String(scene) + " scene";
@@ -582,6 +620,7 @@ juce::String Palette::load(const juce::File& file, const std::string& sceneName)
             else if (tokens[0] == "crush" && tokens.size() >= 5) crushes[t] = { tokens[2].getFloatValue(), tokens[3].getFloatValue(), juce::jlimit(0.0f, 1.0f, tokens[4].getFloatValue()) };
             else if (tokens[0] == "comp" && tokens.size() >= 7) comps[t] = { tokens[2].getFloatValue(), juce::jmax(1.0f, tokens[3].getFloatValue()), tokens[4].getFloatValue(), tokens[5].getFloatValue(), juce::jlimit(0.0f, 1.0f, tokens[6].getFloatValue()) };
             else if (tokens[0] == "duck") duckDepth[t] = juce::jlimit(0.0f, 1.0f, tokens[2].getFloatValue());
+            else if (tokens[0] == "release") releaseS[t] = juce::jmax(0.0f, tokens[2].getFloatValue());
             else if (tokens[0] == "lowcut") lowCutHz[t] = juce::jmax(0.0f, tokens[2].getFloatValue());
             else if (tokens[0] == "amp" && tokens.size() >= 5) amps[t] = { juce::jlimit(0.0f, 1.0f, tokens[2].getFloatValue()), tokens[3].getFloatValue(), juce::jlimit(0.0f, 1.0f, tokens[4].getFloatValue()),
                                                                      tokens.size() >= 6 ? tokens[5].getFloatValue() : 110.0f, tokens.size() >= 7 ? tokens[6].getFloatValue() : 7.0f,
@@ -755,6 +794,7 @@ juce::String Engine::load(double sampleRate, int maxBlock, const Palette& palett
     glue.prepare(sampleRate);
     glue.makeupDb = palette.masterDb;
     for (auto& f : reverbLowCut_) f.highpass(sampleRate, 180);
+    for (auto& o : octaveUp_) o.prepare(sampleRate);
     kickTrack_ = palette.info->trackOf("kick") >= 0 ? palette.info->trackOf("kick") : palette.info->trackOf("pulse");
     duckCurve_.assign(size_t(maxBlock), 0);
     kickHits_.reserve(64);
@@ -837,6 +877,16 @@ juce::String Engine::loadInto(Slot& slot, int track, int entry)
     {
         if (auto err = loadSurgePatch(*slot.plugin, findSurgePatch(e.patch)); err.isNotEmpty()) return err;
         if (palette_.info->pure[track]) purify(*slot.plugin, palette_.info->pure[track] == 1);
+        if (const float rel = palette_.releaseS[track]; rel > 0)
+            for (auto sc : { "A", "B" })
+                for (auto* q : slot.plugin->getParameters())
+                    if (q->getName(128) == juce::String(sc) + " Amp EG Release")
+                    {   // only ever longer: "873.8 ms", "2.58 s"
+                        const auto t = q->getCurrentValueAsText();
+                        const double now = t.retainCharacters("0123456789.").getDoubleValue() * (t.endsWith(" ms") ? 0.001 : 1.0);
+                        if (now < rel)
+                            if (auto err = setParameterText(*slot.plugin, q->getName(128), juce::String(rel, 2) + " s"); err.isNotEmpty()) return err;
+                    }
     }
     slot.plugin->reset();
     slot.cutoff = nullptr;
@@ -1162,7 +1212,8 @@ void Engine::renderChunk(float* const* out, int numChannels, int offset, int len
     // One track's sound into the mix and the sends: its low cut, width, pan and duck, then its gain.
     auto mixTrack = [&](int i, const float* L, const float* R) {
         auto& t = tracks_[i];
-        const float* sends = palette_.info->sends[i];
+        const float sends[2] = { palette_.sends[i][0] >= 0 ? palette_.sends[i][0] : palette_.info->sends[i][0],
+                                 palette_.sends[i][1] >= 0 ? palette_.sends[i][1] : palette_.info->sends[i][1] };
         float peak = 0;
         double sq = 0;
         for (int n = 0; n < len; ++n)
@@ -1310,6 +1361,9 @@ void Engine::renderChunk(float* const* out, int numChannels, int offset, int len
         meter(delayMeter, delayIn);
         if (stemOut)
             for (int c = 0; c < 2; ++c) juce::FloatVectorOperations::copyWithMultiply(st[2 * numTracks_ + c], delayIn.getReadPointer(c), returnGain[0], len);
+        if (palette_.shimmer > 0)
+            for (int c = 0; c < 2; ++c)
+                for (int n = 0; n < len; ++n) reverbIn.getWritePointer(c)[n] += palette_.shimmer * octaveUp_[c].process(reverbIn.getReadPointer(c)[n]);
         runFx(*reverb_, reverbIn);
         duckReturn(reverbIn, 0.5f);
         if (mixStage)

@@ -24,8 +24,11 @@ data = {s: sf.read(f"{base}.{s}.wav", dtype="float32")[0] for s in stems}
 sr = 48000
 LOOK = 72  # PeakLimiter look_
 mix = sf.read(wav, dtype="float32")[0]
-pal = open(f"sounds/{os.path.basename(base).rstrip('0123456789')}.txt", encoding="utf8").read()
-man = {"sections": [], "master": master,  # the palette's balance, which the page's faders add to
+LABELS = dict(doom=dict(ground="Log", body="Skin", mallet="Bowl", texture="Chain", chord="Brass", fx="Unsettler"))  # strip names where the page's (Blackgaze's) are wrong
+song = os.path.basename(base).rstrip('0123456789')
+pal = open(f"sounds/{song}.txt", encoding="utf8").read()
+man = {"song": song, "title": song.title(), "bpm": float(open(base + ".sections.txt").readline().split()[1]),
+       "labels": LABELS.get(song, {}), "sections": [], "master": master,  # the palette's balance, which the page's faders add to
        "base": {t: float(g) for t, g in re.findall(r"^gain (\w+)\s+([-\d.]+)", pal, re.M)},
        "returns": {t: float(g) for t, g in re.findall(r"^return (\w+)\s+([-\d.]+)", pal, re.M)}}
 for k, name in enumerate(names[:-1]):

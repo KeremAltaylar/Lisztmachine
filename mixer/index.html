@@ -76,7 +76,7 @@ pre { margin: 0; background: var(--well); border-radius: 8px; padding: 12px 14px
 <main>
   <header>
     <div>
-      <h1>Blackgaze Mixer</h1>
+      <h1 id="title">Blackgaze Mixer</h1>
       <p class="lede">Mix the song yourself. 0 dB is the engine's mix. Your settings save by themselves, and Claude reads them back into the palette.</p>
     </div>
     <span id="saved" class="pill">Not saved yet</span>
@@ -108,7 +108,7 @@ pre { margin: 0; background: var(--well); border-radius: 8px; padding: 12px 14px
 
   <section class="out">
     <div class="out-head">
-      <div class="label">Your mix as palette lines (sounds/blackgaze.txt)</div>
+      <div class="label">Your mix as palette lines (sounds/<span id="song">blackgaze</span>.txt)</div>
       <div style="display:flex;gap:8px"><button id="copy" type="button">Copy</button><button id="reset" type="button">Reset all to engine</button></div>
     </div>
     <pre id="lines">No changes yet. Move a fader.</pre>
@@ -117,9 +117,9 @@ pre { margin: 0; background: var(--well); border-radius: 8px; padding: 12px 14px
 </main>
 
 <script>
-const BPM = 150, BAR = 4 * 60 / BPM;
+let BPM = 150, BAR = 4 * 60 / BPM, SONG = "blackgaze"; // the song, from the manifest
 let BASE = {}, MASTER = 9.3, RETURNS = {}; // the palette's balance (from the manifest); a fader adds to it
-const LABEL = { pad: "Pads", metal: "Metal", perc: "Perc", bass: "Bass", sub: "808", arp: "Lead", chord: "Keys", fx: "Noise", harm: "Choir",
+let LABEL = { pad: "Pads", metal: "Metal", perc: "Perc", bass: "Bass", sub: "808", arp: "Lead", chord: "Keys", fx: "Noise", harm: "Choir",
   ground: "Iron", body: "Plate", mallet: "Glass", texture: "Scrape", impact: "Impact", riff: "Guitar", delay: "Echo", reverb: "Reverb", pulse: "Pulse", tick: "Tick" };
 const ORDER = ["riff", "arp", "chord", "pad", "harm", "bass", "sub", "ground", "body", "metal", "perc", "impact", "texture", "fx", "mallet", "pulse", "tick", "delay", "reverb"];
 
@@ -139,6 +139,9 @@ async function boot() {
   try { man = await (await fetch("manifest.json")).json(); }
   catch { status("Could not load the song's stems list. Reload the page.", true); return; }
   BASE = man.base || {}; MASTER = man.master ?? MASTER; RETURNS = man.returns || {};
+  if (man.song) { SONG = man.song; BPM = man.bpm; BAR = 4 * 60 / BPM; $("song").textContent = SONG;
+    $("title").textContent = document.title = man.title + " Mixer"; Object.assign(LABEL, man.labels || {}); }
+  status(`Press Play to load ${man.sections[0].name}.`);
   const allStems = ORDER.filter(s => man.sections.some(x => x.stems.includes(s)));
   $("rail").innerHTML = man.sections.map((s, k) => `<button type="button" data-k="${k}" aria-pressed="${k === 0}">
     <b>${s.name}</b><small>bars ${Math.round(s.start / BAR) + 1}–${Math.round(s.end / BAR)}</small></button>`).join("");
@@ -177,12 +180,12 @@ async function boot() {
   connectDb();
 }
 
-// Saving: one document, read back by Claude with ArtifactData (mixes/blackgaze).
+// Saving: one document per song, read back by Claude with ArtifactData (mixes/<song>).
 let doc = null, saveTimer = 0;
 async function connectDb() {
   const db = await window.claude?.use("db");
   if (!db) { $("saved").textContent = "Not saving: copy the lines below"; $("saved").className = "pill bad"; return; }
-  doc = db.doc("mixes/blackgaze");
+  doc = db.doc("mixes/" + SONG);
   try {
     const snap = await doc.get();
     if (snap.exists) { const d = snap.data(); Object.assign(mix.tracks, d.tracks || {}); mix.master = d.master || 0; apply(); lines();

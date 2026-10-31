@@ -1,0 +1,192 @@
+{
+ "song": "doom",
+ "title": "Doom",
+ "bpm": 68.0,
+ "sections": [
+  {
+   "name": "Feedback",
+   "start": 0.0,
+   "end": 28.2353,
+   "stems": [
+    "fx",
+    "texture",
+    "riff",
+    "delay",
+    "reverb"
+   ]
+  },
+  {
+   "name": "Procession",
+   "start": 28.2353,
+   "end": 84.7059,
+   "stems": [
+    "pad",
+    "bass",
+    "sub",
+    "fx",
+    "harm",
+    "ground",
+    "texture",
+    "riff",
+    "delay",
+    "reverb"
+   ]
+  },
+  {
+   "name": "Monolith",
+   "start": 84.7059,
+   "end": 169.412,
+   "stems": [
+    "pad",
+    "metal",
+    "perc",
+    "bass",
+    "sub",
+    "chord",
+    "harm",
+    "ground",
+    "body",
+    "mallet",
+    "texture",
+    "riff",
+    "delay",
+    "reverb"
+   ]
+  },
+  {
+   "name": "Shroud",
+   "start": 169.412,
+   "end": 225.882,
+   "stems": [
+    "pad",
+    "bass",
+    "sub",
+    "arp",
+    "chord",
+    "fx",
+    "harm",
+    "ground",
+    "body",
+    "mallet",
+    "texture",
+    "riff",
+    "delay",
+    "reverb"
+   ]
+  },
+  {
+   "name": "Funeral",
+   "start": 225.882,
+   "end": 310.588,
+   "stems": [
+    "pad",
+    "metal",
+    "perc",
+    "bass",
+    "sub",
+    "arp",
+    "chord",
+    "fx",
+    "harm",
+    "ground",
+    "body",
+    "mallet",
+    "texture",
+    "impact",
+    "riff",
+    "delay",
+    "reverb"
+   ]
+  },
+  {
+   "name": "Ash",
+   "start": 310.588,
+   "end": 338.824,
+   "stems": [
+    "pad",
+    "arp",
+    "harm",
+    "mallet",
+    "texture",
+    "delay",
+    "reverb"
+   ]
+  },
+  {
+   "name": "Monument",
+   "start": 338.824,
+   "end": 451.765,
+   "stems": [
+    "pad",
+    "metal",
+    "perc",
+    "bass",
+    "sub",
+    "arp",
+    "chord",
+    "fx",
+    "harm",
+    "ground",
+    "body",
+    "mallet",
+    "texture",
+    "impact",
+    "riff",
+    "delay",
+    "reverb"
+   ]
+  },
+  {
+   "name": "Dust",
+   "start": 451.765,
+   "end": 480.0,
+   "stems": [
+    "pad",
+    "bass",
+    "sub",
+    "arp",
+    "chord",
+    "fx",
+    "harm",
+    "ground",
+    "body",
+    "mallet",
+    "texture",
+    "riff",
+    "delay",
+    "reverb"
+   ]
+  }
+ ],
+ "master": 9.6,
+ "base": {
+  "pulse": 0.0,
+  "metal": 6.0,
+  "tick": 14.9,
+  "perc": -3.4,
+  "pad": -0.5,
+  "bass": -0.7,
+  "sub": -8.3,
+  "arp": -11.3,
+  "chord": -5.1,
+  "fx": -6.9,
+  "harm": -4.2,
+  "ground": -21.6,
+  "body": -12.5,
+  "mallet": -29.9,
+  "texture": -19.2,
+  "impact": -4.0,
+  "riff": -8.1
+ },
+ "returns": {
+  "reverb": 7.5
+ },
+ "labels": {
+  "ground": "Log",
+  "body": "Skin",
+  "mallet": "Bowl",
+  "texture": "Chain",
+  "chord": "Brass",
+  "fx": "Unsettler"
+ }
+}

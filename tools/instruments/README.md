@@ -9,3 +9,4 @@ DSmolken double bass, Karoryfer Bigcat cello, Black And Green Guitars, Growlybas
 Bear Sax, aliexpress erhu; cloned: jlearman SteelDrum (Unlicense) as `steel-drum/`, body_percussion
 as `body-percussion/`; VSCO 2 CE (sgossner/VSCO-2-CE, sparse: Woodwinds/Bassoon, Clarinet, Brass/F Horn,
 Tenor Trombone, Tuba) as `vsco2/`, with the generated mappings in this folder (copy them into `vsco2/`).
+doom-baritone.sfz: a wrapper of Black And Green Guitars 10-combo_twang an octave down (copy it into `lib/Karoryfer_Black_And_Green_Guitars_1000/Programs/`).

@@ -166,21 +166,23 @@ const G::Spec kDoom {
     .bpmLo = 62, .bpmHi = 68, .mode = &kPhrygian, .tonics = { 1, 2, 11, 9, 4 },
     .progs = { { { 0, 1, 0, 5 }, { 0, 5, 3, 1 }, { 0, 3, 1, 0 } } }, .preRoot = 1,
     .form = { { { "Feedback", 8, .15f, "RFT" }, { "Procession", 16, .45f, "PRBUTG" }, { "Monolith", 24, .70f, "PRBUDCKSTGYM" },
-                { "Shroud", 16, .40f, "PAFTH" }, { "Funeral", 24, .85f, "PRBUDCKSTGYMAI" }, { "Ash", 8, .25f, "PAT" },
-                { "Monument", 32, 1.0f, "PRBUDCKSHTGYMAFI" }, { "Dust", 8, .15f, "RFT" } } },
+                { "Shroud", 16, .40f, "PAFT" }, { "Funeral", 24, .85f, "PRBUDCKSTGYMAI" }, { "Ash", 8, .25f, "PAT" },
+                { "Monument", 32, 1.0f, "PRBUDCKSTGYMAFI" }, { "Dust", 8, .15f, "RFT" } } },
     .pulse = part("X...............", "X.......X.......", "X.......X...x..."),
     .metal = part("", "..........1.....", "......1.......2."), // far bells, chains
-    .tick = part("", "x.......x.......", "x...x...x...x.g."),
+    .tick = part("", "", ""),
     .perc = part("", "........1.......", "....1.......2..."), // struck iron, deep
     .bass = part("x---------------", "x---------------", "x-------x-------"),
-    .chord = part("", "x---------------................", "x---------------x-------........"),
+    // 2026-10-31 (Kerem: long sustains, no short plucky envelopes, heavy notes to play breakdowns on):
+    // the chords held through, no clicks, the riff one heavy chord a bar, the choir in open intervals
+    .chord = part("", "x-------------------------------", "x-------------------------------"),
     .sub = part("x---------------", "x---------------", "x-------^-------"),
     .ground = part("", "1...............", "1.......2.....1."),
     .body = part("", "........o.......", "....o.......o.o."),
     .mallet = part("", "1...............", "1.......3......."),
     .texture = part("x---------------", "x---------------", "x-------x-------"),
     .arpLo = 55, .arpHi = 79, .percLo = 33, .percHi = 48, .ext = 0,
-    .riff = G::RiffStyle::Doom, .riffLo = 30, .summit = G::Summit::Unison,
+    .riff = G::RiffStyle::Sludge, .riffLo = 30, .summit = G::Summit::Unison, .gaze = true,
 };
 
 const G::Spec kBlackgaze {
@@ -644,7 +646,21 @@ void GenreComposer::emitHarm(int bar, std::vector<Event>& out)
     // up to its neighbour in the mode on beat three and comes back with the next bar.
     const int64_t t0 = int64_t(bar) * kBarTicks;
     std::vector<int> want;
-    if (active(Harm, bar)) want = voice(bar, 3, 62, 84, true, harmVoices_);
+    if (active(Harm, bar) && spec_.gaze)
+    {   // open and wide: the root, its fifth in the mode, and above the octave the ninth, or the
+        // eleventh where the ninth is only a half step (phrygian's flat second)
+        const auto& m = *spec_.mode;
+        const int r = rootAt(bar), pc = (tonicAt(bar) + degreeSemis(m, r)) % 12;
+        const int root = 60 + (pc - 60 % 12 + 12) % 12;
+        const int fifth = (degreeSemis(m, r + 4) - degreeSemis(m, r) + 24) % 12;
+        const int ninth = (degreeSemis(m, r + 1) - degreeSemis(m, r) + 24) % 12;
+        int top = root + 12 + (ninth == 2 ? 2 : (degreeSemis(m, r + 3) - degreeSemis(m, r) + 24) % 12);
+        if (top > 84) top -= 12;
+        want = { root, root + fifth, top };
+        std::sort(want.begin(), want.end());
+        want.erase(std::unique(want.begin(), want.end()), want.end());
+    }
+    else if (active(Harm, bar)) want = voice(bar, 3, 62, 84, true, harmVoices_);
     const bool late = !want.empty() && bar > 0 && rootAt(bar) != rootAt(bar - 1);
     const int64_t at = t0 + (late ? 2 * kPPQ : 0);
     for (int p : harmHeld_)

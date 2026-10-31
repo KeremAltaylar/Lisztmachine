@@ -20,25 +20,21 @@ chord    -3.0    1040  Brass/Reso Brassy
 arp      -8.5    1807  3rd/Rozzer/Leads/Dark Heart
 arp       8.5     438  3rd/Nick Moritz/Synths/Mystery Grotto
 arp      -5.2     163  3rd/Nick Moritz/Synths/Regressive Notes
-bass    -17.0    1532  3rd/John Valentine/Basses/Distorted Power Bass Guitar
-bass     -6.3     239  3rd/Kinsey Dulcet/Bass/OJD Bass
-bass      5.4     613  3rd/Slowboat/Basses/Perc Bass 2
 chord    -7.1     879  3rd/Emu/Synths/Disto Brass Pass
-bass     -4.9    2207  3rd/Altenberg/Basses/Aggressive
 
 # Echoes: beats, feedback, mix
 delay chord 1.5 0.40 0.20
 
 # Balance (to be measured in the mix)
 gain pulse   0.0
-gain metal   6.4
+gain metal   6.0
 gain tick    14.9
-gain perc    -3.1
-gain pad     -0.3
-gain bass    -0.7
-gain sub     -9.3
-gain arp     -11.4
-gain chord   -5.5
+gain perc    -3.4
+gain pad     -0.5
+gain bass    -0.7  # as Kerem heard it in Procession and Monolith (balance.py wanted -6.1)
+gain sub     -8.3
+gain arp     -11.3
+gain chord   -5.1
 gain fx     -6.9
 master 9.6
 amp bass  0.79 1800 0.75
@@ -73,9 +69,9 @@ body     0.0    1000  internal/modal-skin
 mallet   0.0    1000  internal/modal-bowl
 texture  0.0    1000  internal/modal-chain
 impact   0.0    1000  internal/modal-plate
-gain ground  -20.3
-gain body    -12.0
-gain mallet  -29.2
+gain ground  -21.6
+gain body    -12.5
+gain mallet  -29.9
 gain texture -19.2
 gain impact -4.0
 comp body -24 3 8 90 0.35
@@ -85,13 +81,27 @@ delay mallet 0.75 0.4 0.25
 delay impact 1.5 0.55 0.4 throws
 
 # Sampled instruments (CC0: Karoryfer, D. Smolken, VSCO 2 CE; jSteelDrum: Unlicense), played by sfizz
-chord    29.3    1019  sfz/vsco2/TenorTrombone-stac.sfz
+chord    21.8    1019  sfz/vsco2/TenorTrombone-sus.sfz
 pad      21.9     720  sfz/vsco2/Tuba-sus.sfz
 bass     24.5     900  sfz/Karoryfer.Growlybass.v1.002/Growlybass/growlybass_angry.sfz
 arp      13.5    2290  sfz/Karoryfer_Bigcat_cello.v1.001/Karoryfer_Bigcat_cello/Programs/02- Bowed (mod wheel).sfz
 
 # 2026-10-30: the riff (the engine's guitar: two takes, left and right, the fifths pure) into a fuzz and a cabinet
-riff     0.0    1000  internal/guitar
+riff    19.0    1000  sfz/Karoryfer_Black_And_Green_Guitars_1000/Programs/doom-baritone.sfz
 gain riff    -8.1
 drive riff 0.85 2500
 amp riff  0.70 1800 1.0 45 -2 3600 6 1100
+
+# 2026-10-31 (Kerem: the bass guitar's low hits are the tone, "Gnarly bassy guitar tone"; the other
+# tones' envelopes too short, long sustains and releases; a glue reverb for all, shimmerish, 25 % wet;
+# the engine guitar's overdrive sounded electronic, an organic gnarly guitar instead): the bass guitar
+# only (the synth basses out), the riff on the sampled guitars (both, left and right) an octave down
+# into the same fuzz and amp, the trombone held instead of staccato, every Surge sound's release at
+# least these seconds, every track into the reverb, and into it an octave up too (the shimmer)
+release pad   4.0
+release harm  4.0
+release chord 3.0
+release arp   2.5
+send all reverb 0.25
+shimmer 0.5
+return reverb 7.5  # the reverb 9.5 dB under the dry tracks (measured in Monolith: -17 at 0): 25 % wet

@@ -5,3 +5,5 @@ build/
 visuals/media/
 plugins/
 mixer/media/
+mixer/*/media/
+mixer/doom/index.html

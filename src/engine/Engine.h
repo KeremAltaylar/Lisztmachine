@@ -54,6 +54,9 @@ struct Palette
     CompSpec comps[kMaxTracks];         // "comp <track> thresholdDb ratio attackMs releaseMs mix"
     float duckDepth[kMaxTracks];        // "duck <track> depth": over the mix stage's own; -1 keeps it
     float lowCutHz[kMaxTracks];         // "lowcut <track> Hz": over the mix stage's own; -1 keeps it
+    float releaseS[kMaxTracks] = {};    // "release <track> seconds": a Surge sound's amp envelope lets go at least this slowly
+    float sends[kMaxTracks][2];         // "send <track>|all delay|reverb amount": over the scene's sends; -1 keeps them
+    float shimmer = 0;                  // "shimmer amount": the reverb also fed an octave up
     // Lines: "part gain bright Category/Patch" (a Surge patch, or internal/click|blip|sub),
     // "voices ..." for every track of the voice group, "gain ...", "delay ...".
     juce::String load(const juce::File& file, const std::string& scene = "berlin"); // returns an error or empty
@@ -394,6 +397,16 @@ private:
     std::unique_ptr<juce::AudioPluginInstance> delay_, reverb_;
     juce::AudioBuffer<float> delayBus_, reverbBus_;
     Biquad reverbLowCut_[2]; // the reverb's lows smear the kick and the bass, and spread them wide
+    // The shimmer: what goes into the reverb, also an octave up (fed back from the reverb's output it ran
+    // away: a 7 s reverb gains more than the loop can lose)
+    struct OctaveUp
+    {
+        std::vector<float> buf;
+        int at = 0, n = 1;
+        float phase = 0, lp = 0;
+        void prepare(double sampleRate) { n = int(0.06 * sampleRate); buf.assign(size_t(n + 2), 0); at = 0; phase = 0; lp = 0; }
+        float process(float x);
+    } octaveUp_[2];
     juce::MidiBuffer noMidi_;
     float delaySeconds_[2] = { 0, 0 }; // left, right: shown with their bar division
 
