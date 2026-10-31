@@ -2141,7 +2141,7 @@ async function boot() {
   const setLayer = m => { pad.layer = m; $('pad-layer').textContent = 'Hits: ' + m; };
   const nextLayer = () => setLayer(MODES[(MODES.indexOf(pad.layer) + 1) % 3]);
   $('pad-layer').onclick = nextLayer;
-  setLayer(piece.hits || 'layer');
+  setLayer(piece.hits || 'affect'); // 2026-10-31 (Kerem): the hits act on the picture in every song, no drawn layer (P still cycles)
   const pieceHash = [...piece.name].reduce((a, ch) => (a * 31 + ch.charCodeAt(0)) >>> 0, 7);
   const worldHue = (() => {
     let x = 0, y = 0;
