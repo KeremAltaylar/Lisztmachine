@@ -553,6 +553,7 @@ juce::String Palette::load(const juce::File& file, const std::string& sceneName)
     for (auto& p : parts) p.clear();
     for (auto& g : trackGainDb) g = 0;
     masterDb = 0;
+    returnDb[0] = returnDb[1] = 0;
     for (auto& d : drives) d = {};
     for (auto& a : amps) a = {};
     for (auto& c : crushes) c = {};
@@ -572,6 +573,7 @@ juce::String Palette::load(const juce::File& file, const std::string& sceneName)
         tokens.removeEmptyStrings();
         const auto where = file.getFileName() + " line " + juce::String(n + 1) + ": ";
         if (tokens[0] == "master" && tokens.size() >= 2) { masterDb = tokens[1].getFloatValue(); continue; }
+        if (tokens[0] == "return" && tokens.size() >= 3 && (tokens[1] == "delay" || tokens[1] == "reverb")) { returnDb[tokens[1] == "reverb"] = tokens[2].getFloatValue(); continue; }
         if (tokens[0] == "gain" || tokens[0] == "delay" || tokens[0] == "drive" || tokens[0] == "crush" || tokens[0] == "comp" || tokens[0] == "duck" || tokens[0] == "lowcut" || tokens[0] == "amp")
         {
             const int t = info->trackOf(tokens[1].toStdString());
@@ -1292,6 +1294,7 @@ void Engine::renderChunk(float* const* out, int numChannels, int offset, int len
     };
     if (effects && delay_ && reverb_)
     {
+        const float returnGain[2] = { juce::Decibels::decibelsToGain(palette_.returnDb[0]), juce::Decibels::decibelsToGain(palette_.returnDb[1]) };
         runFx(*delay_, delayIn);
         // The echoes and the reverb pump with the kick too, so the tail breathes instead of washing.
         auto duckReturn = [&](juce::AudioBuffer<float>& b, float depth) {
@@ -1301,12 +1304,12 @@ void Engine::renderChunk(float* const* out, int numChannels, int offset, int len
         duckReturn(delayIn, 0.35f);
         for (int c = 0; c < 2; ++c)
         {
-            juce::FloatVectorOperations::add(pa[c], delayIn.getReadPointer(c), len);
+            juce::FloatVectorOperations::addWithMultiply(pa[c], delayIn.getReadPointer(c), returnGain[0], len);
             juce::FloatVectorOperations::addWithMultiply(reverbIn.getWritePointer(c), delayIn.getReadPointer(c), kDelayToReverb, len);
         }
         meter(delayMeter, delayIn);
         if (stemOut)
-            for (int c = 0; c < 2; ++c) juce::FloatVectorOperations::copy(st[2 * numTracks_ + c], delayIn.getReadPointer(c), len);
+            for (int c = 0; c < 2; ++c) juce::FloatVectorOperations::copyWithMultiply(st[2 * numTracks_ + c], delayIn.getReadPointer(c), returnGain[0], len);
         runFx(*reverb_, reverbIn);
         duckReturn(reverbIn, 0.5f);
         if (mixStage)
@@ -1314,8 +1317,8 @@ void Engine::renderChunk(float* const* out, int numChannels, int offset, int len
                 for (int n = 0; n < len; ++n) reverbIn.getWritePointer(c)[n] = reverbLowCut_[c].process(reverbIn.getReadPointer(c)[n]);
         meter(reverbMeter, reverbIn);
         if (stemOut)
-            for (int c = 0; c < 2; ++c) juce::FloatVectorOperations::copy(st[2 * numTracks_ + 2 + c], reverbIn.getReadPointer(c), len);
-        for (int c = 0; c < 2; ++c) juce::FloatVectorOperations::add(pa[c], reverbIn.getReadPointer(c), len);
+            for (int c = 0; c < 2; ++c) juce::FloatVectorOperations::copyWithMultiply(st[2 * numTracks_ + 2 + c], reverbIn.getReadPointer(c), returnGain[1], len);
+        for (int c = 0; c < 2; ++c) juce::FloatVectorOperations::addWithMultiply(pa[c], reverbIn.getReadPointer(c), returnGain[1], len);
     }
 
     if (mixStage && numChannels > 1) glue.process(pa[0], pa[1], len);

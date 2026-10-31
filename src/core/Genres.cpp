@@ -201,7 +201,9 @@ const G::Spec kBlackgaze {
     .metal = part("", "..............1.", "......1.......2."),
     .tick = part("", "", ""),
     .perc = part("", "......1.......1.", "1..1..1...1..1.."),
-    .bass = part("x---------------", "x-------x-------", "x---x---x---x---"),
+    // the bass grooves where the song is between its storms (Rise, Ascent: 3+3+2, then a push to the
+    // fifth) and is plain under the blasts (Kerem: "main parts are cool simple")
+    .bass = part("x---------------", "x--x--x-.xx-5-x-", "x---x---x---x---"),
     .chord = part("", "x---------------", "x-------x-------"),
     .sub = part("x---------------", "x---------------", "x-------x-------"),
     .ground = part("1...............", "1.......1..1....", "1.1.1.1.1.1.1.1."),

@@ -1,0 +1,105 @@
+{
+  "base": {
+    "arp": 20.7,
+    "bass": 0.8,
+    "body": -19.3,
+    "chord": -4.9,
+    "fx": -11.7,
+    "ground": -17.1,
+    "harm": -5.7,
+    "impact": -4,
+    "mallet": -25.5,
+    "metal": 3.1,
+    "pad": -5,
+    "perc": -9,
+    "riff": -8.9,
+    "sub": -11.6,
+    "texture": -35.3,
+    "tick": 6.3
+  },
+  "baseMaster": 9.3,
+  "master": 0,
+  "savedAt": "2026-10-31T15:00:33.096Z",
+  "tracks": {
+    "arp": {
+      "db": -19.8,
+      "lowcut": 0,
+      "mute": false
+    },
+    "bass": {
+      "db": 4.4,
+      "lowcut": 0,
+      "mute": false
+    },
+    "body": {
+      "db": -24,
+      "lowcut": 0,
+      "mute": false
+    },
+    "chord": {
+      "db": 8.2,
+      "lowcut": 0,
+      "mute": false
+    },
+    "delay": {
+      "db": 12,
+      "lowcut": 0,
+      "mute": false
+    },
+    "fx": {
+      "db": 0,
+      "lowcut": 0,
+      "mute": false
+    },
+    "ground": {
+      "db": -24,
+      "lowcut": 0,
+      "mute": false
+    },
+    "harm": {
+      "db": 2.8,
+      "lowcut": 0,
+      "mute": false
+    },
+    "impact": {
+      "db": 0,
+      "lowcut": 0,
+      "mute": false
+    },
+    "metal": {
+      "db": 3.4,
+      "lowcut": 0,
+      "mute": false
+    },
+    "pad": {
+      "db": 1.5,
+      "lowcut": 0,
+      "mute": false
+    },
+    "perc": {
+      "db": 0,
+      "lowcut": 0,
+      "mute": false
+    },
+    "reverb": {
+      "db": 12,
+      "lowcut": 0,
+      "mute": false
+    },
+    "riff": {
+      "db": 7,
+      "lowcut": 0,
+      "mute": false
+    },
+    "sub": {
+      "db": 6.9,
+      "lowcut": 0,
+      "mute": false
+    },
+    "texture": {
+      "db": -10.6,
+      "lowcut": 0,
+      "mute": false
+    }
+  }
+}

@@ -69,7 +69,6 @@
     "fx",
     "harm",
     "ground",
-    "body",
     "texture",
     "riff",
     "delay",
@@ -128,17 +127,39 @@
     "pad",
     "metal",
     "perc",
+    "bass",
     "sub",
-    "arp",
     "chord",
     "harm",
-    "ground",
-    "body",
     "texture",
     "riff",
     "delay",
     "reverb"
    ]
   }
- ]
+ ],
+ "master": 5.5,
+ "base": {
+  "pulse": 0.0,
+  "metal": 9.0,
+  "tick": 6.3,
+  "perc": -9.7,
+  "pad": -3.6,
+  "bass": 5.0,
+  "sub": -4.8,
+  "arp": 6.9,
+  "chord": 3.3,
+  "fx": -11.7,
+  "harm": -2.7,
+  "ground": -41.1,
+  "body": -43.3,
+  "mallet": -25.5,
+  "texture": -45.9,
+  "impact": -4.0,
+  "riff": -4.9
+ },
+ "returns": {
+  "delay": 12.0,
+  "reverb": 12.0
+ }
 }

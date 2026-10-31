@@ -39,6 +39,7 @@ def run(scene):
     open(p, "w", encoding="utf8", newline="").write(txt)
     return f"{scene}: limiter {lim:.1f} off {off[scene]:.1f} | " + ", ".join(moves)
 
+MIXED = {"blackgaze"}  # mixed by Kerem in the mixer page: balancing would undo him
 with ThreadPoolExecutor(4) as ex:
-    for line in ex.map(run, PEAK): print(line, flush=True)
+    for line in ex.map(run, [p for p in PEAK if p not in MIXED]): print(line, flush=True)
 json.dump(off, open(OFF, "w"))

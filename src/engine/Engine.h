@@ -46,6 +46,7 @@ struct Palette
     std::vector<PaletteEntry> parts[kMaxTracks];
     float trackGainDb[kMaxTracks] = {}; // "gain <track> dB": the balance between tracks
     float masterDb = 0;                 // "master dB": drive into the master's soft clipper
+    float returnDb[2] = {};             // "return delay|reverb dB": the shared buses' level in the mix (their sends unchanged)
     InsertDelay delays[kMaxTracks];     // "delay <track> beats feedback mix"
     DriveSpec drives[kMaxTracks];       // "drive <track> amount toneHz"
     AmpSpec amps[kMaxTracks];           // "amp <track> gain presenceHz mix [tightHz pushDb cabHz thumpDb scoopHz]"

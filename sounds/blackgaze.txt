@@ -15,9 +15,6 @@ chord     -3.9     726  3rd/Giana Brotherz/Keys/Vintage Boost
 chord     -2.3     374  3rd/Luna/Keys/Electric Nightmares
 arp      -32.9     976  3rd/Dan Maurer/Synths/Warm Reception
 arp      -42.4     583  3rd/Emu/Leads/Doink Realm Organ
-bass     16.7     431  3rd/Luna/Basses/Acid
-bass     -6.8     167  3rd/Luna/Basses/Synthwave
-bass     -5.1     805  3rd/Zoozither/Basses/Open Up
 
 # Dexed (the free DX7, plugins/Dexed.vst3): voices of its cartridge, by name
 pad      -8.8    1117  dexed/LFORez ++Y
@@ -28,16 +25,16 @@ delay arp 1.5 0.45 0.25
 
 # Balance (to be measured in the mix)
 gain pulse   0.0
-gain metal   5.6
+gain metal   9.0
 gain tick    6.3
 gain perc    -9.7
-gain pad     -5.1
-gain bass    0.6
-gain sub     -11.7
-gain arp     26.7
-gain chord   -4.9
+gain pad     -3.6
+gain bass    5.0
+gain sub     -4.8
+gain arp     6.9
+gain chord   3.3
 gain fx    -11.7
-master 9.3
+master 5.5
 amp bass  0.51 1800 0.75
 amp chord 0.51 2500 0.85
 amp arp   0.51 3000 0.80
@@ -59,11 +56,11 @@ metal   -7.5    1063  3rd/Malfunction/Drums/Tuning Drums
 harm      5.6    1136  3rd/Giana Brotherz/Pads/Dub Choir
 harm     -3.2     740  3rd/Giana Brotherz/Pads/Deep Choir
 perc     -4.1     300  internal/deep
-gain harm    -5.5
+gain harm    -2.7
 amp harm  0.25 2200 0.35
 drive sub  0.55 2500
 duck sub 0.30
-lowcut bass 90
+lowcut bass 60
 
 # The percussion section (modal: struck and shaken objects, tuned to the chords)
 ground   0.0     300  internal/deep
@@ -71,10 +68,10 @@ body     0.0    1000  internal/modal-plate
 mallet   0.0    1000  internal/modal-glass
 texture  0.0    1000  internal/modal-scrape
 impact   0.0    1000  internal/modal-plate
-gain ground  -17.1
-gain body    -19.3
+gain ground  -41.1
+gain body    -43.3
 gain mallet  -25.5
-gain texture -35.3
+gain texture -45.9
 gain impact -4.0
 comp body -24 3 8 90 0.35
 duck body 0.2
@@ -90,7 +87,7 @@ arp      18.2    2983  sfz/aliexpress-erhu_v1000/Programs/02-erhu_long.sfz
 
 # 2026-10-30: the riff (the engine's guitar: two takes, left and right, the fifths pure) into a fuzz and a cabinet
 riff     0.0    1000  internal/guitar
-gain riff    -11.9
+gain riff    -4.9
 drive riff 1.0 6500
 amp riff  1.0 3200 1.0 160 9 6500 1 300
 delay riff 0.75 0.35 0.25
@@ -101,3 +98,11 @@ delay riff 0.75 0.35 0.25
 drive ground 0.55 2500
 drive body 0.60 3500
 comp ground -22 4 3 80 0.4
+
+# 2026-10-31: Kerem's own mix (the Blackgaze Mixer page, db mixes/blackgaze): the gains above are his,
+# the shared echo and reverb up 12 dB, the bass only the bass guitar (the Acid synth's resonance in
+# Ascent was not wanted). tools/balance.py leaves this song alone now. Then the master drive 9.3 -> 5.5 (his
+# faders summed hot: -6.8 LUFS, PLR 5.6; now about -10, PLR 8, like Doom) and the bass cut 90 -> 60 Hz
+# (the bass guitar's low fundamentals; 80-160 Hz had fallen 3.6 dB).
+return delay  12
+return reverb 12

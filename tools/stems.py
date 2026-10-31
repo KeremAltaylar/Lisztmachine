@@ -1,6 +1,6 @@
 # Cuts a --stems render into one mp3 per section and stem for the mixer page, and checks that the
 # stems through the glue rebuild the mix. Usage: python tools/stems.py <render.wav> <page dir> <master dB>
-import sys, json, os, numpy as np, soundfile as sf
+import sys, json, os, re, numpy as np, soundfile as sf
 
 wav, page, master = sys.argv[1], sys.argv[2], float(sys.argv[3])
 CHECK = "--check" in sys.argv  # only the rebuild check, no mp3s
@@ -24,7 +24,10 @@ data = {s: sf.read(f"{base}.{s}.wav", dtype="float32")[0] for s in stems}
 sr = 48000
 LOOK = 72  # PeakLimiter look_
 mix = sf.read(wav, dtype="float32")[0]
-man = {"sections": []}
+pal = open(f"sounds/{os.path.basename(base).rstrip('0123456789')}.txt", encoding="utf8").read()
+man = {"sections": [], "master": master,  # the palette's balance, which the page's faders add to
+       "base": {t: float(g) for t, g in re.findall(r"^gain (\w+)\s+([-\d.]+)", pal, re.M)},
+       "returns": {t: float(g) for t, g in re.findall(r"^return (\w+)\s+([-\d.]+)", pal, re.M)}}
 for k, name in enumerate(names[:-1]):
     a, b = int(times[k] * sr), int(times[k + 1] * sr)
     present = []
