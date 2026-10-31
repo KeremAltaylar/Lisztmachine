@@ -31,12 +31,12 @@ gain metal   6.0
 gain tick    14.9
 gain perc    -3.4
 gain pad     11.0  # Kerem's mix: +11.5
-gain bass    -0.7  # as Kerem heard it in Procession and Monolith (balance.py wanted -6.1)
-gain sub     -8.3
+gain bass    7.0  # Kerem's mixes: as he heard it in round 1 (-0.7), then +7.7
+gain sub     -2.4  # Kerem's mix: +5.9
 gain arp     -11.3
 gain chord   -5.1
-gain fx     -6.9
-master 4.0  # Kerem's faders summed hot (-6.0 LUFS, PLR 4.9): 9.6 -> 4.0 for -10, PLR 8.4
+gain fx      1.9  # Kerem's mix: +8.8
+master 1.0  # Kerem's faders sum hot (round 2: -6.0 LUFS at 9.6; round 3: -7.7 at 4.0): 1.0 for about -10, PLR 8.6
 amp bass  0.79 1800 0.75
 amp chord 0.79 2500 0.85
 amp arp   0.79 3000 0.80
@@ -88,7 +88,7 @@ arp      13.5    2290  sfz/Karoryfer_Bigcat_cello.v1.001/Karoryfer_Bigcat_cello/
 
 # 2026-10-30: the riff (the engine's guitar: two takes, left and right, the fifths pure) into a fuzz and a cabinet
 riff    19.0    1000  sfz/Karoryfer_Black_And_Green_Guitars_1000/Programs/doom-baritone.sfz
-gain riff    -1.8  # Kerem's mix: +6.3
+gain riff    5.5  # Kerem's mixes: +6.3, then +7.3
 drive riff 0.85 2500
 amp riff  0.70 1800 1.0 45 -2 3600 6 1100
 
@@ -113,9 +113,9 @@ return delay 12  # Kerem's mix
 # through each chord; the feedback bus = a ping-pong at a dotted eighth (beats, amount: over 1 it
 # swells and holds), fed by the guitars and the bass, set in the Doom Mixer
 drone   19.0    1000  sfz/Karoryfer_Black_And_Green_Guitars_1000/Programs/doom-drone.sfz
-gain drone  -1.0  # about 7 dB under the riff in Monolith
-feedback 0.75 0.85
-feed riff   0.35
-feed bass   0.20
-feed drone  0.50
-return feedback 0
+gain drone   6.7  # Kerem's mix: +7.7
+feedback 0.75 0.99  # Kerem's mix
+feed riff   0.69
+feed bass   0.49
+feed drone  0.65
+return feedback 6.3

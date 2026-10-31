@@ -126,6 +126,7 @@
     "harm",
     "mallet",
     "texture",
+    "riff",
     "drone",
     "delay",
     "reverb",
@@ -182,39 +183,39 @@
    ]
   }
  ],
- "master": 4.0,
+ "master": 1.0,
  "base": {
   "pulse": 0.0,
   "metal": 6.0,
   "tick": 14.9,
   "perc": -3.4,
   "pad": 11.0,
-  "bass": -0.7,
-  "sub": -8.3,
+  "bass": 7.0,
+  "sub": -2.4,
   "arp": -11.3,
   "chord": -5.1,
-  "fx": -6.9,
+  "fx": 1.9,
   "harm": -0.1,
   "ground": -21.6,
   "body": -12.5,
   "mallet": -29.9,
   "texture": -19.2,
   "impact": -4.0,
-  "riff": -1.8,
-  "drone": -1.0
+  "riff": 5.5,
+  "drone": 6.7
  },
  "returns": {
   "reverb": 17.6,
   "delay": 12.0,
-  "feedback": 0.0
+  "feedback": 6.3
  },
  "feedback": {
   "beats": 0.75,
-  "amount": 0.85,
+  "amount": 0.99,
   "feeds": {
-   "riff": 0.35,
-   "bass": 0.2,
-   "drone": 0.5
+   "riff": 0.69,
+   "bass": 0.49,
+   "drone": 0.65
   }
  }
 }
