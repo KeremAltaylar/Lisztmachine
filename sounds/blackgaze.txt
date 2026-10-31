@@ -5,9 +5,7 @@
 # part   gain   bright  patch
 
 pulse    0.0      60  internal/none
-metal    1.8     812  3rd/Malfunction/Drums/Inharmonic Attack 1
-metal    -0.9    2537  3rd/Malfunction/Drums/Jerry
-tick     0.0    6000  internal/click
+tick     0.0    6000  internal/none
 fx        4.0    4170  FX/Radio Noise
 
 # 2026-10-29 evening: this song's own synths (pitch-true, beating <= 15 %, none shared with another song)
@@ -15,8 +13,8 @@ pad     -13.2    1194  3rd/Databroth/Pads/Warmbo
 pad      -0.1     579  3rd/Giana Brotherz/Organs/Wanna B3
 chord     -3.9     726  3rd/Giana Brotherz/Keys/Vintage Boost
 chord     -2.3     374  3rd/Luna/Keys/Electric Nightmares
-arp      -22.8     976  3rd/Dan Maurer/Synths/Warm Reception
-arp      -27.9     583  3rd/Emu/Leads/Doink Realm Organ
+arp      -27.3     976  3rd/Dan Maurer/Synths/Warm Reception
+arp      -35.4     583  3rd/Emu/Leads/Doink Realm Organ
 bass     16.7     431  3rd/Luna/Basses/Acid
 bass     -6.8     167  3rd/Luna/Basses/Synthwave
 bass     -5.1     805  3rd/Zoozither/Basses/Open Up
@@ -30,13 +28,13 @@ delay arp 1.5 0.45 0.25
 
 # Balance (to be measured in the mix)
 gain pulse   0.0
-gain metal   1.0
+gain metal   3.1
 gain tick    6.3
-gain perc    -8.0
+gain perc    -9.0
 gain pad     -5.0
-gain bass    0.7
+gain bass    0.8
 gain sub     -11.6
-gain arp     16.5
+gain arp     20.7
 gain chord   -4.9
 gain fx    -11.7
 master 9.3
@@ -56,24 +54,25 @@ delay perc  1.0 0.5 0.3 throws
 
 # 2026-10-29: the 808, the choir, deep metal, darker synths
 sub      0.0      60  internal/808
-metal    6.8     783  3rd/Malfunction/Drums/Gong
+metal    4.5     783  3rd/Malfunction/Drums/Gong
+metal   -5.7    1063  3rd/Malfunction/Drums/Tuning Drums
 harm      5.6    1136  3rd/Giana Brotherz/Pads/Dub Choir
 harm     -3.2     740  3rd/Giana Brotherz/Pads/Deep Choir
-perc     -3.8     300  internal/deep
-gain harm    -5.8
+perc     -4.9     300  internal/deep
+gain harm    -5.7
 amp harm  0.25 2200 0.35
 drive sub  0.55 2500
 duck sub 0.30
 lowcut bass 90
 
 # The percussion section (modal: struck and shaken objects, tuned to the chords)
-ground   0.0    1000  internal/modal-log
-body     0.0    1000  internal/modal-block
+ground   0.0     300  internal/deep
+body     0.0    1000  internal/modal-plate
 mallet   0.0    1000  internal/modal-glass
 texture  0.0    1000  internal/modal-scrape
 impact   0.0    1000  internal/modal-plate
-gain ground  -28.5
-gain body    -11.4
+gain ground  -17.1
+gain body    -19.3
 gain mallet  -25.5
 gain texture -35.3
 gain impact -4.0
@@ -91,7 +90,14 @@ arp      18.2    2983  sfz/aliexpress-erhu_v1000/Programs/02-erhu_long.sfz
 
 # 2026-10-30: the riff (the engine's guitar: two takes, left and right, the fifths pure) into a fuzz and a cabinet
 riff     0.0    1000  internal/guitar
-gain riff    -11.4
-drive riff 0.60 3500
-amp riff  0.75 2600 1.0 70 1 4500 3 800
+gain riff    -8.9
+drive riff 1.0 6500
+amp riff  1.0 3200 1.0 160 9 6500 1 300
 delay riff 0.75 0.35 0.25
+
+# 2026-10-31 (Kerem: no high percussion, industrial; "really gnarly", Filosofem): ground = low struck iron
+# (FM), body = a sheet of plate, both through grit; the guitar a fuzz into a thin, buzzing, mid-forward
+# amp: the lows tight above 160 Hz, the mud scooped at 300, the top left open to 6.5 kHz
+drive ground 0.55 2500
+drive body 0.60 3500
+comp ground -22 4 3 80 0.4

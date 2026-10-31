@@ -188,21 +188,25 @@ const G::Spec kBlackgaze {
     // after Deafheaven, Alcest and Lantlos: tremolo-picked open chords (root, fifth, ninth) as a wall,
     // the minor with its major colours (the relative major, the sixth and seventh chords), the choir
     // high, and a melody that only the summit finds.
+    // 2026-10-31 (Kerem: no high percussion, industrial, he may blast-beat it; a northern line like
+    // Transilvanian Hunger or Spectral Wound, in that feel): no ticks, glass or bright metal; low struck
+    // iron on a machine grid (eighths at the height, threes over it), a plate on the offbeats; the
+    // tremolo carries a melody on its top string.
     .bpmLo = 150, .bpmHi = 158, .mode = &kAeolian, .tonics = { 4, 11, 9, 2, 6 },
     .progs = { { { 0, 5, 2, 6 }, { 5, 6, 0, 0 }, { 0, 3, 5, 6 } } }, .preRoot = 6,
-    .form = { { { "Haze", 24, .20f, "PFTR" }, { "Rise", 32, .50f, "PRBUHTGA" }, { "Storm", 64, .80f, "PRBUKSHCDTGYMI" },
-                { "Clearing", 32, .35f, "PAFT" }, { "Ascent", 32, .65f, "PRBUHDTGYMA" }, { "Sunbather", 64, 1.0f, "PRBUKSHCDTGYMAFI" },
+    .form = { { { "Haze", 24, .20f, "PFTRG" }, { "Rise", 32, .50f, "PRBUTGYCA" }, { "Storm", 64, .80f, "PRBUKSCDTGYI" },
+                { "Clearing", 32, .35f, "PAFTG" }, { "Ascent", 32, .65f, "PRBUSCDTGYA" }, { "Sunbather", 64, 1.0f, "PRBUKSCDTGYAFI" },
                 { "Afterglow", 16, .20f, "PRT" } } },
     .pulse = part("X.......X.......", "X...X...X...X...", "X.X.X.X.X.X.X.X."), // the blast's weight, as ghost pumps
-    .metal = part("", "......1.......2.", "..1...2...1...3."),
-    .tick = part("x...x...x...x...", "x.x.x.x.x.x.x.x.", "xxxxxxxxxxxxxxxx"),
-    .perc = part("", "..........1.....", "......1...3...2."),
+    .metal = part("", "..............1.", "......1.......2."),
+    .tick = part("", "", ""),
+    .perc = part("", "......1.......1.", "1..1..1...1..1.."),
     .bass = part("x---------------", "x-------x-------", "x---x---x---x---"),
     .chord = part("", "x---------------", "x-------x-------"),
     .sub = part("x---------------", "x---------------", "x-------x-------"),
-    .ground = part("", "1.......1.......", "1...1...1...1..."),
-    .body = part("", "....o.......o...", "..o.o...o.o.o..o"),
-    .mallet = part("1...............", "1.......3.......", "1...3...2...4..."),
+    .ground = part("1...............", "1.......1..1....", "1.1.1.1.1.1.1.1."),
+    .body = part("", "....o.......o...", "..o...o...o.o.o."),
+    .mallet = part("", "", ""),
     .texture = part("x---------------", "x---------------", "x-------x-------"),
     .arpLo = 64, .arpHi = 88, .percLo = 36, .percHi = 52,
     .chordSweep = .30f, .riff = G::RiffStyle::Tremolo, .riffLo = 40, .summit = G::Summit::NewTheme,
@@ -1038,7 +1042,36 @@ void GenreComposer::makeRiff()
             if (split) add(26, 6, rng_.chance(.5) ? 1 : -1, .85f, false);
             break;
         }
-        default: break; // tremolo and drone follow the chords, bar by bar
+        case RiffStyle::Tremolo:
+        {
+            // the northern line (after Transilvanian Hunger, Spectral Wound, in their feel): the top
+            // string, two notes a bar, moving by step through the mode above the chord's root and
+            // landing on its chord tones each two bars (the fifth, the octave, the tenth, the twelfth),
+            // closing on the octave or the fifth; the summit gets a line of its own
+            for (auto* mel : { &melA_, &melB_ })
+            {
+                mel->clear();
+                int d = rng_.chance(.5) ? 7 : 9;
+                for (int i = 0; i < 16; ++i)
+                {
+                    if (i == 15) d = rng_.chance(.6) ? 7 : 4;
+                    else if (i > 0)
+                    {
+                        static const int steps[] = { -1, 1, -1, -2, 2, 0, -1 };
+                        d = std::clamp(d + steps[size_t(rng_.range(0, 6))], 4, 11);
+                        if (i % 4 == 0)
+                        {
+                            int best = 7;
+                            for (int c : { 4, 7, 9, 11 }) if (std::abs(c - d) < std::abs(best - d)) best = c;
+                            d = best;
+                        }
+                    }
+                    mel->push_back(d);
+                }
+            }
+            break;
+        }
+        default: break; // the drone follows the chords, bar by bar
     }
 }
 
@@ -1096,7 +1129,32 @@ void GenreComposer::emitRiff(int bar, std::vector<Event>& out)
         const int root = riffRoot(bar, x.deg);
         if (active(Riff, bar))
         {
-            if (spec_.riff == RiffStyle::Tremolo) for (int iv : { 0, over(bar, x.deg, 4), over(bar, x.deg, 8) }) note(Riff, x.t, rlen(x), root + iv, v); // root, fifth, ninth: the open shimmer
+            if (spec_.riff == RiffStyle::Tremolo)
+            {
+                // calm: the open shimmer (root, fifth, ninth) let ring; driving: the power chord with the
+                // northern line on the top string, at the height a third under it as a second guitar
+                std::vector<int> ps { root, root + over(bar, x.deg, 4) };
+                if (tier(bar) == 0) ps.push_back(root + over(bar, x.deg, 8));
+                else
+                {
+                    const auto& mel = sectionAt(bar).restoreTheme ? melB_ : melA_;
+                    const int half = int((x.t - int64_t(bar) * kBarTicks) * 2 / kBarTicks);
+                    const int d = mel[size_t(((bar - sectionAt(bar).startBar) * 2 + half) % 16)];
+                    // the line glides: it takes the octave nearest its last note, so a chord's root
+                    // folding to another octave does not throw it a ninth away
+                    int top = root + over(bar, x.deg, d);
+                    if (lastTop_ > 0)
+                    {
+                        while (top - lastTop_ > 6 && top - 12 > ps[1]) top -= 12;
+                        while (lastTop_ - top > 6 && top + 12 <= 76) top += 12;
+                    }
+                    lastTop_ = top;
+                    const int under = top - (over(bar, x.deg, d) - over(bar, x.deg, d - 2));
+                    for (int p : { top, tier(bar) == 2 ? under : -1 })
+                        if (p > ps[1] && std::find(ps.begin(), ps.end(), p) == ps.end()) ps.push_back(p);
+                }
+                for (int p : ps) note(Riff, x.t, rlen(x), p, v);
+            }
             else powerChord(Riff, x.t, rlen(x), root, over(bar, x.deg, 4), v, out);
         }
         if (unison)

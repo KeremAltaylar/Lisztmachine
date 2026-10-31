@@ -150,6 +150,8 @@ private:
     std::vector<Note> hook_, hookHome_, hookSummit_;
     struct RNote { int step, len, deg; float vel; bool palm; }; // the riff: two bars of sixteenths, degrees above the chord's root
     std::vector<RNote> riff_;
+    int lastTop_ = -1;                              // the line's last pitch: the next one stays near it
+    std::vector<int> melA_, melB_;                  // the tremolo's top line: degrees above the chord's root, two a bar; the summit its own
     std::vector<int> endFig_;                       // per bar: the end figure it plays, or -1
     std::vector<int> chordsHeldRiff_;
     int fxHeld_ = -1;
