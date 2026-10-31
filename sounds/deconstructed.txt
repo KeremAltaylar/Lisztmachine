@@ -6,12 +6,12 @@
 
 pulse    0.0      60  internal/none
 metal    18.0     783  3rd/Malfunction/Drums/Gong
-metal    14.8     812  3rd/Malfunction/Drums/Inharmonic Attack 1
+metal    14.5     812  3rd/Malfunction/Drums/Inharmonic Attack 1
 metal    13.1    2537  3rd/Malfunction/Drums/Jerry
 tick     0.0    6000  internal/click
 perc     1.8    7466  3rd/Cybersoda/Drums/Perc 2
 perc      5.6    2000  3rd/Giana Brotherz/Drums/Zap
-perc     15.5    2737  3rd/Cybersoda/Drums/Perc 6
+perc     14.9    2737  3rd/Cybersoda/Drums/Perc 6
 fx       -5.7     286  FX/Unsettler
 fx        4.0    4170  FX/Radio Noise
 
@@ -34,12 +34,12 @@ delay chord 0.75 0.40 0.22
 
 # Balance (to be measured in the mix)
 gain pulse   0.0
-gain metal   -14.2
-gain tick    6.5
-gain perc    -14.5
+gain metal   -13.8
+gain tick    6.1
+gain perc    -14.4
 gain pad     -4.6
 gain bass    -3.4
-gain sub     -16.3
+gain sub     -16.2
 gain arp     -9.7
 gain chord   -11.3
 gain fx     -9.2
@@ -60,10 +60,10 @@ delay perc  1.0 0.5 0.3 throws
 
 # 2026-10-29: the 808, the choir, deep metal, darker synths
 sub      0.0      60  internal/808
-metal    7.8     997  3rd/Malfunction/Drums/Inharmonic Attack 2
+metal    8.3     997  3rd/Malfunction/Drums/Inharmonic Attack 2
 harm     -2.1    4204  3rd/Giana Brotherz/Pads/Dark Whisper
 harm    -10.6    3541  3rd/Bluelight/Vox/Gregorian Rant Poly
-gain harm    -11.2
+gain harm    -11.4
 amp harm  0.41 2200 0.35
 drive sub  0.55 2500
 duck sub 0.30
@@ -75,9 +75,9 @@ body     0.0    1000  internal/modal-block
 mallet   0.0    1000  internal/modal-glass
 texture  0.0    1000  internal/modal-scrape
 impact   0.0    1000  internal/modal-plate
-gain ground  -27.0
-gain body    -12.8
-gain mallet  -25.0
+gain ground  -28.2
+gain body    -13.1
+gain mallet  -25.8
 gain texture -39.2
 gain impact -4.0
 comp body -24 3 8 90 0.35
@@ -94,6 +94,6 @@ pad      20.4    1019  sfz/vsco2/TenorTrombone-sus.sfz
 
 # 2026-10-30: the riff (the engine's guitar: two takes, left and right, the fifths pure) into a fuzz and a cabinet
 riff     0.0    1000  internal/guitar
-gain riff    -18.2
+gain riff    -18.1
 drive riff 0.50 4000
 amp riff  0.90 2600 1.0 110 4 4800 4 500

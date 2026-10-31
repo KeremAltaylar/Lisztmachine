@@ -5,8 +5,8 @@
 # part   gain   bright  patch
 
 pulse    0.0      60  internal/none
-metal    -5.0     997  3rd/Malfunction/Drums/Inharmonic Attack 2
-metal    6.8     783  3rd/Malfunction/Drums/Gong
+metal    -4.6     997  3rd/Malfunction/Drums/Inharmonic Attack 2
+metal    6.7     783  3rd/Malfunction/Drums/Gong
 tick     0.0    6000  internal/click
 fx       -5.7     286  FX/Unsettler
 
@@ -32,13 +32,13 @@ delay arp 1.5 0.45 0.25
 
 # Balance (to be measured in the mix)
 gain pulse   0.0
-gain metal   -0.9
+gain metal   -0.1
 gain tick    5.8
-gain perc    -10.7
-gain pad     -9.3
-gain bass    0.9
-gain sub     -14.4
-gain arp     -6.0
+gain perc    -11.7
+gain pad     -9.5
+gain bass    0.8
+gain sub     -14.5
+gain arp     -6.1
 gain chord   -14.6
 gain fx     -6.0
 master 8.5
@@ -58,10 +58,10 @@ delay perc  1.0 0.5 0.3 throws
 
 # 2026-10-29: the 808, the choir, deep metal, darker synths
 sub      0.0      60  internal/808
-metal    -4.6    1063  3rd/Malfunction/Drums/Tuning Drums
+metal    -4.8    1063  3rd/Malfunction/Drums/Tuning Drums
 harm     -3.2     740  3rd/Giana Brotherz/Pads/Deep Choir
 harm      5.6    1136  3rd/Giana Brotherz/Pads/Dub Choir
-perc     -2.5     300  internal/deep
+perc     -0.4     300  internal/deep
 gain harm    -7.6
 amp harm  0.32 2200 0.35
 drive sub  0.55 2500
@@ -74,9 +74,9 @@ body     0.0    1000  internal/modal-skin
 mallet   0.0    1000  internal/modal-bowl
 texture  0.0    1000  internal/modal-chain
 impact   0.0    1000  internal/modal-plate
-gain ground  -26.5
-gain body    -20.0
-gain mallet  -36.8
+gain ground  -27.3
+gain body    -19.8
+gain mallet  -37.0
 gain texture -26.0
 gain impact -4.0
 comp body -24 3 8 90 0.35
@@ -93,6 +93,6 @@ pad      20.8     714  sfz/vsco2/FHorn-sus.sfz
 
 # 2026-10-30: the riff (the engine's guitar: two takes, left and right, the fifths pure) into a fuzz and a cabinet
 riff     0.0    1000  internal/guitar
-gain riff    -13.0
+gain riff    -13.1
 drive riff 0.85 2500
 amp riff  0.70 1800 1.0 45 -2 3600 6 1100

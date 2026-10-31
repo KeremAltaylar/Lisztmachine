@@ -82,6 +82,7 @@ public:
         RiffStyle riff = RiffStyle::None;
         int riffLo = 33;                           // the riff's lowest root (the power chord stacks a fifth and an octave on it)
         Summit summit = Summit::Theme;
+        bool ends = true;                          // end figures into the parts that are not big arrivals
     };
 
     static const Spec* find(const std::string& scene);
@@ -153,6 +154,7 @@ private:
     int lastTop_ = -1;                              // the line's last pitch: the next one stays near it
     std::vector<int> melA_, melB_;                  // the tremolo's top line: degrees above the chord's root, two a bar; the summit its own
     std::vector<int> endFig_;                       // per bar: the end figure it plays, or -1
+    std::vector<uint32_t> drop_;                    // per bar: the tracks taken out before a big arrival
     std::vector<int> chordsHeldRiff_;
     int fxHeld_ = -1;
     int percRot_ = 0;

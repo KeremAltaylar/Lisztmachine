@@ -209,7 +209,7 @@ const G::Spec kBlackgaze {
     .mallet = part("", "", ""),
     .texture = part("x---------------", "x---------------", "x-------x-------"),
     .arpLo = 64, .arpHi = 88, .percLo = 36, .percHi = 52,
-    .chordSweep = .30f, .riff = G::RiffStyle::Tremolo, .riffLo = 40, .summit = G::Summit::NewTheme,
+    .chordSweep = .30f, .riff = G::RiffStyle::Tremolo, .riffLo = 40, .summit = G::Summit::NewTheme, .ends = false,
 };
 
 bool is(const char* a, const char* b) { return std::strcmp(a, b) == 0; }
@@ -494,6 +494,7 @@ void GenreComposer::makeArp()
 bool GenreComposer::active(int track, int bar) const
 {
     if (bar < 0 || bar >= totalBars()) return false;
+    if (size_t(bar) < drop_.size() && (drop_[size_t(bar)] & bit(track))) return false;
     if (track == Harm) return (sectionAt(bar).layers & bit(Pad)) != 0 && sectionAt(bar).energy >= .4f;
     return (sectionAt(bar).layers & bit(track)) != 0;
 }
@@ -1171,17 +1172,47 @@ void GenreComposer::planEnds()
     // Each section's end gets a figure: into a rise one that pushes (sixteenths swelling to the bar
     // line, threes across the bar, a roll), into a fall one that stops (hits and then air, stabs,
     // silence and three late hits). Never the same twice in a row; into a big rise two bars, threes first.
+    //
+    // 2026-10-31 (Kerem): into a big arrival (the summit, or a part of .65 and up clearly louder) no
+    // figure: the part empties instead, one instrument out 16 bars before, the bass at 8, one more at
+    // 4, and everything comes back on the new part's downbeat.
     endFig_.assign(size_t(totalBars()), -1);
+    drop_.assign(size_t(totalBars()), 0);
     int last = -1;
     for (size_t si = 0; si + 1 < sections_.size(); ++si)
     {
         const auto& sec = sections_[si];
         const auto& nx = sections_[si + 1];
+        const int end = sec.startBar + sec.bars - 1;
+        if (nx.restoreTheme || (nx.energy >= .65f && nx.energy > sec.energy + .1f))
+        {
+            static const std::vector<std::vector<int>> slots[3] = {
+                { { Arp }, { Chord }, { Metal, Perc }, { Pad } },     // 16 bars out: a voice above
+                { { Bass, Sub }, { Chord }, { Pad } },                 // 8: the bass
+                { { Riff }, { Ground, Body, Perc, Metal }, { Pad } },  // 4: the guitar, or the iron
+            };
+            const int at[3] = { std::min(16, sec.bars / 2), std::min(8, sec.bars / 4), std::min(4, sec.bars / 8) };
+            uint32_t mask = 0;
+            for (int k = 0; k < 3; ++k)
+            {
+                if (at[k] < 1) continue;
+                for (auto& g : slots[k])
+                {
+                    uint32_t m = 0;
+                    for (int t : g) if ((sec.layers & bit(t)) && !(mask & bit(t))) m |= bit(t);
+                    if (!m) continue;
+                    mask |= m;
+                    for (int b = end - at[k] + 1; b <= end; ++b) drop_[size_t(b)] |= mask;
+                    break;
+                }
+            }
+            continue;
+        }
+        if (!spec_.ends) continue;
         static const int up[] = { 1, 2, 4 }, down[] = { 0, 3, 5 };
         int f;
         do f = nx.energy > sec.energy ? up[rng_.range(0, 2)] : down[rng_.range(0, 2)]; while (f == last);
         last = f;
-        const int end = sec.startBar + sec.bars - 1;
         endFig_[size_t(end)] = f;
         if ((nx.restoreTheme || nx.energy - sec.energy >= .3f) && sec.bars >= 8) endFig_[size_t(end - 1)] = f == 2 ? 3 : 2;
     }

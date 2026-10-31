@@ -11,7 +11,7 @@ PEAK = dict(jungle="Liquid Gold", ecstatic="Computation", noir="Cathedral of Smo
 BASE = dict(pad=-27, metal=-28, tick=-31, perc=-29, bass=-25, sub=-25, arp=-26, chord=-28, harm=-29, ground=-30, body=-29, mallet=-31, texture=-38, riff=-26)  # no pulse: it is silent  # no fx: a riser, quiet at the summit and loud before it, so one place cannot judge it
 # the riff: the song itself in Doom, a wall in Blackgaze, a drone under the sequence in Ecstatic, colour in Liquid
 OVER = dict(ecstatic=dict(arp=-23, chord=-26, riff=-30), deconstructed=dict(chord=-25, perc=-28), doom=dict(riff=-23, pad=-29),
-            blackgaze=dict(riff=-24), jungle=dict(riff=-29))
+            blackgaze=dict(riff=-27), jungle=dict(riff=-29))
 OFF = os.path.join(os.path.dirname(__file__), "balance-offsets.json")   # per song: how far everything went down for the limiter
 off = json.load(open(OFF)) if os.path.exists(OFF) else {}
 

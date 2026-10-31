@@ -5,11 +5,11 @@
 # part   gain   bright  patch
 
 pulse    0.0      60  internal/none
-metal    -3.3    1063  3rd/Malfunction/Drums/Tuning Drums
-metal    -4.1     997  3rd/Malfunction/Drums/Inharmonic Attack 2
+metal    -6.5    1063  3rd/Malfunction/Drums/Tuning Drums
+metal    -7.4     997  3rd/Malfunction/Drums/Inharmonic Attack 2
 tick     0.0    6000  internal/click
-perc     0.0    1486  3rd/Cybersoda/Drums/Perc 8
-perc     8.7     431  3rd/Emu/Drums/Mort Noisey Drum
+perc     -0.7    1486  3rd/Cybersoda/Drums/Perc 8
+perc     8.4     431  3rd/Emu/Drums/Mort Noisey Drum
 fx       -5.7     286  FX/Unsettler
 
 # 2026-10-29 evening: this song's own synths (pitch-true, beating <= 15 %, none shared with another song)
@@ -31,13 +31,13 @@ delay chord 1.5 0.40 0.20
 
 # Balance (to be measured in the mix)
 gain pulse   0.0
-gain metal   3.9
+gain metal   6.4
 gain tick    14.9
-gain perc    -4.0
+gain perc    -3.1
 gain pad     -0.3
-gain bass    -0.8
+gain bass    -0.7
 gain sub     -9.3
-gain arp     -11.6
+gain arp     -11.4
 gain chord   -5.5
 gain fx     -6.9
 master 9.6
@@ -57,11 +57,11 @@ delay perc  1.0 0.5 0.3 throws
 
 # 2026-10-29: the 808, the choir, deep metal, darker synths
 sub      0.0      60  internal/808
-metal    9.5     783  3rd/Malfunction/Drums/Gong
-perc     -0.3     287  3rd/Vospi/Drums/Modular Drum
+metal    6.9     783  3rd/Malfunction/Drums/Gong
+perc     -0.6     287  3rd/Vospi/Drums/Modular Drum
 harm     -3.2     740  3rd/Giana Brotherz/Pads/Deep Choir
 harm    -10.6    3541  3rd/Bluelight/Vox/Gregorian Rant Poly
-gain harm    -4.4
+gain harm    -4.2
 amp harm  0.40 2200 0.35
 drive sub  0.55 2500
 duck sub 0.30
@@ -73,9 +73,9 @@ body     0.0    1000  internal/modal-skin
 mallet   0.0    1000  internal/modal-bowl
 texture  0.0    1000  internal/modal-chain
 impact   0.0    1000  internal/modal-plate
-gain ground  -21.3
-gain body    -12.2
-gain mallet  -30.3
+gain ground  -20.3
+gain body    -12.0
+gain mallet  -29.2
 gain texture -19.2
 gain impact -4.0
 comp body -24 3 8 90 0.35
@@ -92,6 +92,6 @@ arp      13.5    2290  sfz/Karoryfer_Bigcat_cello.v1.001/Karoryfer_Bigcat_cello/
 
 # 2026-10-30: the riff (the engine's guitar: two takes, left and right, the fifths pure) into a fuzz and a cabinet
 riff     0.0    1000  internal/guitar
-gain riff    -8.2
+gain riff    -8.1
 drive riff 0.85 2500
 amp riff  0.70 1800 1.0 45 -2 3600 6 1100

@@ -17,10 +17,10 @@ bass     12.1     409  3rd/Luna/Basses/Acidic Warp
 bass     11.7    1864  3rd/Giana Brotherz/Basses/Ring 'n' Shape
 bass     -0.5     151  Basses/WT Bass
 arp      -1.4    1218  3rd/Bluelight/Leads/Distorted Cello
-metal    5.6     783  3rd/Malfunction/Drums/Gong
-metal    0.4     812  3rd/Malfunction/Drums/Inharmonic Attack 1
+metal    4.2     783  3rd/Malfunction/Drums/Gong
+metal    -2.0     812  3rd/Malfunction/Drums/Inharmonic Attack 1
 tick     0.0    6000  internal/click
-perc     -3.0     300  internal/deep
+perc     -3.1     300  internal/deep
 harm     -3.2     740  3rd/Giana Brotherz/Pads/Deep Choir
 harm     -2.1    4204  3rd/Giana Brotherz/Pads/Dark Whisper
 
@@ -33,14 +33,14 @@ delay arp 1.5 0.45 0.25
 
 # Balance (to be measured in the mix)
 gain pulse   0.0
-gain metal   6.1
-gain tick    12.4
-gain perc    -5.6
-gain pad     -3.1
+gain metal   8.7
+gain tick    12.2
+gain perc    -5.8
+gain pad     -3.2
 gain bass    -0.7
 gain sub     -10.2
 gain arp     -5.2
-gain chord   -10.0
+gain chord   -10.1
 gain fx     -6.0
 master 8.5
 amp bass  0.63 1800 0.75
@@ -71,10 +71,10 @@ body     0.0    1000  internal/modal-skin
 mallet   0.0    1000  internal/modal-bowl
 texture  0.0    1000  internal/modal-chain
 impact   0.0    1000  internal/modal-plate
-gain ground  -18.6
-gain body    -13.0
-gain mallet  -30.3
-gain texture -20.4
+gain ground  -19.6
+gain body    -13.1
+gain mallet  -30.4
+gain texture -20.6
 gain impact -4.0
 comp body -24 3 8 90 0.35
 duck body 0.2
@@ -92,6 +92,6 @@ harm     20.2    2361  sfz/vsco2/Clarinet-susLong.sfz
 
 # 2026-10-30: the riff (the engine's guitar: two takes, left and right, the fifths pure) into a fuzz and a cabinet
 riff     0.0    1000  internal/guitar
-gain riff    -10.4
+gain riff    -10.3
 drive riff 0.85 2500
 amp riff  0.70 1800 1.0 45 -2 3600 6 1100

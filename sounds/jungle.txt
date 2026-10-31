@@ -5,9 +5,9 @@
 # part   gain   bright  patch
 
 pulse    0.0      60  internal/none
-metal    -4.0     997  3rd/Malfunction/Drums/Inharmonic Attack 2
-metal    -4.2    1063  3rd/Malfunction/Drums/Tuning Drums
-metal    -12.6    2646  3rd/Emu/Drums/T8 Cowbell
+metal    -4.9     997  3rd/Malfunction/Drums/Inharmonic Attack 2
+metal    -5.0    1063  3rd/Malfunction/Drums/Tuning Drums
+metal    -13.9    2646  3rd/Emu/Drums/T8 Cowbell
 tick     0.0    6000  internal/click
 fx       -5.7     286  FX/Unsettler
 fx        4.0    4170  FX/Radio Noise
@@ -17,7 +17,7 @@ pad       3.8     188  3rd/Inigo Kennedy/Pads/Deep Space 1
 pad      -0.7     442  Pads/MKS-70 Warm Pad
 chord     6.4     585  3rd/Giana Brotherz/Keys/Sin Ring
 chord     4.6     935  3rd/Giana Brotherz/Keys/Tri Meets Saw
-arp       -12.1    1008  3rd/Luna/Synths/Window Warp
+arp       -16.5    1008  3rd/Luna/Synths/Window Warp
 arp      -14.4     539  3rd/TNMG/Leads/Acid Gizmo
 arp     -11.2     288  Leads/Sine Lead
 bass      0.2     269  3rd/Giana Brotherz/Basses/Warm Square
@@ -30,13 +30,13 @@ delay arp 0.75 0.45 0.25
 
 # Balance (to be measured in the mix)
 gain pulse   0.0
-gain metal   -3.2
-gain tick    7.0
-gain perc    -7.4
+gain metal   -2.3
+gain tick    6.9
+gain perc    -8.2
 gain pad     -2.8
 gain bass    1.0
 gain sub     -13.0
-gain arp     9.2
+gain arp     9.1
 gain chord   -6.5
 gain fx    -10.0
 master 8.0
@@ -56,10 +56,10 @@ delay perc  1.0 0.5 0.3 throws
 
 # 2026-10-29: the 808, the choir, deep metal, darker synths
 sub      0.0      60  internal/808
-metal    7.8     783  3rd/Malfunction/Drums/Gong
+metal    7.4     783  3rd/Malfunction/Drums/Gong
 harm     -3.2     740  3rd/Giana Brotherz/Pads/Deep Choir
 harm     -2.1    4204  3rd/Giana Brotherz/Pads/Dark Whisper
-perc     -4.5     300  internal/deep
+perc     -2.8     300  internal/deep
 gain harm    -6.8
 amp harm  0.32 2200 0.35
 drive sub  0.55 2500
@@ -72,9 +72,9 @@ body     0.0    1000  internal/modal-skin
 mallet   0.0    1000  internal/modal-glass
 texture  0.0    1000  internal/modal-rattle
 impact   0.0    1000  internal/modal-plate
-gain ground  -24.2
-gain body    -21.7
-gain mallet  -25.6
+gain ground  -23.5
+gain body    -20.4
+gain mallet  -26.4
 gain texture -18.6
 gain impact -4.0
 comp body -24 3 8 90 0.35
