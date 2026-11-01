@@ -9,7 +9,8 @@
   "texture": "Chain",
   "impact": "Plate",
   "perc": "Deep Metal",
-  "fx": "Unsettler"
+  "fx": "Unsettler",
+  "drone": "Cello"
  },
  "sections": [
   {
@@ -63,6 +64,7 @@
     "body",
     "mallet",
     "texture",
+    "drone",
     "delay",
     "reverb"
    ]
@@ -82,6 +84,8 @@
     "ground",
     "body",
     "texture",
+    "riff",
+    "drone",
     "delay",
     "reverb"
    ]
@@ -106,6 +110,8 @@
     "mallet",
     "texture",
     "impact",
+    "riff",
+    "drone",
     "delay",
     "reverb"
    ]
@@ -116,61 +122,15 @@
    "end": 353.103,
    "stems": [
     "pad",
-    "bass",
     "sub",
     "arp",
     "chord",
-    "ground",
-    "body",
-    "mallet",
-    "texture",
-    "riff",
-    "delay",
-    "reverb"
-   ]
-  },
-  {
-   "name": "Gravity",
-   "start": 353.103,
-   "end": 397.241,
-   "stems": [
-    "pad",
-    "metal",
-    "tick",
-    "perc",
-    "bass",
-    "sub",
-    "arp",
-    "chord",
-    "fx",
     "harm",
     "ground",
     "body",
     "mallet",
     "texture",
-    "impact",
-    "riff",
-    "delay",
-    "reverb"
-   ]
-  },
-  {
-   "name": "Fall",
-   "start": 397.241,
-   "end": 441.379,
-   "stems": [
-    "pad",
-    "metal",
-    "perc",
-    "bass",
-    "sub",
-    "arp",
-    "chord",
-    "ground",
-    "body",
-    "mallet",
-    "texture",
-    "riff",
+    "drone",
     "delay",
     "reverb"
    ]
@@ -180,21 +140,24 @@
  "base": {
   "pulse": 0.0,
   "metal": -0.1,
-  "tick": 5.8,
-  "perc": -11.7,
-  "pad": -9.5,
+  "tick": -5.8,
+  "perc": -35.7,
+  "pad": 0.6,
   "bass": 0.8,
   "sub": -14.5,
   "arp": -6.1,
-  "chord": -14.6,
+  "chord": -14.4,
   "fx": -6.0,
-  "harm": -7.6,
-  "ground": -19.0,
-  "body": -14.0,
+  "harm": -3.6,
+  "ground": -26.0,
+  "body": -14.1,
   "mallet": -37.0,
   "texture": -26.0,
   "impact": -4.0,
-  "riff": -13.1
+  "riff": -13.1,
+  "drone": -4.0
  },
- "returns": {}
+ "returns": {
+  "delay": 7.7
+ }
 }

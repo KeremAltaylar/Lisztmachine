@@ -138,10 +138,10 @@ const G::Spec kHalftime {
     .scene = "halftime", .title = "Halftime",
     .bpmLo = 168, .bpmHi = 174, .mode = &kHarmonicMinor, .tonics = { 7, 0, 5, 10, 2 }, // harmonic minor: the major V pulling home
     .progs = { { { 0, 5, 3, 4 }, { 0, 3, 4, 0 }, { 5, 3, 4, 4 } } }, .preRoot = 4,
-    // 2026-11-01 (Kerem): Breath a lot longer, Gravity shorter; the low and the mid percussion in more parts
-    .form = { { { "Smoke", 16, .15f, "PFT" }, { "Weight", 32, .35f, "PHBUTGY" }, { "Halftime", 64, .60f, "PKSHCBUDTGYM" },
-                { "Hollow", 32, .40f, "PAFTY" }, { "Mass", 64, .85f, "PKSHCBUADTGYMI" }, { "Breath", 48, .25f, "PAT" },
-                { "Gravity", 32, 1.0f, "PKSHCBUADFTGYMIR" }, { "Fall", 32, .30f, "PKSCALTGYMR" } } },
+    // 2026-11-01 (Kerem): Breath a lot longer; the low and the mid percussion in more parts; Gravity and
+    // Fall gone, the song ends in Breath; a bowed cello section (the drone track) holds the chords
+    .form = { { { "Smoke", 16, .15f, "PFT" }, { "Weight", 32, .35f, "PHBUTGY" }, { "Halftime", 64, .60f, "PKSHCBUDTGYMW" },
+                { "Hollow", 32, .40f, "PAFTYW" }, { "Mass", 64, .85f, "PKSHCBUADTGYMIRW" }, { "Breath", 48, .25f, "PATW" } } },
     // halftime: the tempo is 170, the body feels 85 (the live snare on three); the metal answers around it
     .pulse = part("X...............", "X.........x.....", "X.........x...x.X......x..x....."),
     .metal = part("..........1.....", "......1...2.....", "......1...2...3.......1...2..1.3"),

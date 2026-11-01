@@ -6,7 +6,7 @@ from concurrent.futures import ThreadPoolExecutor
 R = r"C:\Users\kerem\build\Lisztmachine\liszt_render_artefacts\Release\liszt_render.exe"
 S = r"C:\Users\kerem\OneDrive\Desktop\Claude\Projects\Lisztmachine\sounds"
 G = open(r"C:\Users\kerem\OneDrive\Desktop\Claude\Projects\Lisztmachine\src\core\Genres.cpp", encoding="utf8").read()
-PEAK = dict(jungle="Liquid Gold", ecstatic="Computation", noir="Cathedral of Smoke", deconstructed="Rebirth", halftime="Gravity",
+PEAK = dict(jungle="Liquid Gold", ecstatic="Computation", noir="Cathedral of Smoke", deconstructed="Rebirth", halftime="Mass",
             doom="Monument", blackgaze="Sunbather")
 BASE = dict(pad=-27, metal=-28, tick=-31, perc=-29, bass=-25, sub=-25, arp=-26, chord=-28, harm=-29, ground=-30, body=-29, mallet=-31, texture=-38, riff=-26)  # no pulse: it is silent  # no fx: a riser, quiet at the summit and loud before it, so one place cannot judge it
 # the riff: the song itself in Doom, a wall in Blackgaze, a drone under the sequence in Ecstatic, colour in Liquid
@@ -39,7 +39,7 @@ def run(scene):
     open(p, "w", encoding="utf8", newline="").write(txt)
     return f"{scene}: limiter {lim:.1f} off {off[scene]:.1f} | " + ", ".join(moves)
 
-MIXED = {"blackgaze", "doom"}  # mixed by Kerem in the mixer page: balancing would undo him
+MIXED = {"blackgaze", "doom", "halftime"}  # mixed by Kerem in the mixer page: balancing would undo him
 with ThreadPoolExecutor(4) as ex:
     for line in ex.map(run, [p for p in PEAK if p not in MIXED]): print(line, flush=True)
 json.dump(off, open(OFF, "w"))

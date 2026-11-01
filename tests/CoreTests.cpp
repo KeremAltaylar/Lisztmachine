@@ -247,7 +247,7 @@ int main()
                       return a.tick == b.tick && a.type == b.type && a.track == b.track && a.pitch == b.pitch && a.value == b.value;
                   }), "%s: same seed must give the same piece", spec->scene);
             const double minutes = c.totalBars() * 4 / c.bpm();
-            CHECK(minutes > 6.5 && minutes < 11, "%s length %.1f min", spec->scene, minutes);
+            CHECK(minutes > 5.5 && minutes < 11, "%s length %.1f min", spec->scene, minutes);
             std::map<std::pair<int, int>, int> held;
             int notes[G::kGenreTracks] = {}, slides = 0, subHeld = 0;
             for (auto& x : ev)
