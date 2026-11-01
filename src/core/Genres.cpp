@@ -58,6 +58,7 @@ const G::Spec kJungle {
     .texture = part("x---------------", "x-------x-------", "x---x---x---x---"),
     .percLo = 36, .percHi = 52,
     .swing = .06f, .chordSweep = .35f, .riff = G::RiffStyle::Sludge, .riffLo = 35, .summit = G::Summit::NewTheme,
+    .build = true, // 2026-11-01: the sharp part changes
 };
 
 const G::Spec kEcstatic {

@@ -5,25 +5,10 @@
 # part   gain   bright  patch
 
 pulse    0.0      60  internal/none
-metal    -4.9     997  3rd/Malfunction/Drums/Inharmonic Attack 2
-metal    -5.0    1063  3rd/Malfunction/Drums/Tuning Drums
-metal    -13.9    2646  3rd/Emu/Drums/T8 Cowbell
 tick     0.0    6000  internal/click
 fx       -5.7     286  FX/Unsettler
-fx        4.0    4170  FX/Radio Noise
 
 # 2026-10-29 evening: this song's own synths (pitch-true, beating <= 15 %, none shared with another song)
-pad       3.8     188  3rd/Inigo Kennedy/Pads/Deep Space 1
-pad      -0.7     442  Pads/MKS-70 Warm Pad
-chord     6.4     585  3rd/Giana Brotherz/Keys/Sin Ring
-chord     4.6     935  3rd/Giana Brotherz/Keys/Tri Meets Saw
-arp       -16.5    1008  3rd/Luna/Synths/Window Warp
-arp      -14.4     539  3rd/TNMG/Leads/Acid Gizmo
-arp     -11.2     288  Leads/Sine Lead
-bass      0.2     269  3rd/Giana Brotherz/Basses/Warm Square
-bass    -12.2     911  3rd/Emu/Basses/Beefy Boi
-bass     -2.6    1188  3rd/Zoozither/Basses/Drill
-bass    -10.5     856  3rd/Cybersoda/Basses/Growl
 
 # Echoes: beats, feedback, mix
 delay arp 0.75 0.45 0.25
@@ -40,10 +25,6 @@ gain arp     9.1
 gain chord   -6.5
 gain fx    -10.0
 master 8.0
-amp bass  0.63 1800 0.75
-amp chord 0.63 2500 0.85
-amp arp   0.63 3000 0.80
-amp pad   0.32 2000 0.45
 drive metal 0.30 4500
 drive perc  0.30 6000
 crush tick  8 3 0.3
@@ -56,12 +37,8 @@ delay perc  1.0 0.5 0.3 throws
 
 # 2026-10-29: the 808, the choir, deep metal, darker synths
 sub      0.0      60  internal/808
-metal    7.4     783  3rd/Malfunction/Drums/Gong
-harm     -3.2     740  3rd/Giana Brotherz/Pads/Deep Choir
-harm     -2.1    4204  3rd/Giana Brotherz/Pads/Dark Whisper
 perc     -2.8     300  internal/deep
 gain harm    -6.8
-amp harm  0.32 2200 0.35
 drive sub  0.55 2500
 duck sub 0.30
 lowcut bass 90
@@ -84,10 +61,6 @@ delay mallet 0.75 0.4 0.25
 delay impact 1.5 0.55 0.4 throws
 
 # Sampled instruments (CC0: Karoryfer, D. Smolken, VSCO 2 CE; jSteelDrum: Unlicense), played by sfizz
-bass     10.0    2593  sfz/Karoryfer.Growlybass.v1.002/Growlybass/growlybass_vicious.sfz
-chord    22.0    1100  sfz/Karoryfer_Black_And_Green_Guitars_1000/Programs/07-black_twang.sfz
-arp      0.7    2290  sfz/Karoryfer_Bigcat_cello.v1.001/Karoryfer_Bigcat_cello/Programs/02- Bowed (mod wheel).sfz
-pad      14.2     714  sfz/vsco2/FHorn-sus.sfz
 
 # 2026-10-30: the riff (the engine's guitar: two takes, left and right, the fifths pure) into a fuzz and a cabinet
 riff     0.0    1000  internal/guitar
@@ -95,4 +68,19 @@ drone    0.0       0  internal/none  # the second guitar: only Doom has one so f
 gain riff    -15.1
 drive riff 0.85 2500
 amp riff  0.70 1800 1.0 45 -2 3600 6 1100
-chord    11.0    1413  sfz/Karoryfer.Scarypiano.v1.002/Scarypiano/Programs/Scarypiano.sfz
+
+# 2026-11-01 (Kerem: "change the synths from scratch, a dreamy DnB song I will play on top of"): one sound
+# for each part, from the new synths, none in another song, each measured pitch-true. Gain: a held note to
+# -22 dB RMS (pad, keys and choir -27), then each set in the mix against the old track gains (the lead 19 dB
+# down: the track gain was made for leads 11-16 dB quieter).
+metal   -11.0    2000  internal/metal
+chord    -2.1     828  vst/fb7999/CHORUSED E.PIANO|OSC1 Octave=0.5|OSC2 Octave=0.5
+pad       0.1    1892  vst/deputy/Pad: No Safe Ground
+harm     -2.0    1549  vst/deputy/Poly: Alto Aaah  # not Resonarium: its resonators burst 13 dB on some notes
+arp     -19.5     752  vst/js80p/Ambient Pluck
+bass     -1.0     231  vst/JC303/|Cutoff=0.3|Resonance=0.3|EnvMod=0.25|Decay=0.7|Drive=0
+lowcut chord 150
+send chord reverb 0.35
+send pad reverb 0.40
+send harm reverb 0.50
+send arp reverb 0.35
