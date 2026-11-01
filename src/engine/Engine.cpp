@@ -145,6 +145,11 @@ std::unique_ptr<juce::AudioPluginInstance> createVstSound(const juce::String& pa
         else if (auto e = setParameterText(*p, q->getName(128), value); e.isNotEmpty()) { error = e; return nullptr; }
     }
     p->enableAllBuses();
+    // Two seconds of silence before the first note: JS80P drops the notes of its first 1.4 s
+    p->prepareToPlay(sampleRate, maxBlock);
+    juce::AudioBuffer<float> warm(juce::jmax(2, p->getTotalNumOutputChannels()), maxBlock);
+    juce::MidiBuffer none;
+    for (int i = 0; i < int(2.0 * sampleRate / maxBlock); ++i) { warm.clear(); p->processBlock(warm, none); }
     return p;
 }
 

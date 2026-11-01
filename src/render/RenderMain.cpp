@@ -186,7 +186,7 @@ static int audition(const juce::String& patch, int note, bool pure)
     for (int b = 0; b < holdBlocks + tailBlocks; ++b)
     {
         juce::MidiBuffer midi;
-        if (b == 0) midi.addEvent(juce::MidiMessage::noteOn(1, note, 0.8f), 0);
+        if (b == 0) midi.addEvent(juce::MidiMessage::noteOn(1, note, 0.8f), 1); // not at 0: JS80P drops a first block's events
         if (b == holdBlocks) midi.addEvent(juce::MidiMessage::noteOff(1, note), 0);
         buf.clear();
         surge->processBlock(buf, midi);
