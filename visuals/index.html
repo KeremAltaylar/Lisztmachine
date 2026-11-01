@@ -116,6 +116,7 @@ nav button[aria-pressed="true"] { color: var(--ember); }
     <button id="pad-layer" title="P">Hits: layer</button>
     <span id="pad-state">Off</span>
     <button id="metro" title="M" aria-pressed="false">Metronome off</button>
+    <label class="amt" for="metro-vol">Metronome volume <input id="metro-vol" type="range" min="-24" max="24" step="1" value="12"> <span id="metro-vol-v">+12 dB</span></label>
   </div>
 </div>
 
@@ -2148,8 +2149,22 @@ async function boot() {
   // first one higher and louder. Scheduled ahead on the audio clock, the same clock as the recording,
   // so it sits on the song's grid whatever the frame rate; closing it cancels what is scheduled.
   const metro = { on: false, next: 0, from: -1, nodes: [] };
-  const metroBus = actx.createGain();
-  metroBus.connect(actx.destination);
+  // its own fader (2026-11-01 Kerem: +12 dB, and a volume fader), then a soft clip, so a loud click
+  // rounds off instead of clipping the output with the music
+  const metroBus = actx.createGain(), metroClip = actx.createWaveShaper();
+  metroClip.curve = Float32Array.from({ length: 4097 }, (_, i) => 0.95 * Math.tanh(8 * (i / 2048 - 1))); // the bus runs 1/8 into it: unity when quiet, room for +24 dB
+  metroBus.connect(metroClip).connect(actx.destination);
+  const setMetroVol = dB => {
+    dB = Math.max(-24, Math.min(24, Math.round(dB)));
+    $('metro-vol').value = dB;
+    $('metro-vol-v').textContent = (dB > 0 ? '+' : '') + dB + ' dB';
+    metroBus.gain.setTargetAtTime(Math.pow(10, dB / 20) / 8, actx.currentTime, 0.02);
+    try { localStorage.setItem('lisztmachine-metro-db', dB); } catch {}
+  };
+  let metroDb = 12;
+  try { const v = localStorage.getItem('lisztmachine-metro-db'); if (v !== null) metroDb = +v; } catch {}
+  setMetroVol(metroDb);
+  $('metro-vol').oninput = e => setMetroVol(+e.target.value);
   const metroClear = () => { metro.nodes.forEach(n => { try { n.stop(); } catch {} }); metro.nodes = []; };
   setInterval(() => {
     if (!metro.on || !playing) { if (metro.nodes.length) metroClear(); metro.from = -1; return; }
