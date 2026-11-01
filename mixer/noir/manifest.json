@@ -10,7 +10,9 @@
   "impact": "Plate",
   "perc": "Deep Metal",
   "fx": "Unsettler",
-  "arp": "Lead",
+  "arp": "Sax",
+  "bass": "Contrabass",
+  "drone": "Dark Pad",
   "harm": "Choir"
  },
  "sections": [
@@ -104,7 +106,6 @@
     "mallet",
     "texture",
     "impact",
-    "riff",
     "delay",
     "reverb"
    ]
@@ -123,7 +124,7 @@
     "ground",
     "body",
     "texture",
-    "riff",
+    "drone",
     "delay",
     "reverb"
    ]
@@ -148,7 +149,7 @@
     "mallet",
     "texture",
     "impact",
-    "riff",
+    "drone",
     "delay",
     "reverb"
    ]
@@ -167,7 +168,7 @@
     "ground",
     "body",
     "texture",
-    "riff",
+    "drone",
     "delay",
     "reverb"
    ]

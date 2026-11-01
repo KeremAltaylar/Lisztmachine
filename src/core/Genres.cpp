@@ -93,9 +93,11 @@ const G::Spec kNoir {
     // leading tone around a minor tonic), long chords, the hook alone in a big room
     .bpmLo = 72, .bpmHi = 80, .mode = &kHungarianMinor, .tonics = { 11, 6, 8, 1, 3 },
     .progs = { { { 0, 5, 4, 0 }, { 0, 5, 1, 4 }, { 0, 6, 5, 4 } } }, .preRoot = 4,
+    // 2026-11-01 (Kerem): the guitar stabs out, a second pad (the drone track) where they were; a
+    // contrabass walking under a saxophone solo
     .form = { { { "Rain", 8, .15f, "PFT" }, { "Cigarette", 16, .30f, "PHDT" }, { "Roads", 24, .55f, "PKSHCBUDLTGYM" },
-                { "Hollow Hall", 16, .35f, "PDAFT" }, { "Mezzanine", 32, .80f, "PKSHCBUADTGYMI" }, { "Teardrop", 8, .20f, "PATR" },
-                { "Cathedral of Smoke", 32, 1.0f, "PKSHCBUADFTGYMIR" }, { "Last Light", 16, .25f, "PDALTR" } } },
+                { "Hollow Hall", 16, .35f, "PDAFT" }, { "Mezzanine", 32, .80f, "PKSHCBUADTGYMI" }, { "Teardrop", 8, .20f, "PATW" },
+                { "Cathedral of Smoke", 32, 1.0f, "PKSHCBUADFTGYMIW" }, { "Last Light", 16, .25f, "PDALTW" } } },
     .pulse = part("X.........X.....", "X.......X.X.....", "X.....x.X.X....."),
     .metal = part("", "..........1.....", "......1...2...3."), // far bells
     .tick = part("..g...g...g...g.", "x.g.x.g.x.g.x.g2", "xgxgx2xgxgxgx2xg"),
@@ -107,9 +109,10 @@ const G::Spec kNoir {
     .body = part("", "......o.........", "..o...o...o..o.."),
     .mallet = part("1...............", "1.......3.......", "1.......3...2..."),
     .texture = part("x---------------", "x---------------", "x-------x-------"),
-    .percLo = 36, .percHi = 52,
-    .gap = .10f, .swing = .10f, .chordSweep = .45f, .riff = G::RiffStyle::Sludge, .riffLo = 30, .summit = G::Summit::Unison,
+    .arpLo = 52, .arpHi = 79, .percLo = 36, .percHi = 52, // the soloist: an alto saxophone, where it sounds
+    .gap = .10f, .swing = .10f, .chordSweep = .45f, .summit = G::Summit::Theme,
     .build = true, // 2026-11-01: the sharp part changes, as in Deconstructed Club
+    .walk = true, .solo = true,
 };
 
 const G::Spec kDeconstructed {
@@ -517,7 +520,7 @@ std::array<int, 2> GenreComposer::range(int track) const
         case Metal: return { 48, 76 };
         case Tick: return { 72, 100 };
         case Perc: return { spec_.percLo, spec_.percHi };
-        case Bass: return { 40, 64 };
+        case Bass: return spec_.walk ? std::array<int, 2> { 28, 64 } : std::array<int, 2> { 40, 64 };
         case Sub: return { 24, 52 };
         case Arp: return { spec_.arpLo, spec_.arpHi };
         case Chord: return { 46, 76 };
@@ -764,6 +767,7 @@ void GenreComposer::emitPart(int track, const Part& part, int bar, std::vector<E
     if (attack && (track == Bass || track == Sub || track == Chord || track == Ground || track == Body || track == Pulse)) return;
     // A unison summit: the bass and the 808 play the riff with the guitar (emitRiff), the chords make room.
     if (summitUnison(bar) && (track == Bass || track == Sub || (track == Chord && in < sec.bars / 2))) return;
+    if (track == Bass && spec_.walk) { emitWalk(bar, out); return; }
     const bool halfT = summitHalftime(bar);
     const int hm = halfT ? 2 : 1;
     const bool cutHold = bar + 1 < totalBars() && (attackBar(bar + 1) || summitUnison(bar + 1)); // the next bar plays its own low notes
@@ -987,6 +991,144 @@ void GenreComposer::emitArp(int bar, std::vector<Event>& out)
         out.push_back({ notes[j].first, Event::NoteOn, Arp, uint8_t(notes[j].second), vel });
         out.push_back({ notes[j].first + len, Event::NoteOff, Arp, uint8_t(notes[j].second), 0 });
     }
+}
+
+void GenreComposer::emitWalk(int bar, std::vector<Event>& out)
+{
+    // The contrabass walks (Kerem, 2026-11-01: "contra bass jazz walks"): a note on every beat, the
+    // chord's root on the one, on two and three steps of the mode toward the next root (or up or down
+    // through the chord when it is near), and on four the half step into the next bar's root from the
+    // side the line comes from. In the calm it plays in two: the root and the fifth. Now and then
+    // a beat is raked: a ghosted, swung eighth before it on the same note.
+    const int64_t t0 = int64_t(bar) * kBarTicks;
+    const int lo = 28, hi = 50; // E1 to D3, sounding where it is written
+    const auto& m = *spec_.mode;
+    const int r = lowRootAt(bar);
+    auto nearest = [&](int pc, int to) {
+        int best = -1;
+        for (int p = lo + ((pc - lo) % 12 + 12) % 12; p <= hi; p += 12)
+            if (best < 0 || std::abs(p - to) < std::abs(best - to)) best = p;
+        return best;
+    };
+    auto fold = [&](int p) { while (p > hi) p -= 12; while (p < lo) p += 12; return p; };
+    auto put = [&](int64_t t, int p, float vel, int64_t len) {
+        out.push_back({ t, Event::NoteOn, Bass, uint8_t(fold(p)), std::clamp(vel, .05f, 1.0f) });
+        out.push_back({ t + len, Event::NoteOff, Bass, uint8_t(fold(p)), 0 });
+    };
+    const int root = nearest((tonicAt(bar) + degreeSemis(m, r)) % 12, walkLast_ >= 0 ? walkLast_ : 36);
+    const int third = (degreeSemis(m, r + 2) - degreeSemis(m, r) + 24) % 12, fifth = (degreeSemis(m, r + 4) - degreeSemis(m, r) + 24) % 12;
+    const float lv = .72f + .2f * energyAt(bar);
+    auto jitter = [&] { return float(rng_.uniform() * .06 - .03); };
+    if (tier(bar) == 0) // in two
+    {
+        const int f = fold(root + fifth > hi ? root + fifth - 12 : root + fifth);
+        put(t0, root, lv + jitter(), 2 * kPPQ - 30);
+        put(t0 + 2 * kPPQ, f, lv - .08f + jitter(), 2 * kPPQ - 30);
+        walkLast_ = f;
+        return;
+    }
+    auto stepIn = [&](int p, int d) { int q = p + d; while (!inMode(bar, q)) q += d; return q; };
+    const int nb = std::min(bar + 1, totalBars() - 1);
+    int target = nearest((tonicAt(nb) + degreeSemis(m, lowRootAt(nb))) % 12, root);
+    if (target == root && root + 12 <= hi && rng_.chance(.3)) target += 12; // the chord holds: the line climbs to its octave
+    // the half step in; before a build (it plays its own low notes) or the end, a step of the mode instead
+    const bool into = bar + 1 < totalBars() && !attackBar(bar + 1);
+    const int side = target < root ? 1 : target > root ? -1 : rng_.chance(.5) ? 1 : -1;
+    const int approach = into ? target + side : stepIn(target, side);
+    const int dir = approach >= root ? 1 : -1;
+    const int s2 = stepIn(root, dir), s3 = stepIn(s2, dir);
+    int p2, p3;
+    if (std::abs(approach - root) >= 4 && (dir > 0 ? s3 < approach : s3 > approach) && rng_.chance(.7)) { p2 = s2; p3 = s3; }
+    else if (root + fifth <= hi) { p2 = root + third; p3 = root + fifth; }  // up through the chord
+    else { p2 = root - (12 - fifth); p3 = root - (12 - third); }          // down through it
+    const int notes[4] = { root, p2, p3, approach };
+    const float accent[4] = { 0, -.06f, -.03f, -.05f };
+    const bool rake = rng_.chance(.12 + .2 * energyAt(bar)); // the ghost before beat three
+    for (int b = 0; b < 4; ++b)
+    {
+        const int64_t len = rake && b == 1 ? kPPQ * 2 / 3 - 20 : kPPQ - 25;
+        put(t0 + b * kPPQ, notes[b], lv + accent[b] + jitter(), len);
+    }
+    if (rake) put(t0 + kPPQ + kPPQ * 2 / 3, notes[2], .38f, kPPQ / 3 - 20);
+    walkLast_ = fold(approach);
+}
+
+void GenreComposer::emitSolo(int bar, std::vector<Event>& out)
+{
+    // The soloist (Kerem, 2026-11-01: "a lead solo instrument like a saxophone solo, with the bass"):
+    // where a part begins it states the song's hook (the head), then plays phrases of its own over the
+    // walk, two or three bars long (up to four as the music drives) with a bar to breathe between:
+    // mostly steps of the mode with a leap to a chord tone now and then (and back the other way), a
+    // chromatic note between two steps a whole tone apart, chord tones on the beats; long notes in the
+    // calm, swung eighths as it moves, runs of sixteenths and triplets at the top; every phrase ends
+    // long on a chord tone. It rests through the builds. One voice: no note overlaps the next.
+    if (!active(Arp, bar)) { soloLeft_ = soloRest_ = 0; return; }
+    auto& sec = sectionAt(bar);
+    const int in = bar - sec.startBar;
+    const float e = energyAt(bar);
+    if (attackBar(bar)) { soloLeft_ = soloRest_ = 0; return; }
+    if (in < (e < .35f ? 4 : 2)) { emitHook(bar, out); soloLeft_ = 0; soloRest_ = 1; soloPitch_ = -1; return; } // the head
+    bool start = false;
+    if (soloLeft_ == 0)
+    {
+        if (soloRest_ > 0) { --soloRest_; return; }
+        soloLeft_ = rng_.range(2, e > .7f ? 4 : 3);
+        start = true;
+    }
+    const bool last = --soloLeft_ == 0 || bar + 1 >= totalBars() || attackBar(bar + 1) || !active(Arp, bar + 1);
+    if (last) { soloLeft_ = 0; soloRest_ = e > .7f ? rng_.range(0, 1) : 1; }
+
+    const int64_t t0 = int64_t(bar) * kBarTicks, q = kPPQ, sw = kPPQ * 2 / 3; // a swung eighth: two thirds into the beat
+    std::vector<int64_t> on;
+    for (int b = 0; b < (last ? 3 : 4); ++b)
+    {
+        const int64_t s = b * q;
+        const double u = rng_.uniform();
+        if (e < .35f) { if (u < .55) on.push_back(s); else if (u < .75 && b < 2) { on.push_back(s); ++b; } else if (u < .85) on.push_back(s + sw); }
+        else if (e < .75f) { if (u < .5) { on.push_back(s); on.push_back(s + sw); } else if (u < .8) on.push_back(s); else if (u < .92) on.push_back(s + sw); }
+        else
+        {
+            if (u < .4) { on.push_back(s); on.push_back(s + sw); }
+            else if (u < .62) for (int k = 0; k < 4; ++k) on.push_back(s + k * q / 4);
+            else if (u < .78) for (int k = 0; k < 3; ++k) on.push_back(s + k * q / 3);
+            else on.push_back(s);
+        }
+    }
+    if (on.empty()) on.push_back(0);
+
+    const int lo = spec_.arpLo, hi = spec_.arpHi;
+    const auto ct = chordTones(bar, false);
+    auto isCT = [&](int p) { return std::find(ct.begin(), ct.end(), (p % 12 + 12) % 12) != ct.end(); };
+    auto toCT = [&](int p, int d) { for (int k = 0; k < 7; ++k) { if (isCT(p + d * k)) return p + d * k; if (isCT(p - d * k)) return p - d * k; } return p; };
+    auto stepIn = [&](int p, int d) { int x = p + d; while (!inMode(bar, x)) x += d; return x; };
+    int p = soloPitch_ < 0 ? toCT(lo + (hi - lo) * 2 / 5, 1) : soloPitch_;
+    const int64_t cap = e < .35f ? 2 * q : q; // how long a note may ring before a rest
+    bool resolve = false;
+    for (size_t i = 0; i < on.size(); ++i)
+    {
+        const bool onBeat = on[i] % q == 0, fin = last && i + 1 == on.size();
+        if (p > hi - 4) soloDir_ = -1;
+        else if (p < lo + 4) soloDir_ = 1;
+        else if (rng_.chance(.15)) soloDir_ = -soloDir_;
+        if (resolve) { p += soloDir_; resolve = false; }                  // the chromatic note goes on by a half step
+        else if (start && i == 0) p = toCT(p, soloDir_);                  // a phrase begins on a chord tone near the last
+        else if (rng_.chance(.12)) { p = toCT(p + soloDir_ * rng_.range(5, 7), soloDir_); soloDir_ = -soloDir_; } // a leap, then back
+        else
+        {
+            int n = stepIn(p, soloDir_);
+            if (!onBeat && i + 1 < on.size() && std::abs(n - p) == 2 && rng_.chance(.25)) { n = p + soloDir_; resolve = true; } // chromatic, between the steps
+            p = onBeat || fin ? toCT(n, soloDir_) : n;
+        }
+        while (p > hi) p -= 12;
+        while (p < lo) p += 12;
+        const int64_t next = i + 1 < on.size() ? on[i + 1] : kBarTicks;
+        int64_t len = fin ? kBarTicks - on[i] - 40 : std::min(next - on[i], cap) - 20;
+        if (!onBeat && !fin && rng_.chance(.2)) len = std::min<int64_t>(len, q / 3);
+        const float vel = std::clamp(.6f + .3f * e + (onBeat ? .06f : -.04f) + float(rng_.uniform() * .08 - .04), .2f, 1.0f);
+        out.push_back({ t0 + on[i], Event::NoteOn, Arp, uint8_t(p), vel });
+        out.push_back({ t0 + on[i] + std::max<int64_t>(30, len), Event::NoteOff, Arp, uint8_t(p), 0 });
+    }
+    soloPitch_ = p;
 }
 
 bool GenreComposer::summitHalftime(int bar) const { return spec_.summit == Summit::Halftime && sectionAt(bar).restoreTheme; }
@@ -1351,7 +1493,8 @@ void GenreComposer::generateBar(int bar, std::vector<Event>& out)
     emitPart(Perc, spec_.perc, bar, out);
     emitPart(Bass, spec_.bass, bar, out);
     emitPart(Chord, spec_.chord, bar, out);
-    if (spec_.hook) emitHook(bar, out);
+    if (spec_.solo) emitSolo(bar, out);
+    else if (spec_.hook) emitHook(bar, out);
     else emitArp(bar, out);
     emitPart(Sub, spec_.sub, bar, out);
     emitHarm(bar, out);

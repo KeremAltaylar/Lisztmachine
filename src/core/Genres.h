@@ -87,6 +87,8 @@ public:
         bool legato = false;                       // every riff and bass note rings into the next one (no muted notes, no gaps)
         bool gaze = false;                         // the choir holds open intervals (root, fifth, ninth) instead of the chord
     bool build = false;                        // every part ends in a three-bar unison build (2, 4, 8 hits a bar), the next one enters whole
+    bool walk = false;                         // the bass walks: a contrabass on every beat (in two in the calm), its pattern unused
+    bool solo = false;                         // the arp track is a soloist: the hook as the head of each part, then phrases of its own
     };
 
     static const Spec* find(const std::string& scene);
@@ -142,6 +144,8 @@ private:
     bool inMode(int bar, int pitch) const;
     void emitPart(int track, const Part& part, int bar, std::vector<Event>& out);
     void emitArp(int bar, std::vector<Event>& out);
+    void emitWalk(int bar, std::vector<Event>& out);
+    void emitSolo(int bar, std::vector<Event>& out);
     void emitHeld(int track, int bar, std::vector<Event>& out, int& held, int pitch);
     int tier(int bar) const;
 
@@ -170,6 +174,8 @@ private:
     std::vector<bool> drummerLeads_;                // per section: the live drums lead (L)
     std::array<float, 16> accent_ {};               // the song's groove: how hard each sixteenth of the bar leans
     int gapBeat_ = -1, stutterBeat_ = -1;
+    int walkLast_ = -1;                             // the walk's last note: the next bar's root is found near it
+    int soloLeft_ = 0, soloRest_ = 0, soloPitch_ = -1, soloDir_ = 1; // the phrase: bars left in it, bars of breath, where the line is
 };
 
 const SceneInfo* genreSceneInfo(const std::string& scene);

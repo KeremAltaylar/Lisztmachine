@@ -26,7 +26,7 @@ LOOK = 72  # PeakLimiter look_
 mix = sf.read(wav, dtype="float32")[0]
 LABELS = dict(doom=dict(ground="Log", body="Skin", mallet="Bowl", texture="Chain", chord="Brass", fx="Unsettler"),
               halftime=dict(ground="Low Drums", body="Hand Drums", mallet="Bowl", texture="Chain", impact="Plate", perc="Deep Metal", fx="Unsettler", drone="Cello"),
-              noir=dict(ground="Low Drums", body="Hand Drums", mallet="Bowl", texture="Chain", impact="Plate", perc="Deep Metal", fx="Unsettler", arp="Lead", harm="Choir"),
+              noir=dict(ground="Low Drums", body="Hand Drums", mallet="Bowl", texture="Chain", impact="Plate", perc="Deep Metal", fx="Unsettler", arp="Sax", bass="Contrabass", drone="Dark Pad", harm="Choir"),
               deconstructed=dict(ground="Low Logs", body="Block", mallet="Glass", texture="Scrape", impact="Plate", perc="Tubes", chord="Stabs", riff="Riff Synth", arp="Erhu", fx="Unsettler", harm="Cello"))  # strip names where the page's (Blackgaze's) are wrong
 song = os.path.basename(base).rstrip('0123456789')
 pal = open(f"sounds/{song}.txt", encoding="utf8").read()

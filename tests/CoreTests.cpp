@@ -250,8 +250,13 @@ int main()
             CHECK(minutes > 5.5 && minutes < 11, "%s length %.1f min", spec->scene, minutes);
             std::map<std::pair<int, int>, int> held;
             int notes[G::kGenreTracks] = {}, slides = 0, subHeld = 0;
-            for (auto& x : ev)
+            // a walk's approach and a solo's passing note may leave the key: by a half step into the track's next note
+            std::vector<int> nextOn(ev.size(), -1);
+            { int last[G::kGenreTracks]; std::fill(std::begin(last), std::end(last), -1);
+              for (size_t i = ev.size(); i-- > 0;) if (ev[i].type == Event::NoteOn) { nextOn[i] = last[ev[i].track]; last[ev[i].track] = ev[i].pitch; } }
+            for (size_t i = 0; i < ev.size(); ++i)
             {
+                auto& x = ev[i];
                 const auto key = std::make_pair(int(x.track), int(x.pitch));
                 if (x.track == G::Sub && x.type == Event::NoteOn && subHeld++ > 0) ++slides; // the 808 starts a note while one holds
                 if (x.track == G::Sub && x.type == Event::NoteOff) --subHeld;
@@ -261,7 +266,8 @@ int main()
                     CHECK(x.value > 0 && x.value <= 1, "%s velocity %f", spec->scene, x.value);
                     const auto r = c.range(x.track);
                     CHECK(x.pitch >= r[0] && x.pitch <= r[1], "%s track %d pitch %d out of range", spec->scene, x.track, x.pitch);
-                    if (!(x.track == G::Tick && x.pitch >= 96)) // noise ticks have no pitch
+                    const bool chromatic = ((x.track == G::Bass && spec->walk) || (x.track == G::Arp && spec->solo)) && nextOn[i] >= 0 && std::abs(nextOn[i] - x.pitch) == 1;
+                    if (!(x.track == G::Tick && x.pitch >= 96) && !chromatic) // noise ticks have no pitch
                         CHECK(inMode(*spec->mode, c.tonicAt(int(x.tick / kBarTicks)), x.pitch), "%s track %d pitch %d outside the key", spec->scene, x.track, x.pitch);
                     ++held[key];
                     ++notes[x.track];

@@ -10,13 +10,6 @@ pad      -1.7     445  3rd/Giana Brotherz/Organs/Liquid Steel
 pad       4.6    1016  3rd/Luna/Organs/Another Additive Organ
 chord    -0.7    1035  3rd/Giana Brotherz/Keys/Ring Piano
 chord    -6.0     501  3rd/Giana Brotherz/Keys/Glassy E-Piano
-arp       2.7     812  3rd/Luna/Bells/Taco Bell
-arp       2.4    1142  3rd/Luna/Synths/Wavetable Warp
-arp      -0.5     279  3rd/Nick Moritz/Synths/Moon Piano
-bass     12.1     409  3rd/Luna/Basses/Acidic Warp
-bass     11.7    1864  3rd/Giana Brotherz/Basses/Ring 'n' Shape
-bass     -0.5     151  Basses/WT Bass
-arp      -1.4    1218  3rd/Bluelight/Leads/Distorted Cello
 metal    4.2     783  3rd/Malfunction/Drums/Gong
 metal    -2.0     812  3rd/Malfunction/Drums/Inharmonic Attack 1
 tick     0.0    6000  internal/click
@@ -26,7 +19,6 @@ harm     -2.1    4204  3rd/Giana Brotherz/Pads/Dark Whisper
 
 # Dexed (the free DX7, plugins/Dexed.vst3): voices of its cartridge, by name
 pad      -1.0     464  dexed/PHAROH
-arp      -2.2    1961  dexed/SAHARA
 
 # Echoes: beats, feedback, mix
 delay arp 1.5 0.45 0.25
@@ -43,9 +35,7 @@ gain arp     -5.2
 gain chord   -10.1
 gain fx     -6.0
 master 8.5
-amp bass  0.63 1800 0.75
 amp chord 0.63 2500 0.85
-amp arp   0.63 3000 0.80
 amp pad   0.32 2000 0.45
 drive metal 0.30 4500
 drive perc  0.30 6000
@@ -63,7 +53,7 @@ gain harm    -6.6
 amp harm  0.32 2200 0.35
 drive sub  0.55 2500
 duck sub 0.30
-lowcut bass 90
+lowcut bass 35  # the contrabass's low E (41 Hz) stays
 
 # The percussion section (modal: struck and shaken objects, tuned to the chords)
 ground   0.0    1000  internal/modal-log
@@ -84,15 +74,13 @@ delay impact 1.5 0.55 0.4 throws
 
 # Sampled instruments (CC0: Karoryfer, D. Smolken, VSCO 2 CE; jSteelDrum: Unlicense), played by sfizz
 chord    20.2    1413  sfz/Karoryfer.Scarypiano.v1.002/Scarypiano/Programs/Scarypiano.sfz
-bass     16.2     624  sfz/DSmolken.double_bass.v1.001/dsmolken_double_bass/d_smolken_rubner_bass_arco.sfz
-arp      13.5    2290  sfz/Karoryfer_Bigcat_cello.v1.001/Karoryfer_Bigcat_cello/Programs/lm-cello.sfz  # 2026-11-01: the octave-true cello (02 sounded an octave high)
-arp      26.9    2983  sfz/aliexpress-erhu_v1000/Programs/02-erhu_long.sfz
 pad      13.3     708  sfz/vsco2/Bassoon-sus.sfz
 harm     20.2    2361  sfz/vsco2/Clarinet-susLong.sfz
 
 # 2026-10-30: the riff (the engine's guitar: two takes, left and right, the fifths pure) into a fuzz and a cabinet
 riff     0.0    1000  internal/guitar
-drone    0.0       0  internal/none  # the second guitar: only Doom has one so far
+drone   -10.4     382  vst/TAL-NoiseMaker/|Filter Cutoff=0.35|Filter Resonance=0.2|Amp Attack=0.45|Amp Release=0.55|Osc 2 Volume=0.8|Osc 2 Fine Tune=0.53|Chorus 1 Enable=1|Reverb Wet=0.35|Reverb Decay=0.8|Osc 1 Tune=0.5|Osc 3 Volume=0
+send drone reverb 0.30
 gain riff    -10.3
 drive riff 0.85 2500
 amp riff  0.70 1800 1.0 45 -2 3600 6 1100
@@ -101,3 +89,9 @@ amp riff  0.70 1800 1.0 45 -2 3600 6 1100
 # (the organ a 16-foot stop, an octave down). Gain: a held note to -27 dB RMS. Bright places them in the louder parts.
 pad       0.3     900  vst/fb7999/CATHEDRAL ORGAN 1
 harm      0.0    1500  vst/scrooo/Pad: Scary Choir
+
+# 2026-11-01 (Kerem: "contra bass jazz walks", the guitar stabs out for another pad, a saxophone solo):
+# the bass is the contrabass alone, plucked; the lead the Weresax alto alone (noir-sax: its vibrato on);
+# the second pad (the drone track, where the riff's stabs were) TAL-NoiseMaker's dark pad, his pick.
+bass     16.2     624  sfz/DSmolken.double_bass.v1.001/dsmolken_double_bass/d_smolken_rubner_bass_pizz.sfz
+arp      13.2    2170  sfz/Weresax/Programs/noir-sax.sfz  # +5 over its measured level: a soloist, in front
