@@ -55,6 +55,7 @@ nav button[aria-pressed="true"] { color: var(--ember); }
 .pad { font-size: 12px; color: var(--dim); }
 .pad button { padding: 4px 10px; border: 1px solid var(--rule); color: var(--ink); }
 .pad button:hover { border-color: var(--ember); color: var(--ember); }
+.pad button[aria-pressed="true"] { border-color: var(--ember); color: var(--ember); }
 .pad select { font: inherit; color: var(--ink); background: var(--void); border: 1px solid var(--rule); padding: 3px 6px; max-width: 46vw; }
 .amt { display: inline-flex; align-items: center; gap: 8px; color: var(--ink); font-variant-numeric: tabular-nums; }
 .amt input { width: 140px; accent-color: var(--ember); }
@@ -83,7 +84,7 @@ nav button[aria-pressed="true"] { color: var(--ember); }
       <button class="go" id="piece-blackgaze" data-piece="blackgaze" disabled>Blackgaze</button>
     </div>
     <button class="go" id="go" hidden disabled>Loading…</button>
-    <p class="keys"><kbd>1</kbd>–<kbd>8</kbd> study · <kbd>G</kbd> new look · <kbd>Space</kbd> pause · <kbd>←</kbd><kbd>→</kbd> 10 s · <kbd>↑</kbd><kbd>↓</kbd> section · <kbd>S</kbd> strobe on/off · <kbd>B</kbd> feedback on/off · <kbd>K</kbd> test drum hit · <kbd>[</kbd><kbd>]</kbd> pad sensitivity · <kbd>,</kbd><kbd>.</kbd> pad effect · <kbd>P</kbd> hits: affect / layer / off · <kbd>H</kbd> hide controls · <kbd>F</kbd> full screen</p>
+    <p class="keys"><kbd>1</kbd>–<kbd>8</kbd> study · <kbd>G</kbd> new look · <kbd>Space</kbd> pause · <kbd>←</kbd><kbd>→</kbd> 10 s · <kbd>↑</kbd><kbd>↓</kbd> section · <kbd>S</kbd> strobe on/off · <kbd>B</kbd> feedback on/off · <kbd>K</kbd> test drum hit · <kbd>[</kbd><kbd>]</kbd> pad sensitivity · <kbd>,</kbd><kbd>.</kbd> pad effect · <kbd>P</kbd> hits: affect / layer / off · <kbd>M</kbd> metronome on/off · <kbd>H</kbd> hide controls · <kbd>F</kbd> full screen</p>
     <p class="err" id="err" hidden></p>
   </div>
 </div>
@@ -114,6 +115,7 @@ nav button[aria-pressed="true"] { color: var(--ember); }
     <label class="amt" for="pad-amt">Pad effect <input id="pad-amt" type="range" min="0" max="100" step="1" value="50"> <span id="pad-amt-v">50</span></label>
     <button id="pad-layer" title="P">Hits: layer</button>
     <span id="pad-state">Off</span>
+    <button id="metro" title="M" aria-pressed="false">Metronome off</button>
   </div>
 </div>
 
@@ -2104,6 +2106,7 @@ async function boot() {
     else if (e.key === ',') { setAmt(pad.amt - 10); }
     else if (e.key === '.') { setAmt(pad.amt + 10); }
     else if (e.key === 'p' || e.key === 'P') { nextLayer(); }
+    else if (e.key === 'm' || e.key === 'M') { setMetro(!metro.on); }
     else if (e.key === '[') { setThr(1.25); }
     else if (e.key === ']') { setThr(0.8); }
     else if (e.key === 'g' || e.key === 'G') { roll(); }
@@ -2141,6 +2144,36 @@ async function boot() {
   const setLayer = m => { pad.layer = m; $('pad-layer').textContent = 'Hits: ' + m; };
   const nextLayer = () => setLayer(MODES[(MODES.indexOf(pad.layer) + 1) % 3]);
   $('pad-layer').onclick = nextLayer;
+  // The metronome (M, 2026-11-01 Kerem): a click on every beat of whichever song plays, the bar's
+  // first one higher and louder. Scheduled ahead on the audio clock, the same clock as the recording,
+  // so it sits on the song's grid whatever the frame rate; closing it cancels what is scheduled.
+  const metro = { on: false, next: 0, from: -1, nodes: [] };
+  const metroBus = actx.createGain();
+  metroBus.connect(actx.destination);
+  const metroClear = () => { metro.nodes.forEach(n => { try { n.stop(); } catch {} }); metro.nodes = []; };
+  setInterval(() => {
+    if (!metro.on || !playing) { if (metro.nodes.length) metroClear(); metro.from = -1; return; }
+    const spb = 60 / F.show.bpm;
+    if (metro.from !== startAt) { metroClear(); metro.from = startAt; metro.next = Math.ceil(startT / spb - 1e-6); } // started or sought
+    for (let at; (at = startAt + metro.next * spb - startT) < actx.currentTime + 0.12; metro.next++) {
+      if (at < actx.currentTime) continue;
+      const down = metro.next % 4 === 0, o = actx.createOscillator(), env = actx.createGain();
+      o.frequency.value = down ? 1760 : 1320;
+      env.gain.setValueAtTime(0, at);
+      env.gain.linearRampToValueAtTime(down ? 0.45 : 0.25, at + 0.001);
+      env.gain.exponentialRampToValueAtTime(0.0005, at + 0.045);
+      o.connect(env).connect(metroBus);
+      o.start(at); o.stop(at + 0.05);
+      o.onended = () => { metro.nodes = metro.nodes.filter(n => n !== o); };
+      metro.nodes.push(o);
+    }
+  }, 25);
+  const setMetro = on => {
+    metro.on = on; metro.from = -1; metroClear();
+    $('metro').textContent = 'Metronome ' + (on ? 'on' : 'off');
+    $('metro').setAttribute('aria-pressed', on);
+  };
+  $('metro').onclick = () => setMetro(!metro.on);
   setLayer(piece.hits || 'affect'); // 2026-10-31 (Kerem): the hits act on the picture in every song, no drawn layer (P still cycles)
   const pieceHash = [...piece.name].reduce((a, ch) => (a * 31 + ch.charCodeAt(0)) >>> 0, 7);
   const worldHue = (() => {
