@@ -75,7 +75,7 @@ body     0.0    1000  internal/modal-block
 mallet   0.0    1000  internal/modal-glass
 texture  0.0    1000  internal/modal-scrape
 impact   0.0    1000  internal/modal-plate
-gain ground  -28.2
+gain ground  -19.0
 gain body    -13.1
 gain mallet  -25.8
 gain texture -39.2
@@ -94,7 +94,7 @@ pad      20.4    1019  sfz/vsco2/TenorTrombone-sus.sfz
 
 # 2026-10-30: the riff (the engine's guitar: two takes, left and right, the fifths pure) into a fuzz and a cabinet
 riff     0.0    1000  internal/guitar
-drone    0.0       0  internal/none  # the second guitar: only Doom has one so far
+drone    0.0       0  internal/none
 gain riff    -18.1
 drive riff 0.50 4000
 amp riff  0.90 2600 1.0 110 4 4800 4 500

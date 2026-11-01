@@ -1,0 +1,197 @@
+{
+ "song": "deconstructed",
+ "title": "Deconstructed Club",
+ "bpm": 128.0,
+ "labels": {
+  "ground": "Low Logs",
+  "body": "Block",
+  "mallet": "Glass",
+  "texture": "Scrape",
+  "impact": "Plate",
+  "perc": "Clicks",
+  "chord": "Guitar Stabs",
+  "arp": "Erhu",
+  "fx": "Unsettler"
+ },
+ "sections": [
+  {
+   "name": "Shatter",
+   "start": 0.0,
+   "end": 30.0,
+   "stems": [
+    "pad",
+    "chord",
+    "fx",
+    "ground",
+    "body",
+    "texture",
+    "riff",
+    "delay",
+    "reverb"
+   ]
+  },
+  {
+   "name": "Glass",
+   "start": 30.0,
+   "end": 90.0,
+   "stems": [
+    "pad",
+    "perc",
+    "bass",
+    "sub",
+    "chord",
+    "fx",
+    "harm",
+    "ground",
+    "body",
+    "mallet",
+    "texture",
+    "riff",
+    "delay",
+    "reverb"
+   ]
+  },
+  {
+   "name": "Fracture",
+   "start": 90.0,
+   "end": 180.0,
+   "stems": [
+    "metal",
+    "perc",
+    "bass",
+    "sub",
+    "chord",
+    "ground",
+    "body",
+    "mallet",
+    "texture",
+    "riff",
+    "delay",
+    "reverb"
+   ]
+  },
+  {
+   "name": "Cathedral",
+   "start": 180.0,
+   "end": 240.0,
+   "stems": [
+    "pad",
+    "bass",
+    "sub",
+    "arp",
+    "chord",
+    "fx",
+    "harm",
+    "ground",
+    "body",
+    "texture",
+    "delay",
+    "reverb"
+   ]
+  },
+  {
+   "name": "Violence",
+   "start": 240.0,
+   "end": 330.0,
+   "stems": [
+    "pad",
+    "metal",
+    "tick",
+    "perc",
+    "bass",
+    "sub",
+    "arp",
+    "chord",
+    "fx",
+    "harm",
+    "ground",
+    "body",
+    "mallet",
+    "texture",
+    "impact",
+    "delay",
+    "reverb"
+   ]
+  },
+  {
+   "name": "Silence",
+   "start": 330.0,
+   "end": 360.0,
+   "stems": [
+    "pad",
+    "bass",
+    "sub",
+    "chord",
+    "harm",
+    "ground",
+    "body",
+    "texture",
+    "riff",
+    "delay",
+    "reverb"
+   ]
+  },
+  {
+   "name": "Rebirth",
+   "start": 360.0,
+   "end": 480.0,
+   "stems": [
+    "pad",
+    "metal",
+    "tick",
+    "perc",
+    "bass",
+    "sub",
+    "arp",
+    "chord",
+    "fx",
+    "harm",
+    "ground",
+    "body",
+    "mallet",
+    "texture",
+    "impact",
+    "riff",
+    "delay",
+    "reverb"
+   ]
+  },
+  {
+   "name": "Wound",
+   "start": 480.0,
+   "end": 540.0,
+   "stems": [
+    "pad",
+    "arp",
+    "chord",
+    "harm",
+    "ground",
+    "texture",
+    "riff",
+    "delay",
+    "reverb"
+   ]
+  }
+ ],
+ "master": 9.6,
+ "base": {
+  "pulse": 0.0,
+  "metal": -13.8,
+  "tick": 6.1,
+  "perc": -14.4,
+  "pad": -4.6,
+  "bass": -3.4,
+  "sub": -16.2,
+  "arp": -9.7,
+  "chord": -11.3,
+  "fx": -9.2,
+  "harm": -11.4,
+  "ground": -19.0,
+  "body": -13.1,
+  "mallet": -25.8,
+  "texture": -39.2,
+  "impact": -4.0,
+  "riff": -18.1
+ },
+ "returns": {}
+}

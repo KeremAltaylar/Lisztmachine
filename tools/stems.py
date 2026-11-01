@@ -25,10 +25,11 @@ sr = 48000
 LOOK = 72  # PeakLimiter look_
 mix = sf.read(wav, dtype="float32")[0]
 LABELS = dict(doom=dict(ground="Log", body="Skin", mallet="Bowl", texture="Chain", chord="Brass", fx="Unsettler"),
-              halftime=dict(ground="Low Drums", body="Hand Drums", mallet="Bowl", texture="Chain", impact="Plate", perc="Deep Metal", fx="Unsettler", drone="Cello"))  # strip names where the page's (Blackgaze's) are wrong
+              halftime=dict(ground="Low Drums", body="Hand Drums", mallet="Bowl", texture="Chain", impact="Plate", perc="Deep Metal", fx="Unsettler", drone="Cello"),
+              deconstructed=dict(ground="Low Logs", body="Block", mallet="Glass", texture="Scrape", impact="Plate", perc="Clicks", chord="Guitar Stabs", arp="Erhu", fx="Unsettler"))  # strip names where the page's (Blackgaze's) are wrong
 song = os.path.basename(base).rstrip('0123456789')
 pal = open(f"sounds/{song}.txt", encoding="utf8").read()
-man = {"song": song, "title": song.title(), "bpm": float(open(base + ".sections.txt").readline().split()[1]),
+man = {"song": song, "title": dict(deconstructed="Deconstructed Club").get(song, song.title()), "bpm": float(open(base + ".sections.txt").readline().split()[1]),
        "labels": LABELS.get(song, {}), "sections": [], "master": master,  # the palette's balance, which the page's faders add to
        "base": {t: float(g) for t, g in re.findall(r"^gain (\w+)\s+([-\d.]+)", pal, re.M)},
        "returns": {t: float(g) for t, g in re.findall(r"^return (\w+)\s+([-\d.]+)", pal, re.M)}}

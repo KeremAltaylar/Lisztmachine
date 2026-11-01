@@ -115,9 +115,11 @@ const G::Spec kDeconstructed {
     .scene = "deconstructed", .title = "Deconstructed Club",
     .bpmLo = 128, .bpmHi = 136, .mode = &kPhrygianDominant, .tonics = { 4, 9, 2, 11, 7 }, // the major third over the flat second
     .progs = { { { 0, 1, 5, 6 }, { 0, 3, 1, 0 }, { 0, 6, 5, 1 } } }, .preRoot = 1,
-    .form = { { { "Shatter", 16, .20f, "PDFTR" }, { "Glass", 32, .40f, "PCKDTGYMR" }, { "Fracture", 48, .65f, "KSCBDULTGYMR" },
-                { "Cathedral", 32, .40f, "PDAFT" }, { "Violence", 48, .85f, "PKSHCBUADTGYMI" }, { "Silence", 16, .15f, "PT" },
-                { "Rebirth", 64, 1.0f, "PKSHCBUADFTGYMIR" }, { "Wound", 32, .30f, "PDATR" } } },
+    // 2026-11-01 (Kerem): the big parts start sharp, the build before each one obvious (spec.build);
+    // the low logs in more parts and busier
+    .form = { { { "Shatter", 16, .20f, "PDFTRG" }, { "Glass", 32, .40f, "PCKDTGYMR" }, { "Fracture", 48, .65f, "KSCBDULTGYMR" },
+                { "Cathedral", 32, .40f, "PDAFTG" }, { "Violence", 48, .85f, "PKSHCBUADTGYMI" }, { "Silence", 16, .15f, "PT" },
+                { "Rebirth", 64, 1.0f, "PKSHCBUADFTGYMIR" }, { "Wound", 32, .30f, "PDATRG" } } },
     .pulse = part("X.......X..x....", "X..x.....X.x..x.", "X..x.X...X.xx..xX....x..X..x.X.."),
     .metal = part("", "......1...2.1...", "...1..2...3.1.21"),
     .tick = part("", "x...x.x...x...x.", "x.xxx.x.x.xxx.xx"),
@@ -125,13 +127,13 @@ const G::Spec kDeconstructed {
     .bass = part("x---------------", "x-------x---5---", "x--x--x-x---8-5-"),
     .chord = part("X---------------", "X.......X..X....", "X..X..X.X.X..X.."),
     .sub = part("x---------------", "x-------x--x----", "x--x--x-x---^-5-"),
-    .ground = part("", "1.........2.....", "1..2......2..1.."),
+    .ground = part("1.........2.....", "1..2......2..1..1.....2...3..1..", "1.21..2.1.2..1.21..2..1.2..3.1.2"),
     .body = part("", "...o..o.....o...", ".o.o..o.o..o..o."),
     .mallet = part("1...............", "1.....2...3.....", "1..3..2..4.1..3."),
     .texture = part("x---------------", "x-------x-------", "x---x---x---x---"),
     .percLo = 60, .percHi = 90,
     .chop = .30f, .gap = .25f, .stutter = .20f, .stutterTrack = G::Metal, .stutterDiv = 32,
-    .riff = G::RiffStyle::Chug, .riffLo = 35, .summit = G::Summit::Halftime,
+    .riff = G::RiffStyle::Chug, .riffLo = 35, .summit = G::Summit::Halftime, .build = true,
 };
 
 const G::Spec kHalftime {
