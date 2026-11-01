@@ -8,25 +8,10 @@ pulse    0.0      60  internal/none
 metal    -2.5    2000  internal/metal
 tick     0.0    6000  internal/click
 fx       -5.7     286  FX/Unsettler
-fx        4.0    4170  FX/Radio Noise
 
-# 2026-10-29 evening: this song's own synths (pitch-true, beating <= 15 %, none shared with another song)
-pad      -5.3     768  3rd/Giana Brotherz/Pads/Digitized Choir
-pad      -10.0    1385  3rd/Kuniklo/Pads/After Warp
-chord    -4.7     356  3rd/Rozzer/Plucks/JP80x0 Pluck
-chord     -3.1    1582  Plucks/Lighter
-arp      -8.9     499  3rd/Bluelight/Leads/Lead 5
-arp      -8.8     787  3rd/Bluelight/Leads/Lead 4
-arp       -2.3    2070  3rd/Bluelight/Leads/Lead 2
-bass     -2.0     172  3rd/Bluelight/Basses/Bass 7
-bass      4.0     466  3rd/Slowboat/Basses/Perc Bass 1
-bass      2.4    1138  3rd/A.Liv/Basses/Raspy Ring On It
-arp      -2.8    2959  3rd/Argitoth/Leads/Screaming Saw
-bass      0.3    3850  3rd/Giana Brotherz/Basses/Distorro
 
 # Echoes: beats, feedback, mix
 delay arp 0.75 0.40 0.22
-delay chord 0.75 0.30 0.15
 
 # Balance (to be measured in the mix)
 gain pulse   0.0
@@ -40,10 +25,6 @@ gain arp     0.8
 gain chord   -2.5
 gain fx     -2.9
 master 9.2
-amp bass  0.45 1800 0.75
-amp chord 0.45 2500 0.85
-amp arp   0.45 3000 0.80
-amp pad   0.22 2000 0.45
 drive metal 0.30 4500
 drive perc  0.30 6000
 crush tick  8 3 0.3
@@ -56,11 +37,8 @@ delay perc  1.0 0.5 0.3 throws
 
 # 2026-10-29: the 808, the choir, deep metal, darker synths
 sub      0.0      60  internal/808
-harm      5.6    1136  3rd/Giana Brotherz/Pads/Dub Choir
-harm     -2.1    4204  3rd/Giana Brotherz/Pads/Dark Whisper
 perc     -1.6     300  internal/deep
 gain harm    -8.0
-amp harm  0.22 2200 0.35
 drive sub  0.55 2500
 duck sub 0.30
 lowcut bass 90
@@ -82,11 +60,6 @@ duck mallet 0.15
 delay mallet 0.75 0.4 0.25
 delay impact 1.5 0.55 0.4 throws
 
-# Sampled instruments (CC0: Karoryfer, D. Smolken, VSCO 2 CE; jSteelDrum: Unlicense), played by sfizz
-chord    15.2    1200  sfz/Karoryfer_Black_And_Green_Guitars_1000/Programs/05-green_staccato.sfz
-arp      5.2    1421  sfz/steel-drum/jSteelDrum.sfz
-pad      12.6    2361  sfz/vsco2/Clarinet-susLong.sfz
-harm     13.3     708  sfz/vsco2/Bassoon-sus.sfz
 
 # 2026-10-30: the riff (the engine's guitar: two takes, left and right, the fifths pure) into a fuzz and a cabinet
 riff     0.0    1000  internal/guitar
@@ -94,3 +67,15 @@ drone    0.0       0  internal/none  # the second guitar: only Doom has one so f
 gain riff    -15.9
 drive riff 0.85 2500
 amp riff  0.70 1800 1.0 45 -2 3600 6 1100
+
+# 2026-11-01 (Kerem: "too many synths, rewrite it", after Schulze's Continuum and Barbieri's Fantas): one
+# sound for each part, all from his Synth Sounds picks and in no other song, each measured pitch-true (within
+# 5 cents across a held chord). Gain: a held note to -22 dB RMS (pad and choir -27); the sequence and the pad then
+# 8 and 9 dB down, measured in the mix (sixteenths of a pluck and four voices of a pad add up).
+arp       3.3     265  vst/JC303/|Cutoff=0.15|Resonance=0.7|EnvMod=0.2|Decay=0.9|Drive=0
+pad      -4.1    2994  vst/fb3300/PAD: Multiphonic
+harm     -0.8    1022  vst/deputy/Poly: Basso Oooh
+bass     -5.6     400  vst/TAL-NoiseMaker/|Filter Cutoff=0.3|Filter Resonance=0.35|Filter Contour=0.7|Filter Decay=0.35|Filter Sustain=0.2|Osc 2 Volume=0.8|Osc 2 Fine Tune=0.52|Filter Drive=0.6
+send arp reverb 0.30
+send harm reverb 0.45
+chord     0.0       0  internal/none  # no chords: the sequence, the pad and the choir carry the harmony

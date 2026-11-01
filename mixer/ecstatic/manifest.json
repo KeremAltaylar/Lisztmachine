@@ -1,0 +1,189 @@
+{
+ "song": "ecstatic",
+ "title": "Ecstatic Arpeggios",
+ "bpm": 124.0,
+ "labels": {
+  "ground": "Low Logs",
+  "body": "Hand Drums",
+  "mallet": "Kalimba",
+  "texture": "Scrape",
+  "impact": "Bowl",
+  "perc": "Deep Metal",
+  "fx": "Unsettler",
+  "arp": "Sequence",
+  "harm": "Choir",
+  "riff": "Guitar Drone"
+ },
+ "sections": [
+  {
+   "name": "Dawn",
+   "start": 0.0,
+   "end": 30.9677,
+   "stems": [
+    "pad",
+    "arp",
+    "texture",
+    "delay",
+    "reverb"
+   ]
+  },
+  {
+   "name": "Continuum",
+   "start": 30.9677,
+   "end": 92.9032,
+   "stems": [
+    "pad",
+    "arp",
+    "mallet",
+    "texture",
+    "riff",
+    "delay",
+    "reverb"
+   ]
+  },
+  {
+   "name": "Lattice",
+   "start": 92.9032,
+   "end": 185.806,
+   "stems": [
+    "pad",
+    "tick",
+    "arp",
+    "harm",
+    "ground",
+    "body",
+    "mallet",
+    "texture",
+    "riff",
+    "delay",
+    "reverb"
+   ]
+  },
+  {
+   "name": "Suspension",
+   "start": 185.806,
+   "end": 247.742,
+   "stems": [
+    "pad",
+    "bass",
+    "sub",
+    "arp",
+    "fx",
+    "harm",
+    "ground",
+    "body",
+    "mallet",
+    "texture",
+    "riff",
+    "delay",
+    "reverb"
+   ]
+  },
+  {
+   "name": "Ecstasy",
+   "start": 247.742,
+   "end": 340.645,
+   "stems": [
+    "pad",
+    "metal",
+    "tick",
+    "perc",
+    "bass",
+    "sub",
+    "arp",
+    "fx",
+    "harm",
+    "ground",
+    "body",
+    "mallet",
+    "texture",
+    "impact",
+    "riff",
+    "delay",
+    "reverb"
+   ]
+  },
+  {
+   "name": "Afterimage",
+   "start": 340.645,
+   "end": 387.097,
+   "stems": [
+    "pad",
+    "metal",
+    "bass",
+    "sub",
+    "arp",
+    "harm",
+    "ground",
+    "body",
+    "mallet",
+    "texture",
+    "riff",
+    "delay",
+    "reverb"
+   ]
+  },
+  {
+   "name": "Computation",
+   "start": 387.097,
+   "end": 480.0,
+   "stems": [
+    "pad",
+    "metal",
+    "tick",
+    "perc",
+    "bass",
+    "sub",
+    "arp",
+    "fx",
+    "harm",
+    "ground",
+    "body",
+    "mallet",
+    "texture",
+    "impact",
+    "riff",
+    "delay",
+    "reverb"
+   ]
+  },
+  {
+   "name": "Halo",
+   "start": 480.0,
+   "end": 526.452,
+   "stems": [
+    "pad",
+    "sub",
+    "arp",
+    "harm",
+    "ground",
+    "body",
+    "texture",
+    "riff",
+    "delay",
+    "reverb"
+   ]
+  }
+ ],
+ "master": 9.2,
+ "base": {
+  "pulse": 0.0,
+  "metal": -2.3,
+  "tick": 16.7,
+  "perc": -8.0,
+  "pad": -3.7,
+  "bass": -2.1,
+  "sub": -11.8,
+  "arp": 0.8,
+  "chord": -2.5,
+  "fx": -2.9,
+  "harm": -8.0,
+  "ground": -17.5,
+  "body": -16.9,
+  "mallet": -30.5,
+  "texture": -34.8,
+  "impact": -4.0,
+  "riff": -15.9
+ },
+ "returns": {}
+}

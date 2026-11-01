@@ -67,9 +67,11 @@ const G::Spec kEcstatic {
     // drone under it, and at the summit a pedal: the low end holds the tonic while the chords move above.
     .bpmLo = 118, .bpmHi = 124, .mode = &kAeolian, .tonics = { 9, 2, 4, 7, 0 },
     .progs = { { { 0, 5, 3, 4 }, { 0, 6, 5, 6 }, { 0, 2, 5, 4 } } }, .preRoot = 4,
-    .form = { { { "Dawn", 16, .15f, "PAT" }, { "Continuum", 32, .35f, "PATM" }, { "Lattice", 48, .55f, "PADHTRM" },
-                { "Suspension", 32, .40f, "PAFTGYMR" }, { "Ecstasy", 48, .80f, "PADHSCBULTGYMRI" }, { "Afterimage", 24, .45f, "PASTGYM" },
-                { "Computation", 48, 1.0f, "PKSHCBUADFTGYMRI" }, { "Halo", 24, .20f, "PADRT" } } },
+    // 2026-11-01 (Kerem: "too many synths, rewrite it"): one sound per part, the chords gone (the sequence,
+    // the pad and the choir carry the harmony), the sequence an octave deeper, the sharp part changes
+    .form = { { { "Dawn", 16, .15f, "PAT" }, { "Continuum", 32, .35f, "PATM" }, { "Lattice", 48, .55f, "PAHTRM" },
+                { "Suspension", 32, .40f, "PAFTGYMR" }, { "Ecstasy", 48, .80f, "PAHSCBULTGYMRI" }, { "Afterimage", 24, .45f, "PASTGYM" },
+                { "Computation", 48, 1.0f, "PKSHCBUAFTGYMRI" }, { "Halo", 24, .20f, "PART" } } },
     // no break here: the sequence is the rhythm; the pulse only lands at the summit
     .pulse = part("", "", "X...X...X...X..."),
     .metal = part("", "", "......1.......2."),
@@ -83,8 +85,8 @@ const G::Spec kEcstatic {
     .mallet = part("1.......3.......", "1..3..2..4..3...", "1.32.14.3.21.43."),
     .texture = part("x---------------", "x---------------", "x-------x-------"),
     .arpRate = { 16, 16, 16 }, .arpLenLo = 9, .arpLenHi = 13, .arpDensLo = .50f, .arpDensHi = 1.0f, .arpGate = .6f,
-    .arpLo = 57, .arpHi = 93, .percLo = 36, .percHi = 52, .ext = 1, .hook = false,
-    .arpMorph = 8, .riff = G::RiffStyle::Drone, .riffLo = 33, .summit = G::Summit::Pedal,
+    .arpLo = 45, .arpHi = 81, .percLo = 36, .percHi = 52, .ext = 1, .hook = false, // the JC303 sounds where it is written
+    .arpMorph = 8, .riff = G::RiffStyle::Drone, .riffLo = 33, .summit = G::Summit::Pedal, .build = true,
 };
 
 const G::Spec kNoir {
