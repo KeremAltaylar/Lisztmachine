@@ -1,0 +1,200 @@
+{
+ "song": "halftime",
+ "title": "Halftime",
+ "bpm": 174.0,
+ "labels": {
+  "ground": "Low Drums",
+  "body": "Hand Drums",
+  "mallet": "Bowl",
+  "texture": "Chain",
+  "impact": "Plate",
+  "perc": "Deep Metal",
+  "fx": "Unsettler"
+ },
+ "sections": [
+  {
+   "name": "Smoke",
+   "start": 0.0,
+   "end": 22.069,
+   "stems": [
+    "pad",
+    "bass",
+    "sub",
+    "fx",
+    "ground",
+    "body",
+    "texture",
+    "delay",
+    "reverb"
+   ]
+  },
+  {
+   "name": "Weight",
+   "start": 22.069,
+   "end": 66.2069,
+   "stems": [
+    "pad",
+    "tick",
+    "bass",
+    "sub",
+    "chord",
+    "fx",
+    "ground",
+    "body",
+    "texture",
+    "delay",
+    "reverb"
+   ]
+  },
+  {
+   "name": "Halftime",
+   "start": 66.2069,
+   "end": 154.483,
+   "stems": [
+    "pad",
+    "metal",
+    "tick",
+    "perc",
+    "bass",
+    "sub",
+    "chord",
+    "harm",
+    "ground",
+    "body",
+    "mallet",
+    "texture",
+    "delay",
+    "reverb"
+   ]
+  },
+  {
+   "name": "Hollow",
+   "start": 154.483,
+   "end": 198.621,
+   "stems": [
+    "pad",
+    "bass",
+    "sub",
+    "arp",
+    "chord",
+    "fx",
+    "harm",
+    "ground",
+    "body",
+    "texture",
+    "delay",
+    "reverb"
+   ]
+  },
+  {
+   "name": "Mass",
+   "start": 198.621,
+   "end": 286.897,
+   "stems": [
+    "pad",
+    "metal",
+    "tick",
+    "perc",
+    "bass",
+    "sub",
+    "arp",
+    "chord",
+    "fx",
+    "harm",
+    "ground",
+    "body",
+    "mallet",
+    "texture",
+    "impact",
+    "delay",
+    "reverb"
+   ]
+  },
+  {
+   "name": "Breath",
+   "start": 286.897,
+   "end": 353.103,
+   "stems": [
+    "pad",
+    "bass",
+    "sub",
+    "arp",
+    "chord",
+    "ground",
+    "body",
+    "mallet",
+    "texture",
+    "riff",
+    "delay",
+    "reverb"
+   ]
+  },
+  {
+   "name": "Gravity",
+   "start": 353.103,
+   "end": 397.241,
+   "stems": [
+    "pad",
+    "metal",
+    "tick",
+    "perc",
+    "bass",
+    "sub",
+    "arp",
+    "chord",
+    "fx",
+    "harm",
+    "ground",
+    "body",
+    "mallet",
+    "texture",
+    "impact",
+    "riff",
+    "delay",
+    "reverb"
+   ]
+  },
+  {
+   "name": "Fall",
+   "start": 397.241,
+   "end": 441.379,
+   "stems": [
+    "pad",
+    "metal",
+    "perc",
+    "bass",
+    "sub",
+    "arp",
+    "chord",
+    "ground",
+    "body",
+    "mallet",
+    "texture",
+    "riff",
+    "delay",
+    "reverb"
+   ]
+  }
+ ],
+ "master": 8.5,
+ "base": {
+  "pulse": 0.0,
+  "metal": -0.1,
+  "tick": 5.8,
+  "perc": -11.7,
+  "pad": -9.5,
+  "bass": 0.8,
+  "sub": -14.5,
+  "arp": -6.1,
+  "chord": -14.6,
+  "fx": -6.0,
+  "harm": -7.6,
+  "ground": -19.0,
+  "body": -14.0,
+  "mallet": -37.0,
+  "texture": -26.0,
+  "impact": -4.0,
+  "riff": -13.1
+ },
+ "returns": {}
+}

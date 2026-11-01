@@ -85,6 +85,7 @@ public:
         bool ends = true;                          // end figures into the parts that are not big arrivals
         bool legato = false;                       // every riff and bass note rings into the next one (no muted notes, no gaps)
         bool gaze = false;                         // the choir holds open intervals (root, fifth, ninth) instead of the chord
+    bool build = false;                        // every part ends in a three-bar unison build (2, 4, 8 hits a bar), the next one enters whole
     };
 
     static const Spec* find(const std::string& scene);
@@ -128,6 +129,7 @@ private:
     // a figure the low instruments play together; the drums stop around it.
     void planEnds();
     bool attackBar(int bar) const { return endFig_[size_t(bar)] >= 0; }
+    bool buildsWith(int track, int bar) const; // a build bar: the track plays it because the next part has it
     void emitAttack(int bar, std::vector<Event>& out);
     bool summitHalftime(int bar) const;
     bool summitUnison(int bar) const;

@@ -138,9 +138,10 @@ const G::Spec kHalftime {
     .scene = "halftime", .title = "Halftime",
     .bpmLo = 168, .bpmHi = 174, .mode = &kHarmonicMinor, .tonics = { 7, 0, 5, 10, 2 }, // harmonic minor: the major V pulling home
     .progs = { { { 0, 5, 3, 4 }, { 0, 3, 4, 0 }, { 5, 3, 4, 4 } } }, .preRoot = 4,
-    .form = { { { "Smoke", 16, .15f, "PFT" }, { "Weight", 32, .35f, "PHBUT" }, { "Halftime", 64, .60f, "PKSHCBUDTGYM" },
-                { "Hollow", 32, .40f, "PAFT" }, { "Mass", 64, .85f, "PKSHCBUADTGYMI" }, { "Breath", 16, .25f, "PAT" },
-                { "Gravity", 64, 1.0f, "PKSHCBUADFTGYMIR" }, { "Fall", 32, .30f, "PKSCALTGYMR" } } },
+    // 2026-11-01 (Kerem): Breath a lot longer, Gravity shorter; the low and the mid percussion in more parts
+    .form = { { { "Smoke", 16, .15f, "PFT" }, { "Weight", 32, .35f, "PHBUTGY" }, { "Halftime", 64, .60f, "PKSHCBUDTGYM" },
+                { "Hollow", 32, .40f, "PAFTY" }, { "Mass", 64, .85f, "PKSHCBUADTGYMI" }, { "Breath", 48, .25f, "PAT" },
+                { "Gravity", 32, 1.0f, "PKSHCBUADFTGYMIR" }, { "Fall", 32, .30f, "PKSCALTGYMR" } } },
     // halftime: the tempo is 170, the body feels 85 (the live snare on three); the metal answers around it
     .pulse = part("X...............", "X.........x.....", "X.........x...x.X......x..x....."),
     .metal = part("..........1.....", "......1...2.....", "......1...2...3.......1...2..1.3"),
@@ -149,13 +150,14 @@ const G::Spec kHalftime {
     .bass = part("x---------------", "x-------..x-----", "x-----x-..x---5-"),
     .chord = part("", "x---------------................", "x---------------................"),
     .sub = part("x---------------", "x---------x-----x-------^-------", "x-------x-x-----x-----5-^---x-x-"),
-    .ground = part("", "......1.........", "......1...3...........2...1....."),
-    .body = part("", "..o.....o.o...o.", "..o..g..o.o..go."),
+    // the low drums (logs) and the hand drums groove around his kick and his snare on three, never on them
+    .ground = part("......1...........2.............", "......1...1...........2...1.....", "...1..1...1..2.....1..2...1.3.2."),
+    .body = part("..o.......o.....", "..o..x.o..o..x.g..o..x.o..og.x.o", "..oxg.xo.go.xgxo..ox.gxo.go.x.xo"),
     .mallet = part("1...............", "1.......2.......", "1.....3...2....."),
     .texture = part("x---------------", "x---------------", "x-------x-------"),
     .percLo = 36, .percHi = 52,
     .chop = .10f, .stutter = .25f, .stutterTrack = G::Tick, .stutterDiv = 32,
-    .riff = G::RiffStyle::Doom, .riffLo = 31, .summit = G::Summit::Unison,
+    .riff = G::RiffStyle::Doom, .riffLo = 31, .summit = G::Summit::Unison, .build = true,
 };
 
 const G::Spec kDoom {
@@ -537,11 +539,12 @@ int GenreComposer::tier(int bar) const
 float GenreComposer::levelAt(int track, int bar) const
 {
     if (track == Riff && attackBar(bar) && active(Riff, bar + 1)) return 1;
+    if (buildsWith(track, bar)) return 1;
     if (!active(track, bar)) return 0;
     auto& sec = sectionAt(bar);
     const int in = bar - sec.startBar, left = sec.startBar + sec.bars - bar;
     const float fade = track == Pad || track == Fx || track == Sub || track == Chord || track == Harm ? 4.0f : 2.0f;
-    const float fadeIn = active(track, bar - in - 1) || (bar == 0 && track != Pad) ? 1.0f : std::min(1.0f, (in + 1) / fade);
+    const float fadeIn = spec_.build || active(track, bar - in - 1) || (bar == 0 && track != Pad) ? 1.0f : std::min(1.0f, (in + 1) / fade);
     const float fadeOut = active(track, bar + left) ? 1.0f : std::min(1.0f, left / fade);
     return std::min(fadeIn, fadeOut);
 }
@@ -773,7 +776,7 @@ void GenreComposer::emitPart(int track, const Part& part, int bar, std::vector<E
     const bool fill8 = drum && ph == 7 && !fill16 && !attack;
     const bool turn = drum && ph % 4 == 3 && !fill8 && !fill16 && !attack;
     // A section the percussion enters: the ticks first, the metal a quarter in, the perc at half.
-    const bool entering = si > 0 && !(sections_[size_t(si - 1)].layers & (bit(Metal) | bit(Tick) | bit(Perc)));
+    const bool entering = !spec_.build && si > 0 && !(sections_[size_t(si - 1)].layers & (bit(Metal) | bit(Tick) | bit(Perc)));
     if (entering && (((track == Metal || track == Body) && in < sec.bars / 4) || ((track == Perc || track == Mallet) && in < sec.bars / 2))) return;
     // Where Kerem's drums lead, the machine's percussion steps back to half and leaves him the room.
     const bool live = drummerLeads_[size_t(si)];
@@ -1224,6 +1227,10 @@ void GenreComposer::planEnds()
     // 2026-10-31 (Kerem): into a big arrival (the summit, or a part of .65 and up clearly louder) no
     // figure: the part empties instead, one instrument out 16 bars before, the bass at 8, one more at
     // 4, and everything comes back on the new part's downbeat.
+    //
+    // 2026-11-01 (Kerem, Halftime: the attacks more obvious, the next part whole after them, "2, 4, 8"):
+    // with spec.build every part ends in three bars of the low instruments in unison, two hits, then
+    // four, then eight, and only the voice above leaves 16 bars before a big arrival.
     endFig_.assign(size_t(totalBars()), -1);
     drop_.assign(size_t(totalBars()), 0);
     int last = -1;
@@ -1232,6 +1239,8 @@ void GenreComposer::planEnds()
         const auto& sec = sections_[si];
         const auto& nx = sections_[si + 1];
         const int end = sec.startBar + sec.bars - 1;
+        if (spec_.build && sec.bars >= 8)
+            for (int k = 0; k < 3; ++k) endFig_[size_t(end - 2 + k)] = 6 + k;
         if (nx.restoreTheme || (nx.energy >= .65f && nx.energy > sec.energy + .1f))
         {
             static const std::vector<std::vector<int>> slots[3] = {
@@ -1241,7 +1250,7 @@ void GenreComposer::planEnds()
             };
             const int at[3] = { std::min(16, sec.bars / 2), std::min(8, sec.bars / 4), std::min(4, sec.bars / 8) };
             uint32_t mask = 0;
-            for (int k = 0; k < 3; ++k)
+            for (int k = 0; k < (spec_.build ? 1 : 3); ++k)
             {
                 if (at[k] < 1) continue;
                 for (auto& g : slots[k])
@@ -1256,7 +1265,7 @@ void GenreComposer::planEnds()
             }
             continue;
         }
-        if (!spec_.ends) continue;
+        if (!spec_.ends || spec_.build) continue;
         static const int up[] = { 1, 2, 4 }, down[] = { 0, 3, 5 };
         int f;
         do f = nx.energy > sec.energy ? up[rng_.range(0, 2)] : down[rng_.range(0, 2)]; while (f == last);
@@ -1266,10 +1275,19 @@ void GenreComposer::planEnds()
     }
 }
 
+bool GenreComposer::buildsWith(int track, int bar) const
+{
+    if (!spec_.build || bar < 0 || bar >= totalBars() || !attackBar(bar)) return false;
+    if (track != Riff && track != Bass && track != Sub && track != Chord && track != Ground && track != Body && track != Pulse) return false;
+    auto& sec = sectionAt(bar);
+    return active(track, sec.startBar + sec.bars);
+}
+
 void GenreComposer::emitAttack(int bar, std::vector<Event>& out)
 {
     if (!attackBar(bar)) return;
-    static const char* kEnds[] = { "X..x..x.X.......", "X.......x.x.xXXX", "X..x..x..x..x..x", "X.x...x.x...X.X.", "X.......x...X...", "........X..x..X." };
+    static const char* kEnds[] = { "X..x..x.X.......", "X.......x.x.xXXX", "X..x..x..x..x..x", "X.x...x.x...X.X.", "X.......x...X...", "........X..x..X.",
+                                   "X.......X.......", "X...X...X...X...", "X.X.X.X.X.X.X.X." }; // the build: 2, 4, 8
     const int f = endFig_[size_t(bar)];
     const char* fig = kEnds[f];
     const int64_t t0 = int64_t(bar) * kBarTicks, six = kSixteenth;
@@ -1282,7 +1300,8 @@ void GenreComposer::emitAttack(int bar, std::vector<Event>& out)
         out.push_back({ t, Event::NoteOn, uint8_t(track), uint8_t(p), std::clamp(vel, .05f, 1.0f) });
         out.push_back({ t + len, Event::NoteOff, uint8_t(track), uint8_t(p), 0 });
     };
-    const bool riffHere = spec_.riff != RiffStyle::None && (active(Riff, bar) || (final && active(Riff, bar + 1))); // the guitar may enter with it
+    const bool riffHere = spec_.riff != RiffStyle::None && (active(Riff, bar) || (final && active(Riff, bar + 1)) || buildsWith(Riff, bar)); // the guitar may enter with it
+    auto on = [&](int track) { return active(track, bar) || buildsWith(track, bar); }; // a build brings in the next part's low end
     for (size_t k = 0; k < at.size(); ++k)
     {
         const int i = at[k];
@@ -1292,16 +1311,16 @@ void GenreComposer::emitAttack(int bar, std::vector<Event>& out)
         const int b = walk ? bar + 1 : bar;
         const int64_t t = t0 + i * six;
         const int64_t len = (lastHit ? std::min(3, 16 - i) : at[k + 1] - i) * six - 12;
-        const float vel = (.6f + .4f * float(i) / 15) * (accent ? 1.0f : .8f);
+        const float vel = f >= 6 ? .7f + .12f * float(f - 6) + .06f * float(i) / 15 : (.6f + .4f * float(i) / 15) * (accent ? 1.0f : .8f);
         const int r = lowRootAt(b), diff = degreeSemis(m, r + walk) - degreeSemis(m, r);
         if (riffHere) powerChord(Riff, t, len, riffRoot(b, walk), over(b, walk, 4), .5f + .5f * vel, out);
-        if (active(Bass, bar)) note(Bass, t, len, up(lowPitch(b, 0, 40, 51, 36) + diff, 40), vel);
-        if (active(Sub, bar) && accent) note(Sub, t, len, up(lowPitch(b, 0, 28, 39, 24) + diff, 24), vel);
-        if (active(Chord, bar) && accent) for (int p : voice(bar, 4, 48, 74, spec_.ext == 2, chordVoices_)) note(Chord, t, std::min<int64_t>(len, 2 * six), p, vel);
-        if (active(Ground, bar)) note(Ground, t, six, ladderPitch(b, 0, 28, 48), vel);
-        if (active(Body, bar)) note(Body, t, six / 2, ladderPitch(b, int(k % 2), 45, 69), vel * .9f);
-        if (active(Pulse, bar) && accent) note(Pulse, t, six / 2, foldInto(24 + tonicAt(bar), 24, 35), vel); // the mix pumps with it
-        if (lastHit && active(Body, bar)) out.push_back({ t, Event::Throw, Body, 0, 1.0f });
+        if (on(Bass)) note(Bass, t, len, up(lowPitch(b, 0, 40, 51, 36) + diff, 40), vel);
+        if (on(Sub) && accent) note(Sub, t, len, up(lowPitch(b, 0, 28, 39, 24) + diff, 24), vel);
+        if (on(Chord) && accent) for (int p : voice(bar, 4, 48, 74, spec_.ext == 2, chordVoices_)) note(Chord, t, std::min<int64_t>(len, 2 * six), p, vel);
+        if (on(Ground)) note(Ground, t, six, ladderPitch(b, 0, 28, 48), vel);
+        if (on(Body)) note(Body, t, six / 2, ladderPitch(b, int(k % 2), 45, 69), vel * .9f);
+        if (on(Pulse) && accent) note(Pulse, t, six / 2, foldInto(24 + tonicAt(bar), 24, 35), vel); // the mix pumps with it
+        if (lastHit && (f < 6 || final) && on(Body)) out.push_back({ t, Event::Throw, Body, 0, 1.0f });
     }
     if (f == 4 && active(Body, bar))
         for (int j = 0; j < 12; ++j) // the roll: sixteenths from the half, thirty-seconds in the last beat, swelling

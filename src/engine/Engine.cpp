@@ -644,7 +644,7 @@ juce::String Palette::load(const juce::File& file, const std::string& sceneName)
         if (targets.empty() || tokens.size() < 4)
             return where + "expected 'part gain bright Category/Patch'";
         // The patch name is the rest of the line: it may contain spaces.
-        auto patch = line.fromFirstOccurrenceOf(tokens[2], false, false).trim();
+        auto patch = line.fromFirstOccurrenceOf(tokens[1], false, false).fromFirstOccurrenceOf(tokens[2], false, false).trim(); // after the gain: a bright of 0 is also in 0.0
         if (isSfzSound(patch) && !findSfz(patch).existsAsFile()) // not installed here: the track plays its other sounds
         {
             DBG(where + "no sampled instrument '" + patch + "', skipped");
