@@ -185,6 +185,12 @@ std::unique_ptr<juce::AudioPluginInstance> createSurge(double sampleRate, int ma
 std::unique_ptr<juce::AudioPluginInstance> createDexed(double sampleRate, int maxBlock, juce::String& error);
 juce::String loadDexedVoice(juce::AudioPluginInstance& dexed, const juce::String& patch);
 bool isDexedSound(const juce::String& patch);
+// Any other VST3 synth: "vst/<plugin file name>/<program name or #index>[|Parameter=value...]" in a
+// palette (a value is the parameter's 0..1 position, or its text), found in ~/liszt-deps/synths/vst3,
+// ~/Music/Lisztmachine/plugins or the standard VST3 folders. A fresh instance per sound.
+bool isVstSound(const juce::String& patch);
+juce::File findVst(const juce::String& patch);
+std::unique_ptr<juce::AudioPluginInstance> createVstSound(const juce::String& patch, double sampleRate, int maxBlock, juce::String& error);
 // Sampled instruments: "sfz/<library folder>/<file>.sfz" in a palette, played by sfizz, found under
 // the instruments folder (C:/Users/kerem/liszt-instruments, or ~/Music/Lisztmachine/instruments on
 // the Mac). Its one parameter, "Expression", is the mod wheel and expression pedal: the dynamics

@@ -1,0 +1,424 @@
+{
+ "synths": [
+  {
+   "plugin": "MoniqueMonosynth",
+   "about": "Monique: a morphing mono synth",
+   "sounds": [
+    {
+     "id": "MoniqueMonosynth_0",
+     "label": "Overdriven Drone",
+     "patch": "vst/MoniqueMonosynth/Yemski Overdriven Drone",
+     "ok": true
+    },
+    {
+     "id": "MoniqueMonosynth_1",
+     "label": "Hairy Growler",
+     "patch": "vst/MoniqueMonosynth/Yemski Hairy Growler",
+     "ok": true
+    },
+    {
+     "id": "MoniqueMonosynth_2",
+     "label": "A Dark One",
+     "patch": "vst/MoniqueMonosynth/A DARK ONE",
+     "ok": true
+    },
+    {
+     "id": "MoniqueMonosynth_3",
+     "label": "Lost in FM Space",
+     "patch": "vst/MoniqueMonosynth/LOST IN FM SPACE 1",
+     "ok": true
+    }
+   ]
+  },
+  {
+   "plugin": "Resonarium",
+   "about": "Resonarium: coupled strings and resonators",
+   "sounds": [
+    {
+     "id": "Resonarium_0",
+     "label": "Colour Out of Space",
+     "patch": "vst/Resonarium/Colour Out of Space",
+     "ok": true
+    },
+    {
+     "id": "Resonarium_1",
+     "label": "Netherstorm",
+     "patch": "vst/Resonarium/Netherstorm",
+     "ok": true
+    },
+    {
+     "id": "Resonarium_2",
+     "label": "Waterphone",
+     "patch": "vst/Resonarium/Waterphone",
+     "ok": true
+    },
+    {
+     "id": "Resonarium_3",
+     "label": "Garden of Unearthly Delights",
+     "patch": "vst/Resonarium/Garden of Unearthly Delights",
+     "ok": true
+    }
+   ]
+  },
+  {
+   "plugin": "RipplerX",
+   "about": "RipplerX: struck and bowed resonators",
+   "sounds": [
+    {
+     "id": "RipplerX_0",
+     "label": "Gong",
+     "patch": "vst/RipplerX/Gong",
+     "ok": true
+    },
+    {
+     "id": "RipplerX_1",
+     "label": "Tubes",
+     "patch": "vst/RipplerX/Tubes",
+     "ok": true
+    },
+    {
+     "id": "RipplerX_2",
+     "label": "Bells",
+     "patch": "vst/RipplerX/Bells2",
+     "ok": true
+    },
+    {
+     "id": "RipplerX_3",
+     "label": "Strings",
+     "patch": "vst/RipplerX/Strings",
+     "ok": true
+    }
+   ]
+  },
+  {
+   "plugin": "Tunefish4",
+   "about": "Tunefish 4: additive pads and basses",
+   "sounds": [
+    {
+     "id": "Tunefish4_0",
+     "label": "Brainsaw",
+     "patch": "vst/Tunefish4/Brainsaw",
+     "ok": true
+    },
+    {
+     "id": "Tunefish4_1",
+     "label": "Distant Strings",
+     "patch": "vst/Tunefish4/Distant Strings",
+     "ok": true
+    },
+    {
+     "id": "Tunefish4_2",
+     "label": "Lions Roar",
+     "patch": "vst/Tunefish4/Lions Roar",
+     "ok": true
+    },
+    {
+     "id": "Tunefish4_3",
+     "label": "Fuzzystring",
+     "patch": "vst/Tunefish4/Fuzzystring",
+     "ok": true
+    }
+   ]
+  },
+  {
+   "plugin": "deputy",
+   "about": "The Deputy: a 70s string machine",
+   "sounds": [
+    {
+     "id": "deputy_0",
+     "label": "Carrying No Cross",
+     "patch": "vst/deputy/Pad: Carrying No Cross",
+     "ok": true
+    },
+    {
+     "id": "deputy_1",
+     "label": "Basso Oooh",
+     "patch": "vst/deputy/Poly: Basso Oooh",
+     "ok": true
+    },
+    {
+     "id": "deputy_2",
+     "label": "Attack of the Drone",
+     "patch": "vst/deputy/SFX: Attack of the Drone",
+     "ok": true
+    },
+    {
+     "id": "deputy_3",
+     "label": "No Safe Ground",
+     "patch": "vst/deputy/Pad: No Safe Ground",
+     "ok": true
+    }
+   ]
+  },
+  {
+   "plugin": "fb3300",
+   "about": "FB-3300: the Korg PS-3300",
+   "sounds": [
+    {
+     "id": "fb3300_0",
+     "label": "Multiphonic",
+     "patch": "vst/fb3300/PAD: Multiphonic",
+     "ok": true
+    },
+    {
+     "id": "fb3300_1",
+     "label": "Schoenerism",
+     "patch": "vst/fb3300/PAD: Schoenerism",
+     "ok": true
+    },
+    {
+     "id": "fb3300_2",
+     "label": "Recto Rezo",
+     "patch": "vst/fb3300/KEY: Recto Rezo",
+     "ok": true
+    },
+    {
+     "id": "fb3300_3",
+     "label": "Subbass",
+     "patch": "vst/fb3300/BAS: Subbass",
+     "ok": true
+    }
+   ]
+  },
+  {
+   "plugin": "fb7999",
+   "about": "FB-7999: the Korg DW-8000",
+   "sounds": [
+    {
+     "id": "fb7999_0",
+     "label": "Sleeping Giant",
+     "patch": "vst/fb7999/SLEEPING GIANT",
+     "ok": true
+    },
+    {
+     "id": "fb7999_1",
+     "label": "Cathedral Organ",
+     "patch": "vst/fb7999/CATHEDRAL ORGAN 1",
+     "ok": true
+    },
+    {
+     "id": "fb7999_2",
+     "label": "Low Strings",
+     "patch": "vst/fb7999/LOW STRINGS",
+     "ok": true
+    },
+    {
+     "id": "fb7999_3",
+     "label": "Disintegrator",
+     "patch": "vst/fb7999/DISINTEGRATOR",
+     "ok": true
+    }
+   ]
+  },
+  {
+   "plugin": "js80p",
+   "about": "JS80P: wavefolder and FM",
+   "sounds": [
+    {
+     "id": "js80p_0",
+     "label": "Dystopian Cathedral",
+     "patch": "vst/js80p/Dystopian Cathedral",
+     "ok": true
+    },
+    {
+     "id": "js80p_1",
+     "label": "Nightmare",
+     "patch": "vst/js80p/Nightmare",
+     "ok": true
+    },
+    {
+     "id": "js80p_2",
+     "label": "Creepy Wind",
+     "patch": "vst/js80p/Creepy Wind",
+     "ok": true
+    },
+    {
+     "id": "js80p_3",
+     "label": "Gloomy Brass",
+     "patch": "vst/js80p/Gloomy Brass",
+     "ok": true
+    }
+   ]
+  },
+  {
+   "plugin": "monofury",
+   "about": "Mono/Fury: the Korg Mono/Poly",
+   "sounds": [
+    {
+     "id": "monofury_0",
+     "label": "Spooky Unison",
+     "patch": "vst/monofury/Spooky Unison Share",
+     "ok": true
+    },
+    {
+     "id": "monofury_1",
+     "label": "The Bad Ass",
+     "patch": "vst/monofury/The Bad Ass",
+     "ok": true
+    },
+    {
+     "id": "monofury_2",
+     "label": "Dead Elevator",
+     "patch": "vst/monofury/Dead Elevator",
+     "ok": true
+    },
+    {
+     "id": "monofury_3",
+     "label": "Alien Subversion",
+     "patch": "vst/monofury/Alien Subversion",
+     "ok": true
+    }
+   ]
+  },
+  {
+   "plugin": "scrooo",
+   "about": "scrooo: formant synthesis",
+   "sounds": [
+    {
+     "id": "scrooo_0",
+     "label": "Tomb of Frankenstein",
+     "patch": "vst/scrooo/Pad: Tomb Of Frankenstein",
+     "ok": true
+    },
+    {
+     "id": "scrooo_1",
+     "label": "Scary Choir",
+     "patch": "vst/scrooo/Pad: Scary Choir",
+     "ok": true
+    },
+    {
+     "id": "scrooo_2",
+     "label": "Raizer Drone",
+     "patch": "vst/scrooo/Drone: Raizer",
+     "ok": true
+    },
+    {
+     "id": "scrooo_3",
+     "label": "Wraiths of Industry",
+     "patch": "vst/scrooo/Pad: Wraiths of Industry",
+     "ok": true
+    }
+   ]
+  },
+  {
+   "plugin": "JC303",
+   "about": "JC303: a 303 with modelled overdrive",
+   "sounds": [
+    {
+     "id": "JC303_0",
+     "label": "Dark acid",
+     "patch": "vst/JC303/|Cutoff=0.25|Resonance=0.85|EnvMod=0.5|Decay=0.5|Switch Overdrive Mod=1|Drive=0.5",
+     "ok": true
+    },
+    {
+     "id": "JC303_1",
+     "label": "Squelch",
+     "patch": "vst/JC303/|Cutoff=0.4|Resonance=0.95|EnvMod=0.8|Decay=0.3|Switch Overdrive Mod=1|Drive=0.3",
+     "ok": true
+    },
+    {
+     "id": "JC303_2",
+     "label": "Square growl",
+     "patch": "vst/JC303/|Waveform=0|Cutoff=0.2|Resonance=0.6|EnvMod=0.3|Decay=0.8|Switch Overdrive Mod=1|Drive=0.8",
+     "ok": true
+    },
+    {
+     "id": "JC303_3",
+     "label": "Deep and clean",
+     "patch": "vst/JC303/|Cutoff=0.15|Resonance=0.7|EnvMod=0.2|Decay=0.9|Drive=0",
+     "ok": true
+    }
+   ]
+  },
+  {
+   "plugin": "TAL-NoiseMaker",
+   "about": "TAL-NoiseMaker: a virtual analog",
+   "sounds": [
+    {
+     "id": "TAL-NoiseMaker_0",
+     "label": "Dark pad",
+     "patch": "vst/TAL-NoiseMaker/|Filter Cutoff=0.35|Filter Resonance=0.2|Amp Attack=0.45|Amp Release=0.55|Osc 2 Volume=0.8|Osc 2 Fine Tune=0.53|Chorus 1 Enable=1|Reverb Wet=0.35|Reverb Decay=0.8",
+     "ok": true
+    },
+    {
+     "id": "TAL-NoiseMaker_1",
+     "label": "Fat bass",
+     "patch": "vst/TAL-NoiseMaker/|Filter Cutoff=0.3|Filter Resonance=0.35|Filter Contour=0.7|Filter Decay=0.35|Filter Sustain=0.2|Osc 2 Volume=0.8|Osc 2 Fine Tune=0.52|Filter Drive=0.6",
+     "ok": true
+    },
+    {
+     "id": "TAL-NoiseMaker_2",
+     "label": "Crushed lead",
+     "patch": "vst/TAL-NoiseMaker/|Filter Cutoff=0.55|Filter Resonance=0.5|Osc Bitcrusher=0.35|Delay Wet=0.3|Amp Release=0.3",
+     "ok": true
+    },
+    {
+     "id": "TAL-NoiseMaker_3",
+     "label": "Detuned drone",
+     "patch": "vst/TAL-NoiseMaker/|Master Detune=0.6|Osc 2 Volume=0.8|Filter Cutoff=0.45|Amp Attack=0.6|Amp Release=0.7|Reverb Wet=0.5|Reverb Decay=0.9|Filter Drive=0.4",
+     "ok": true
+    }
+   ]
+  },
+  {
+   "plugin": "OB-Xf",
+   "about": "OB-Xf: the Oberheim OB-X",
+   "sounds": [
+    {
+     "id": "OB-Xf_0",
+     "label": "Brass pad",
+     "patch": "vst/OB-Xf/|Osc 2 Volume=0.8|Osc 2 Detune=0.15|Filter Cutoff=0.45|Filter Resonance=0.2|Filter Env Amount=0.4|Filter Env Attack=0.4|Filter Env Decay=0.6|Filter Env Sustain=0.5|Amp Env Attack=0.35",
+     "ok": true
+    },
+    {
+     "id": "OB-Xf_1",
+     "label": "Ring metal",
+     "patch": "vst/OB-Xf/|Osc 2 Volume=0.6|Ring Mod Volume=0.7|Osc 2 Pitch=0.6|Filter Cutoff=0.5|Filter Resonance=0.4|Filter 4-Pole Mode=1",
+     "ok": true
+    },
+    {
+     "id": "OB-Xf_2",
+     "label": "4-pole bass",
+     "patch": "vst/OB-Xf/|Filter 4-Pole Mode=1|Filter Cutoff=0.3|Filter Resonance=0.5|Filter Env Amount=0.6|Filter Env Decay=0.4|Filter Env Sustain=0.1|Osc 2 Volume=0.8|Osc 2 Detune=0.1",
+     "ok": true
+    },
+    {
+     "id": "OB-Xf_3",
+     "label": "Xpander drone",
+     "patch": "vst/OB-Xf/|Filter 4-Pole Xpander=1|Filter Xpander Mode=0.5|Filter Cutoff=0.4|Filter Resonance=0.6|Osc 2 Volume=0.8|Osc 2 Detune=0.3|Noise Volume=0.2|Amp Env Attack=0.5",
+     "ok": true
+    }
+   ]
+  },
+  {
+   "plugin": "Six Sines",
+   "about": "Six Sines: six-operator FM",
+   "sounds": [
+    {
+     "id": "Six_Sines_0",
+     "label": "Feedback sine",
+     "patch": "vst/Six Sines/|Op 1 Feedback Active=1|Op 1 Feedback Level=0.7",
+     "ok": true
+    },
+    {
+     "id": "Six_Sines_1",
+     "label": "Hard feedback",
+     "patch": "vst/Six Sines/|Op 1 Feedback Active=1|Op 1 Feedback Level=0.92|Op 1 Feedback Overdrive=1",
+     "ok": true
+    },
+    {
+     "id": "Six_Sines_2",
+     "label": "Saturated",
+     "patch": "vst/Six Sines/|Op 1 Feedback Active=1|Op 1 Feedback Level=0.8|Main Saturation Type=0.5|Main Saturation Drive=0.6",
+     "ok": true
+    },
+    {
+     "id": "Six_Sines_3",
+     "label": "Bit-crushed",
+     "patch": "vst/Six Sines/|Op 1 Feedback Active=1|Op 1 Feedback Level=0.75|Main Bit Depth Adjust=0.6|Main Env Release=0.7",
+     "ok": true
+    }
+   ]
+  }
+ ]
+}

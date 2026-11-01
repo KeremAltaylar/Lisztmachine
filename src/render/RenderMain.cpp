@@ -105,18 +105,79 @@ static double centroidOf(const std::vector<float>& x, size_t from, double sr)
     return den > 0 ? num / den : 0;
 }
 
+// Any sound a palette can name, loaded and ready: Surge, Dexed, sfz or another VST3.
+static std::unique_ptr<juce::AudioPluginInstance> makeSound(const juce::String& patch, double sr, int block, bool pure, juce::String& err)
+{
+    const bool dexed = isDexedSound(patch), sampled = isSfzSound(patch), vst = isVstSound(patch);
+    setOfflineRendering(true);
+    auto s = vst ? createVstSound(patch, sr, block, err) : sampled ? createSfz(sr, block, findSfz(patch), err) : dexed ? createDexed(sr, block, err) : createSurge(sr, block, err);
+    if (!s) return nullptr;
+    if (!sampled && !vst)
+        if (auto e = dexed ? loadDexedVoice(*s, patch) : loadSurgePatch(*s, findSurgePatch(patch)); e.isNotEmpty()) { err = e; return nullptr; }
+    if (pure && !dexed && !sampled && !vst) purify(*s);
+    return s;
+}
+
+// --demo <patch> <out.wav>: the sound playing a short dark phrase (D minor, 80 bpm, 12 s): two bars
+// of a slow line (a mono synth plays it too), then two bars of held chords, and a release tail.
+static int demo(const juce::String& patch, const juce::File& out)
+{
+    const double sr = 48000, beat = 0.75;
+    const int block = 256;
+    juce::String err;
+    auto s = makeSound(patch, sr, block, false, err);
+    if (!s) { std::cerr << err << "\n"; return 1; }
+    s->prepareToPlay(sr, block);
+    struct N { double at, len; std::vector<int> notes; float vel; };
+    const std::vector<N> score = {
+        { 0, 1.9, { 50 }, .8f }, { 2, .9, { 53 }, .7f }, { 3, .9, { 52 }, .7f },  // D, F, E
+        { 4, .45, { 50 }, .9f }, { 4.5, .45, { 45 }, .6f }, { 5, 2.9, { 46 }, .8f },  // D, A, Bb held
+        { 8, 3.9, { 46, 50, 53 }, .75f },                                              // Bb
+        { 12, 3.9, { 45, 49, 52 }, .75f },                                             // A (the major V)
+    };
+    const int total = int(14.5 * sr / block);
+    juce::AudioBuffer<float> buf(juce::jmax(2, s->getTotalNumOutputChannels()), block);
+    juce::AudioBuffer<float> mix(2, total * block);
+    mix.clear();
+    for (int b = 0; b < total; ++b)
+    {
+        juce::MidiBuffer midi;
+        const double t0 = double(b) * block / sr, t1 = t0 + block / sr;
+        for (auto& n : score)
+            for (int k : n.notes)
+            {
+                const double on = n.at * beat, off = (n.at + n.len) * beat;
+                if (on >= t0 && on < t1) midi.addEvent(juce::MidiMessage::noteOn(1, k, n.vel), int((on - t0) * sr));
+                if (off >= t0 && off < t1) midi.addEvent(juce::MidiMessage::noteOff(1, k), int((off - t0) * sr));
+            }
+        buf.clear();
+        s->processBlock(buf, midi);
+        for (int c = 0; c < 2; ++c) mix.copyFrom(c, b * block, buf, juce::jmin(c, buf.getNumChannels() - 1), 0, block);
+    }
+    // to -16 dBFS RMS over the sounding part, so the page compares sounds, not levels; then a peak guard
+    double sq = 0;
+    for (int c = 0; c < 2; ++c) for (int i = 0; i < mix.getNumSamples(); ++i) sq += double(mix.getSample(c, i)) * mix.getSample(c, i);
+    const double rms = std::sqrt(sq / (2.0 * mix.getNumSamples()));
+    if (rms < 1e-6) { std::cerr << patch << ": silent\n"; return 2; }
+    mix.applyGain(float(std::pow(10.0, -16.0 / 20) / rms));
+    const float peak = mix.getMagnitude(0, mix.getNumSamples());
+    if (peak > 0.95f) mix.applyGain(0.95f / peak);
+    out.deleteFile();
+    juce::WavAudioFormat wav;
+    std::unique_ptr<juce::AudioFormatWriter> w(wav.createWriterFor(new juce::FileOutputStream(out), sr, 2, 24, {}, 0));
+    if (!w) { std::cerr << "cannot write " << out.getFullPathName() << "\n"; return 1; }
+    w->writeFromAudioSampleBuffer(mix, 0, mix.getNumSamples());
+    std::cout << patch << ": rms " << dbfs(rms) << " dBFS before levelling\n";
+    return 0;
+}
+
 static int audition(const juce::String& patch, int note, bool pure)
 {
     const double sr = 48000;
     const int block = 256;
     juce::String err;
-    const bool dexed = isDexedSound(patch), sampled = isSfzSound(patch);
-    setOfflineRendering(true);
-    auto surge = sampled ? createSfz(sr, block, findSfz(patch), err) : dexed ? createDexed(sr, block, err) : createSurge(sr, block, err);
+    auto surge = makeSound(patch, sr, block, pure, err);
     if (!surge) { std::cerr << err << "\n"; return 1; }
-    if (!sampled)
-        if (auto e = dexed ? loadDexedVoice(*surge, patch) : loadSurgePatch(*surge, findSurgePatch(patch)); e.isNotEmpty()) { std::cerr << e << "\n"; return 1; }
-    if (pure && !dexed && !sampled) purify(*surge);
     surge->prepareToPlay(sr, block);
 
     const int holdBlocks = int(3.0 * sr / block), tailBlocks = int(2.0 * sr / block);
@@ -407,6 +468,25 @@ int main(int argc, char** argv)
             for (size_t i = c - 200; i < c + 200 && i < l.size(); ++i) { pl = std::max(pl, std::abs(l[i])); pr = std::max(pr, std::abs(r[i])); }
             std::cout << "echo " << k << " at " << k * 0.5 << " s: left " << dbfs(pl) << " dB, right " << dbfs(pr) << " dB\n";
         }
+        return 0;
+    }
+    if (args[0] == "--demo") return demo(args[1], juce::File(args[2]));
+    if (args[0] == "--programs") // --programs vst/<plugin>: its program names, one per line
+    {
+        juce::String err;
+        auto p = createVstSound(args[1] + "/", 48000, 256, err);
+        if (!p) { std::cerr << err << "\n"; return 1; }
+        for (int i = 0; i < p->getNumPrograms(); ++i) std::cout << i << "\t" << p->getProgramName(i) << "\n";
+        for (auto* q : p->getParameters()) // presets behind a parameter (Firefly's "Master Preset"): its values by name
+            if (q->getName(128).endsWithIgnoreCase("Preset"))
+            {
+                juce::String last;
+                for (int s = 0; s <= 2000; ++s)
+                {
+                    q->setValue(float(s) / 2000.0f);
+                    if (auto t = q->getCurrentValueAsText(); t != last) { std::cout << q->getName(128) << "=" << t << "\n"; last = t; }
+                }
+            }
         return 0;
     }
     if (args[0] == "--audition") return audition(args[1], args.size() > 2 && args[2].containsOnly("0123456789") ? args[2].getIntValue() : 57, args.contains("--pure"));

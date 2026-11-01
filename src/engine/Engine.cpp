@@ -100,6 +100,54 @@ juce::String loadDexedVoice(juce::AudioPluginInstance& dexed, const juce::String
     return "no Dexed voice '" + name + "' (has: " + names.joinIntoString(", ") + ")";
 }
 
+bool isVstSound(const juce::String& patch) { return patch.startsWith("vst/"); }
+
+juce::File findVst(const juce::String& patch)
+{
+    const auto name = patch.fromFirstOccurrenceOf("vst/", false, false).upToFirstOccurrenceOf("/", false, false) + ".vst3";
+    const auto home = juce::File::getSpecialLocation(juce::File::userHomeDirectory);
+    for (auto dir : { home.getChildFile("liszt-deps/synths/vst3"), home.getChildFile("Music/Lisztmachine/plugins"),
+                      juce::File("C:/Program Files/Common Files/VST3"), juce::File("/Library/Audio/Plug-Ins/VST3"),
+                      home.getChildFile("Library/Audio/Plug-Ins/VST3") })
+    {
+        if (auto f = dir.getChildFile(name); f.exists()) return f;
+        for (const auto& sub : dir.findChildFiles(juce::File::findDirectories, false)) // a vendor's folder (u-he, Surge Synth Team)
+            if (auto f = sub.getChildFile(name); f.exists()) return f;
+    }
+    return {};
+}
+
+std::unique_ptr<juce::AudioPluginInstance> createVstSound(const juce::String& patch, double sampleRate, int maxBlock, juce::String& error)
+{
+    const auto file = findVst(patch);
+    if (!file.exists()) { error = "no plugin for '" + patch + "'"; return nullptr; }
+    auto p = createVst3(file, sampleRate, maxBlock, error);
+    if (!p) return nullptr;
+    juce::StringArray parts;
+    parts.addTokens(patch.fromFirstOccurrenceOf("vst/", false, false).fromFirstOccurrenceOf("/", false, false), "|", "");
+    const auto prog = parts.isEmpty() ? juce::String() : parts[0].trim();
+    if (prog.startsWith("#")) p->setCurrentProgram(prog.substring(1).getIntValue());
+    else if (prog.isNotEmpty())
+    {
+        int found = -1;
+        for (int i = 0; i < p->getNumPrograms() && found < 0; ++i)
+            if (p->getProgramName(i).trim().equalsIgnoreCase(prog)) found = i;
+        if (found < 0) { error = "no program '" + prog + "' in " + file.getFileName(); return nullptr; }
+        p->setCurrentProgram(found);
+    }
+    for (int k = 1; k < parts.size(); ++k)
+    {
+        const auto name = parts[k].upToFirstOccurrenceOf("=", false, false).trim(), value = parts[k].fromFirstOccurrenceOf("=", false, false).trim();
+        juce::AudioProcessorParameter* q = nullptr;
+        for (auto* c : p->getParameters()) if (c->getName(128).trim().equalsIgnoreCase(name)) { q = c; break; }
+        if (!q) { error = "no parameter '" + name + "' in " + file.getFileName(); return nullptr; }
+        if (value.containsOnly("0123456789.")) q->setValueNotifyingHost(juce::jlimit(0.0f, 1.0f, value.getFloatValue()));
+        else if (auto e = setParameterText(*p, q->getName(128), value); e.isNotEmpty()) { error = e; return nullptr; }
+    }
+    p->enableAllBuses();
+    return p;
+}
+
 bool isSfzSound(const juce::String& patch) { return patch.startsWith("sfz/"); }
 
 juce::File findSfz(const juce::String& patch)
@@ -650,7 +698,12 @@ juce::String Palette::load(const juce::File& file, const std::string& sceneName)
             DBG(where + "no sampled instrument '" + patch + "', skipped");
             continue;
         }
-        if (!isEngineSound(patch) && !isDexedSound(patch) && !isSfzSound(patch) && !findSurgePatch(patch).existsAsFile())
+        if (isVstSound(patch) && !findVst(patch).exists()) // not installed here, like a missing sampled instrument
+        {
+            DBG(where + "no plugin for '" + patch + "', skipped");
+            continue;
+        }
+        if (!isEngineSound(patch) && !isDexedSound(patch) && !isSfzSound(patch) && !isVstSound(patch) && !findSurgePatch(patch).existsAsFile())
             return where + "no Surge patch '" + patch + "'";
         for (int t : targets) parts[t].push_back({ patch, tokens[1].getFloatValue(), tokens[2].getFloatValue() });
     }
@@ -853,8 +906,18 @@ juce::String Engine::loadInto(Slot& slot, int track, int entry)
     const auto& e = palette_.parts[track][size_t(entry)];
     if (tracks_[track].internal) { slot.entry = entry; return {}; }
     // A track may rotate between Surge, Dexed and sampled instruments: the slot's instance is swapped.
-    const bool dexed = isDexedSound(e.patch), sampled = isSfzSound(e.patch);
-    if (sampled)
+    const bool dexed = isDexedSound(e.patch), sampled = isSfzSound(e.patch), vst = isVstSound(e.patch);
+    if (vst)
+    {
+        juce::String err;
+        auto p = createVstSound(e.patch, sampleRate_, maxBlock_, err);
+        if (!p) return err;
+        p->prepareToPlay(sampleRate_, maxBlock_);
+        slot.plugin = std::move(p);
+        slot.dexed = false;
+        slot.sfz = e.patch; // not Surge: the next Surge sound makes a fresh instance
+    }
+    else if (sampled)
     {
         if (slot.sfz != e.patch || !slot.plugin)
         {
@@ -879,7 +942,7 @@ juce::String Engine::loadInto(Slot& slot, int track, int entry)
         slot.dexed = dexed;
         slot.sfz = {};
     }
-    if (sampled) {}
+    if (sampled || vst) {}
     else if (dexed) { if (auto err = loadDexedVoice(*slot.plugin, e.patch); err.isNotEmpty()) return err; }
     else
     {
@@ -900,7 +963,7 @@ juce::String Engine::loadInto(Slot& slot, int track, int entry)
     slot.cutoff = nullptr;
     for (auto* p : slot.plugin->getParameters())
         // Dexed's filter closes far harder than Surge's (a voice fell 21 dB in a summit): it is left alone
-        if (!dexed && p->getName(64) == (sampled ? "Expression" : "A Filter 1 Cutoff")) { slot.cutoff = p; slot.cutoffBase = p->getValue(); }
+        if (!dexed && !vst && p->getName(64) == (sampled ? "Expression" : "A Filter 1 Cutoff")) { slot.cutoff = p; slot.cutoffBase = p->getValue(); }
     slot.gain = juce::Decibels::decibelsToGain(e.gainDb);
     slot.entry = entry;
     slot.quiet = 0;
