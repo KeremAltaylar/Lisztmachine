@@ -8,8 +8,9 @@
   "mallet": "Glass",
   "texture": "Scrape",
   "impact": "Plate",
-  "perc": "Clicks",
-  "chord": "Guitar Stabs",
+  "perc": "Tubes",
+  "chord": "Stabs",
+  "riff": "Riff Synth",
   "arp": "Erhu",
   "fx": "Unsettler",
   "harm": "Cello"
@@ -120,6 +121,7 @@
    "end": 360.0,
    "stems": [
     "pad",
+    "perc",
     "bass",
     "sub",
     "chord",

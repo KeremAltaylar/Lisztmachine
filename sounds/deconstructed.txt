@@ -9,25 +9,16 @@ metal    18.0     783  3rd/Malfunction/Drums/Gong
 metal    14.5     812  3rd/Malfunction/Drums/Inharmonic Attack 1
 metal    13.1    2537  3rd/Malfunction/Drums/Jerry
 tick     0.0    6000  internal/click
-perc     1.8    7466  3rd/Cybersoda/Drums/Perc 2
-perc      5.6    2000  3rd/Giana Brotherz/Drums/Zap
-perc     14.9    2737  3rd/Cybersoda/Drums/Perc 6
 fx       -5.7     286  FX/Unsettler
 fx        4.0    4170  FX/Radio Noise
 
 # 2026-10-29 evening: this song's own synths (pitch-true, beating <= 15 %, none shared with another song)
 pad       -1.5     821  3rd/Giana Brotherz/Organs/Late Night
 pad      -2.3     408  3rd/Jacky Ligon/Ambiance/Fade To Black
-chord     5.5     654  Polysynths/Noise Tone
-chord    -1.8    2043  3rd/Noisegeek/Keys/Kinda Fearless FM
 arp       1.2    1094  3rd/Noisegeek/Leads/Back To Tyrell
 arp      -3.4     373  3rd/Stefan Singer/Leads/FM Flute
 arp     -16.2     685  3rd/Zoozither/Leads/Frontal
-bass     -1.8     346  3rd/Luna/Basses/SK Acid
-bass     -4.0     612  3rd/Slowboat/Basses/Gigantic Bass 1
-bass    -10.3    1180  Basses/Static 2
 arp       1.4    4212  3rd/Bluelight/Leads/Crusher
-bass    -15.2    3468  3rd/Altenberg/Basses/Neuro
 
 # Echoes: beats, feedback, mix
 delay chord 0.75 0.40 0.22
@@ -44,10 +35,6 @@ gain arp     -9.7
 gain chord   -11.3
 gain fx     -9.2
 master 9.6
-amp bass  0.83 1800 0.75
-# 2026-11-01 (Kerem: the guitars more mid): the lows cut early, a push at 850 Hz and presence at 1.4 kHz,
-# the cabinet closed at 3.4 kHz, the scoop moved up to take the fizz instead of the mids
-amp chord 0.83 1400 0.85 260 9 3400 -3 4200
 lowcut chord 200
 amp arp   0.50 3000 0.70
 amp pad   0.41 2000 0.45
@@ -90,15 +77,14 @@ delay mallet 0.75 0.4 0.25
 delay impact 1.5 0.55 0.4 throws
 
 # Sampled instruments (CC0: Karoryfer, D. Smolken, VSCO 2 CE; jSteelDrum: Unlicense), played by sfizz
-chord    19.2    2000  sfz/Karoryfer_Black_And_Green_Guitars_1000/Programs/08-black_staccato.sfz
 # 2026-11-01 (Kerem: the erhu's timbre more interesting): a trio of erhus over the fingerboard, wide unsteady vibrato
 arp      26.9    2983  sfz/aliexpress-erhu_v1000/Programs/dc-erhu-trio.sfz
 delay arp 1.5 0.5 0.3
-bass     2.6    1500  sfz/Karoryfer.Growlybass.v1.002/Growlybass/growlybass_excessive.sfz
 pad      20.4    1019  sfz/vsco2/TenorTrombone-sus.sfz
 
 # 2026-10-30: the riff (the engine's guitar: two takes, left and right, the fifths pure) into a fuzz and a cabinet
-riff     0.0    1000  internal/guitar
+# 2026-11-01 (Kerem: the guitar to a mid synth): TAL-NoiseMaker, its oscillators an octave up (B2-B3), no sub
+riff     3.9    1358  vst/TAL-NoiseMaker/|Filter Cutoff=0.55|Filter Resonance=0.5|Osc Bitcrusher=0.35|Amp Release=0.3|Osc 1 Tune=0.75|Osc 2 Tune=0.75|Osc 3 Volume=0|Osc 2 Volume=0.6|Osc 2 Fine Tune=0.52
 drone    0.0       0  internal/none
 gain riff    -18.1
 drive riff 0.50 4000
@@ -108,6 +94,12 @@ lowcut riff 180
 # 2026-11-01 (Kerem picked from the Synth Sounds page, "choose 2-3"): three of the new synths. Gain: held
 # note measured to -22 dB RMS (the pad -27). Bright here places each on the dark-to-bright line so it plays in
 # the louder parts (it measured darker: JC303 253 Hz, the gong 423 Hz).
-bass      2.6     900  vst/JC303/|Cutoff=0.25|Resonance=0.85|EnvMod=0.5|Decay=0.5|Switch Overdrive Mod=1|Drive=0.5
 metal     0.2    1500  vst/RipplerX/Gong
 pad      -6.4    1350  vst/js80p/Dystopian Cathedral
+
+# 2026-11-01 (Kerem: guitar stabs to mid synths, the clicks out, a real bass): the stabs are RipplerX bells
+# (the FM keys gone too), the clicks RipplerX tubes, the bass Mono/Fury's The Bad Ass alone (fast, a sub octave in it)
+# Each set to the level of the sound it replaced in Rebirth.
+chord    -9.3     900  vst/RipplerX/Bells2
+perc      2.4    1000  vst/RipplerX/Tubes
+bass     -9.5     400  vst/monofury/The Bad Ass
