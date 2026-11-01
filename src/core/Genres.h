@@ -72,6 +72,7 @@ public:
         int arpLenLo = 5, arpLenHi = 7;            // its cycle, in notes: phases against the bar
         float arpDensLo = .4f, arpDensHi = .8f, arpGate = .7f;
         int arpLo = 60, arpHi = 86, percLo = 36, percHi = 55; // registers (the lead patches sound an octave down)
+    int harmLo = 62, harmHi = 84;              // the choir's register
         int ext = 2;                               // chords: 0 triads, 1 sevenths, 2 ninths
         bool hook = true;                          // the arp track plays the song's hook; false: the polymetric arpeggio
         float chop = 0, gap = 0, stutter = 0;      // chances per bar, scaled by energy

@@ -131,7 +131,7 @@ const G::Spec kDeconstructed {
     .body = part("", "...o..o.....o...", ".o.o..o.o..o..o."),
     .mallet = part("1...............", "1.....2...3.....", "1..3..2..4.1..3."),
     .texture = part("x---------------", "x-------x-------", "x---x---x---x---"),
-    .percLo = 60, .percHi = 90,
+    .percLo = 60, .percHi = 90, .harmLo = 43, .harmHi = 67, // the choir low: a cello section (Kerem: "low oriented and celloish")
     .chop = .30f, .gap = .25f, .stutter = .20f, .stutterTrack = G::Metal, .stutterDiv = 32,
     .riff = G::RiffStyle::Chug, .riffLo = 35, .summit = G::Summit::Halftime, .build = true,
 };
@@ -520,7 +520,7 @@ std::array<int, 2> GenreComposer::range(int track) const
         case Sub: return { 24, 52 };
         case Arp: return { spec_.arpLo, spec_.arpHi };
         case Chord: return { 46, 76 };
-        case Harm: return { 60, 86 };
+        case Harm: return { spec_.harmLo - 2, spec_.harmHi + 2 };
         case Ground: return { 28, 48 };
         case Body: return { 45, 69 };
         case Mallet: return { 60, 88 };
@@ -666,7 +666,7 @@ void GenreComposer::emitHarm(int bar, std::vector<Event>& out)
         std::sort(want.begin(), want.end());
         want.erase(std::unique(want.begin(), want.end()), want.end());
     }
-    else if (active(Harm, bar)) want = voice(bar, 3, 62, 84, true, harmVoices_);
+    else if (active(Harm, bar)) want = voice(bar, 3, spec_.harmLo, spec_.harmHi, true, harmVoices_);
     const bool late = !want.empty() && bar > 0 && rootAt(bar) != rootAt(bar - 1);
     const int64_t at = t0 + (late ? 2 * kPPQ : 0);
     for (int p : harmHeld_)

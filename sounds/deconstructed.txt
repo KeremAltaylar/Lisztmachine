@@ -45,8 +45,11 @@ gain chord   -11.3
 gain fx     -9.2
 master 9.6
 amp bass  0.83 1800 0.75
-amp chord 0.83 2500 0.85
-amp arp   0.83 3000 0.80
+# 2026-11-01 (Kerem: the guitars more mid): the lows cut early, a push at 850 Hz and presence at 1.4 kHz,
+# the cabinet closed at 3.4 kHz, the scoop moved up to take the fizz instead of the mids
+amp chord 0.83 1400 0.85 260 9 3400 -3 4200
+lowcut chord 200
+amp arp   0.50 3000 0.70
 amp pad   0.41 2000 0.45
 drive metal 0.30 4500
 drive perc  0.30 6000
@@ -61,10 +64,10 @@ delay perc  1.0 0.5 0.3 throws
 # 2026-10-29: the 808, the choir, deep metal, darker synths
 sub      0.0      60  internal/808
 metal    8.3     997  3rd/Malfunction/Drums/Inharmonic Attack 2
-harm     -2.1    4204  3rd/Giana Brotherz/Pads/Dark Whisper
-harm    -10.6    3541  3rd/Bluelight/Vox/Gregorian Rant Poly
-gain harm    -11.4
-amp harm  0.41 2200 0.35
+# 2026-11-01: the choir is a bowed cello section, low (43-67), clean
+harm     10.0    1000  sfz/Karoryfer_Bigcat_cello.v1.001/Karoryfer_Bigcat_cello/Programs/lm-cello.sfz
+gain harm    -4.3  # Kerem: +7.1 on the choir before it became the cello
+send harm reverb 0.30
 drive sub  0.55 2500
 duck sub 0.30
 lowcut bass 90
@@ -75,7 +78,7 @@ body     0.0    1000  internal/modal-block
 mallet   0.0    1000  internal/modal-glass
 texture  0.0    1000  internal/modal-scrape
 impact   0.0    1000  internal/modal-plate
-gain ground  -19.0
+gain ground  -30.1  # Kerem: -11.1
 gain body    -13.1
 gain mallet  -25.8
 gain texture -39.2
@@ -88,7 +91,9 @@ delay impact 1.5 0.55 0.4 throws
 
 # Sampled instruments (CC0: Karoryfer, D. Smolken, VSCO 2 CE; jSteelDrum: Unlicense), played by sfizz
 chord    19.2    2000  sfz/Karoryfer_Black_And_Green_Guitars_1000/Programs/08-black_staccato.sfz
-arp      26.9    2983  sfz/aliexpress-erhu_v1000/Programs/04-erhu_marcato.sfz
+# 2026-11-01 (Kerem: the erhu's timbre more interesting): a trio of erhus over the fingerboard, wide unsteady vibrato
+arp      26.9    2983  sfz/aliexpress-erhu_v1000/Programs/dc-erhu-trio.sfz
+delay arp 1.5 0.5 0.3
 bass     2.6    1500  sfz/Karoryfer.Growlybass.v1.002/Growlybass/growlybass_excessive.sfz
 pad      20.4    1019  sfz/vsco2/TenorTrombone-sus.sfz
 
@@ -97,4 +102,5 @@ riff     0.0    1000  internal/guitar
 drone    0.0       0  internal/none
 gain riff    -18.1
 drive riff 0.50 4000
-amp riff  0.90 2600 1.0 110 4 4800 4 500
+amp riff  0.90 1400 1.0 260 9 3400 -3 4200
+lowcut riff 180

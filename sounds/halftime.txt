@@ -101,7 +101,7 @@ amp riff  0.70 1800 1.0 45 -2 3600 6 1100
 # 2026-11-01: Kerem's mix (pad +10.1, choir +4, chord +0.2, ground -7, perc -24, tick -11.6, echo +7.7)
 return delay 7.7
 # the organic voice: a bowed cello section holding the chords (root, fifth, octave), slow bow, long release
-drone   10.0    1000  sfz/Karoryfer_Bigcat_cello.v1.001/Karoryfer_Bigcat_cello/Programs/01- Bowed (velocity layer).sfz
+drone   10.0    1000  sfz/Karoryfer_Bigcat_cello.v1.001/Karoryfer_Bigcat_cello/Programs/lm-cello.sfz
 gain drone  -4.0
 release drone 3.0
 send drone reverb 0.35
