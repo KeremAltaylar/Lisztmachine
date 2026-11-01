@@ -109,6 +109,7 @@ const G::Spec kNoir {
     .texture = part("x---------------", "x---------------", "x-------x-------"),
     .percLo = 36, .percHi = 52,
     .gap = .10f, .swing = .10f, .chordSweep = .45f, .riff = G::RiffStyle::Sludge, .riffLo = 30, .summit = G::Summit::Unison,
+    .build = true, // 2026-11-01: the sharp part changes, as in Deconstructed Club
 };
 
 const G::Spec kDeconstructed {

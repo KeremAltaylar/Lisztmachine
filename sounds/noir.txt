@@ -85,7 +85,7 @@ delay impact 1.5 0.55 0.4 throws
 # Sampled instruments (CC0: Karoryfer, D. Smolken, VSCO 2 CE; jSteelDrum: Unlicense), played by sfizz
 chord    20.2    1413  sfz/Karoryfer.Scarypiano.v1.002/Scarypiano/Programs/Scarypiano.sfz
 bass     16.2     624  sfz/DSmolken.double_bass.v1.001/dsmolken_double_bass/d_smolken_rubner_bass_arco.sfz
-arp      13.5    2290  sfz/Karoryfer_Bigcat_cello.v1.001/Karoryfer_Bigcat_cello/Programs/02- Bowed (mod wheel).sfz
+arp      13.5    2290  sfz/Karoryfer_Bigcat_cello.v1.001/Karoryfer_Bigcat_cello/Programs/lm-cello.sfz  # 2026-11-01: the octave-true cello (02 sounded an octave high)
 arp      26.9    2983  sfz/aliexpress-erhu_v1000/Programs/02-erhu_long.sfz
 pad      13.3     708  sfz/vsco2/Bassoon-sus.sfz
 harm     20.2    2361  sfz/vsco2/Clarinet-susLong.sfz
@@ -96,3 +96,8 @@ drone    0.0       0  internal/none  # the second guitar: only Doom has one so f
 gain riff    -10.3
 drive riff 0.85 2500
 amp riff  0.70 1800 1.0 45 -2 3600 6 1100
+
+# 2026-11-01 (Kerem: the newer synths where they fit): from his Synth Sounds picks, both measured pitch-true
+# (the organ a 16-foot stop, an octave down). Gain: a held note to -27 dB RMS. Bright places them in the louder parts.
+pad       0.3     900  vst/fb7999/CATHEDRAL ORGAN 1
+harm      0.0    1500  vst/scrooo/Pad: Scary Choir

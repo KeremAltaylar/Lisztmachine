@@ -1,0 +1,197 @@
+{
+ "song": "noir",
+ "title": "Noir",
+ "bpm": 72.0,
+ "labels": {
+  "ground": "Low Drums",
+  "body": "Hand Drums",
+  "mallet": "Bowl",
+  "texture": "Chain",
+  "impact": "Plate",
+  "perc": "Deep Metal",
+  "fx": "Unsettler",
+  "arp": "Lead",
+  "harm": "Choir"
+ },
+ "sections": [
+  {
+   "name": "Rain",
+   "start": 0.0,
+   "end": 26.6667,
+   "stems": [
+    "pad",
+    "chord",
+    "fx",
+    "texture",
+    "delay",
+    "reverb"
+   ]
+  },
+  {
+   "name": "Cigarette",
+   "start": 26.6667,
+   "end": 80.0,
+   "stems": [
+    "pad",
+    "tick",
+    "bass",
+    "sub",
+    "chord",
+    "fx",
+    "ground",
+    "body",
+    "texture",
+    "delay",
+    "reverb"
+   ]
+  },
+  {
+   "name": "Roads",
+   "start": 80.0,
+   "end": 160.0,
+   "stems": [
+    "pad",
+    "metal",
+    "tick",
+    "perc",
+    "bass",
+    "sub",
+    "chord",
+    "harm",
+    "ground",
+    "body",
+    "mallet",
+    "texture",
+    "delay",
+    "reverb"
+   ]
+  },
+  {
+   "name": "Hollow",
+   "start": 160.0,
+   "end": 213.333,
+   "stems": [
+    "pad",
+    "bass",
+    "sub",
+    "arp",
+    "chord",
+    "fx",
+    "ground",
+    "body",
+    "texture",
+    "delay",
+    "reverb"
+   ]
+  },
+  {
+   "name": "Mezzanine",
+   "start": 213.333,
+   "end": 320.0,
+   "stems": [
+    "pad",
+    "metal",
+    "tick",
+    "perc",
+    "bass",
+    "sub",
+    "arp",
+    "chord",
+    "fx",
+    "harm",
+    "ground",
+    "body",
+    "mallet",
+    "texture",
+    "impact",
+    "riff",
+    "delay",
+    "reverb"
+   ]
+  },
+  {
+   "name": "Teardrop",
+   "start": 320.0,
+   "end": 346.667,
+   "stems": [
+    "pad",
+    "bass",
+    "sub",
+    "arp",
+    "chord",
+    "harm",
+    "ground",
+    "body",
+    "texture",
+    "riff",
+    "delay",
+    "reverb"
+   ]
+  },
+  {
+   "name": "Cathedral",
+   "start": 346.667,
+   "end": 453.333,
+   "stems": [
+    "pad",
+    "metal",
+    "tick",
+    "perc",
+    "bass",
+    "sub",
+    "arp",
+    "chord",
+    "fx",
+    "harm",
+    "ground",
+    "body",
+    "mallet",
+    "texture",
+    "impact",
+    "riff",
+    "delay",
+    "reverb"
+   ]
+  },
+  {
+   "name": "Last",
+   "start": 453.333,
+   "end": 506.667,
+   "stems": [
+    "pad",
+    "bass",
+    "sub",
+    "arp",
+    "chord",
+    "harm",
+    "ground",
+    "body",
+    "texture",
+    "riff",
+    "delay",
+    "reverb"
+   ]
+  }
+ ],
+ "master": 8.5,
+ "base": {
+  "pulse": 0.0,
+  "metal": 8.7,
+  "tick": 12.2,
+  "perc": -5.8,
+  "pad": -3.2,
+  "bass": -0.7,
+  "sub": -10.2,
+  "arp": -5.2,
+  "chord": -10.1,
+  "fx": -6.0,
+  "harm": -6.6,
+  "ground": -19.6,
+  "body": -13.1,
+  "mallet": -30.4,
+  "texture": -20.6,
+  "impact": -4.0,
+  "riff": -10.3
+ },
+ "returns": {}
+}
