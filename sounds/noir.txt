@@ -95,3 +95,4 @@ harm      0.0    1500  vst/scrooo/Pad: Scary Choir
 # the second pad (the drone track, where the riff's stabs were) TAL-NoiseMaker's dark pad, his pick.
 bass     16.2     624  sfz/DSmolken.double_bass.v1.001/dsmolken_double_bass/d_smolken_rubner_bass_pizz.sfz
 arp      13.2    2170  sfz/Weresax/Programs/noir-sax.sfz  # +5 over its measured level: a soloist, in front
+send arp reverb 0.45  # Kerem: the sax more into the reverb (was 0.20)
