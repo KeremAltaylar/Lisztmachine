@@ -6,20 +6,7 @@
 #   bright   measured spectral centroid in Hz (orders the patches dark -> bright)
 #   patch    Surge XT factory patch, Category/Name
 # part  gain   bright  patch
-pad     -9.1    576  Polysynths/Disturbing Resonance
-pad     -8.7    773  Pads/Smooth Dist
-pad     -3.9   2263  Pads/Endgame
-
-bass   -11.3    316  Basses/Behemoth
-bass    -2.9    851  Basses/Doomsday
-
-seq     -9.1   1391  Sequences/FB Seq
-seq     -3.9   3945  Sequences/Tyskland
-seq      4.1   4090  Sequences/Burial Ground
-
-lead    -6.4   1236  Leads/Rough
-lead   -11.4   3065  Leads/Resofest 2
-master 6.8
+master 8.3
 
 # 2026-10-29: an amp and its cabinet on the melodic parts (gain, presence Hz, mix)
 amp bass  0.40 1800 0.45
@@ -28,16 +15,11 @@ amp pad   0.25 2000 0.35
 # 2026-10-30 (Kerem: "more melancholy and organic"): bowed and sampled instruments in every part,
 # a few of the approved dark synths kept between them. Gains from the other songs' in-context levels.
 pad      20.8     714  sfz/vsco2/FHorn-sus.sfz
-pad      13.3     708  sfz/vsco2/Bassoon-sus.sfz
 pad      24.9     720  sfz/vsco2/Tuba-sus.sfz
-pad      20.2    2361  sfz/vsco2/Clarinet-susLong.sfz
 bass     25.5     624  sfz/DSmolken.double_bass.v1.001/dsmolken_double_bass/d_smolken_rubner_bass_arco.sfz
 bass     14.0     321  sfz/DSmolken.double_bass.v1.001/dsmolken_double_bass/d_smolken_rubner_bass_pizz.sfz
-bass     17.0     400  sfz/Karoryfer.Growlybass.v1.002/Growlybass/growlybass_clean.sfz
 seq       8.4    1413  sfz/Karoryfer.Scarypiano.v1.002/Scarypiano/Programs/Scarypiano.sfz
-seq      24.0    1200  sfz/Karoryfer_Black_And_Green_Guitars_1000/Programs/05-green_staccato.sfz
 seq       5.8    1421  sfz/steel-drum/jSteelDrum.sfz
-lead     13.5    2290  sfz/Karoryfer_Bigcat_cello.v1.001/Karoryfer_Bigcat_cello/Programs/02- Bowed (mod wheel).sfz
 lead     22.9    2983  sfz/aliexpress-erhu_v1000/Programs/02-erhu_long.sfz
 
 # The guitar: the engine's (two takes, left and right), power chords let ring under the sequences;
@@ -48,3 +30,13 @@ drive guitar 0.55 2500
 amp guitar  0.55 1800 1.0 45 -2 3600 6 1100
 amp seq   0.30 2600 0.40
 amp lead  0.35 3000 0.45
+
+# 2026-11-02 (Kerem: "improve Berlin's sound with the new synths"): the Surge synths out, one new synth
+# in each part beside the sampled instruments (the growly bass, guitar staccato, bassoon, clarinet and the
+# octave-high cello out too). Each held note measured: the PS-3300 pad 13 % beating, the rest 1-3 %, all
+# within 5 cents and in their octave. Gain: a held note to -22 dB RMS (the pad -27),
+# then each set against the sampled sounds of its part in the mix; the master up 1.5 for them.
+pad       0.7    3263  vst/fb3300/PAD: Synphaera
+bass      1.7     369  vst/OB-Xf/|Filter 4-Pole Mode=1|Filter Cutoff=0.3|Filter Resonance=0.5|Filter Env Amount=0.6|Filter Env Decay=0.4|Filter Env Sustain=0.1|Osc 2 Volume=0.8|Osc 2 Detune=0
+seq      -6.1     756  vst/TAL-NoiseMaker/|Filter Cutoff=0.4|Filter Resonance=0.55|Filter Contour=0.7|Filter Decay=0.3|Filter Sustain=0|Osc 1 Tune=0.5|Osc 2 Volume=0|Osc 3 Volume=0
+lead    -20.2    1770  vst/Six Sines/|Op 1 Feedback Active=1|Op 1 Feedback Level=0.8|Main Saturation Type=0.5|Main Saturation Drive=0.6
