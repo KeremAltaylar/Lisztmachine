@@ -39,9 +39,9 @@ const G::Spec kJungle {
     // live kit can roll over it.
     .bpmLo = 164, .bpmHi = 168, .mode = &kDorian, .tonics = { 2, 9, 4, 11, 7 },
     .progs = { { { 0, 3, 6, 2 }, { 2, 3, 0, 0 }, { 0, 4, 3, 6 } } }, .preRoot = 6,
-    .form = { { { "Rainfall", 16, .15f, "PAT" }, { "Warm Front", 16, .35f, "PADHTM" }, { "Roller", 64, .65f, "PKSHCBUADTGYM" },
-                { "Undertow", 32, .40f, "PADFTM" }, { "Second Roller", 64, .85f, "PKSHCBUADTGYMRI" }, { "Clearing", 16, .25f, "PAT" },
-                { "Liquid Gold", 64, 1.0f, "PKSHCBUADFTGYMRI" }, { "Tide", 16, .15f, "PART" } } },
+    .form = { { { "Rainfall", 16, .15f, "PAT" }, { "Warm Front", 16, .35f, "PADHTMW" }, { "Roller", 64, .65f, "PKSHCBUADTGYMW" },
+                { "Undertow", 32, .40f, "PADFTMW" }, { "Second Roller", 64, .85f, "PKSHCBUADTGYMRIW" }, { "Clearing", 16, .25f, "PATW" },
+                { "Liquid Gold", 64, 1.0f, "PKSHCBUADFTGYMRIW" }, { "Tide", 16, .15f, "PARTW" } } },
     // the two-step's weight drives the pulse; rides and a shuffle of ticks around the live breaks
     .pulse = part("X.........X.....", "X.........X.....", "X.........X..x.."),
     .metal = part("", "..1...2...1...2.", "..1.2.1...1.3.2."),
@@ -59,6 +59,7 @@ const G::Spec kJungle {
     .percLo = 36, .percHi = 52,
     .swing = .06f, .chordSweep = .35f, .riff = G::RiffStyle::Sludge, .riffLo = 35, .summit = G::Summit::NewTheme,
     .build = true, // 2026-11-01: the sharp part changes
+    .voice = true, // 2026-11-02: the singer on the drone track
 };
 
 const G::Spec kEcstatic {
@@ -534,7 +535,7 @@ std::array<int, 2> GenreComposer::range(int track) const
         case Texture: return { 48, 84 };
         case Impact: return { 30, 50 };
         case Riff: return { 24, 76 };
-        case Drone: return { 40, 67 };
+        case Drone: return spec_.voice ? std::array<int, 2> { 62, 84 } : std::array<int, 2> { 40, 67 };
         default: return { 48, 72 };
     }
 }
@@ -1134,6 +1135,62 @@ void GenreComposer::emitSolo(int bar, std::vector<Event>& out)
     soloPitch_ = p;
 }
 
+void GenreComposer::emitVoice(int bar, std::vector<Event>& out)
+{
+    // The singer (Kerem, 2026-11-02: "a haunted, shimmering female opera voice, wordless, as a lead
+    // soloist so it connects the parts to each other"): long notes above the lead, two to four bars a
+    // phrase with a bar to breathe (two in the calm). A phrase that would end on a part's last bar
+    // sings on into the next part, and a breath there is cut short, so the voice carries each change.
+    // Steps of the mode, chord tones on beats one and three, now and then a leap up and a fall back.
+    if (!active(Drone, bar)) { voiceLeft_ = voiceRest_ = 0; return; }
+    const float e = energyAt(bar);
+    const bool edge = bar + 1 < totalBars() && sectionAt(bar + 1).startBar == bar + 1;
+    bool start = false;
+    if (voiceLeft_ == 0)
+    {
+        if (voiceRest_ > 0 && !edge) { --voiceRest_; return; }
+        voiceRest_ = 0;
+        voiceLeft_ = edge ? rng_.range(2, 3) : rng_.range(2, 4);
+        start = true;
+    }
+    if (--voiceLeft_ == 0 && edge) voiceLeft_ = 1;   // never let go on a part's last bar
+    const bool last = voiceLeft_ == 0 || bar + 1 >= totalBars();
+    if (last) voiceRest_ = e < .35f ? 2 : 1;
+
+    const int64_t t0 = int64_t(bar) * kBarTicks, q = kPPQ;
+    std::vector<int64_t> on;
+    if (last) on = { 0 };                                            // the phrase ends on one long note
+    else if (rng_.chance(.3 - .2 * e)) on = { 0 };                   // a whole bar
+    else if (rng_.chance(.5)) on = { 0, 2 * q };                     // two halves
+    else if (rng_.chance(.5)) on = { 0, 3 * q };                     // a dotted half and a lead-in
+    else on = { 0, 2 * q, 3 * q };
+
+    const int lo = 64, hi = 81;
+    const auto ct = chordTones(bar, false);
+    auto isCT = [&](int p) { return std::find(ct.begin(), ct.end(), (p % 12 + 12) % 12) != ct.end(); };
+    auto toCT = [&](int p, int d) { for (int k = 0; k < 7; ++k) { if (isCT(p + d * k)) return p + d * k; if (isCT(p - d * k)) return p - d * k; } return p; };
+    auto stepIn = [&](int p, int d) { int x = p + d; while (!inMode(bar, x)) x += d; return x; };
+    int p = voicePitch_ < 0 ? toCT(lo + (hi - lo) / 2, 1) : voicePitch_;
+    for (size_t i = 0; i < on.size(); ++i)
+    {
+        const bool strong = on[i] % (2 * q) == 0;
+        if (p > hi - 3) voiceDir_ = -1;
+        else if (p < lo + 3) voiceDir_ = 1;
+        else if (rng_.chance(.2)) voiceDir_ = -voiceDir_;
+        if (start && i == 0) p = toCT(p, voiceDir_);
+        else if (rng_.chance(.15)) { p = toCT(p + rng_.range(5, 7), 1); voiceDir_ = -1; } // a leap up, then the fall
+        else { const int n = stepIn(p, voiceDir_); p = strong ? toCT(n, voiceDir_) : n; }
+        while (p > hi) p -= 12;
+        while (p < lo) p += 12;
+        if (strong && !isCT(p)) p = toCT(p, -1);
+        const int64_t next = i + 1 < on.size() ? on[i + 1] : kBarTicks;
+        const float vel = std::clamp(.5f + .35f * e + float(rng_.uniform() * .06 - .03), .2f, 1.0f);
+        out.push_back({ t0 + on[i], Event::NoteOn, Drone, uint8_t(p), vel });
+        out.push_back({ t0 + next - 30, Event::NoteOff, Drone, uint8_t(p), 0 });
+    }
+    voicePitch_ = p;
+}
+
 bool GenreComposer::summitHalftime(int bar) const { return spec_.summit == Summit::Halftime && sectionAt(bar).restoreTheme; }
 
 bool GenreComposer::summitUnison(int bar) const
@@ -1501,7 +1558,8 @@ void GenreComposer::generateBar(int bar, std::vector<Event>& out)
     else emitArp(bar, out);
     emitPart(Sub, spec_.sub, bar, out);
     emitHarm(bar, out);
-    emitDrone(bar, out);
+    if (spec_.voice) emitVoice(bar, out);
+    else emitDrone(bar, out);
     emitPart(Ground, spec_.ground, bar, out);
     emitPart(Body, spec_.body, bar, out);
     emitPart(Mallet, spec_.mallet, bar, out);

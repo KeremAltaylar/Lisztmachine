@@ -89,6 +89,7 @@ public:
     bool build = false;                        // every part ends in a three-bar unison build (2, 4, 8 hits a bar), the next one enters whole
     bool walk = false;                         // the bass walks: a contrabass on every beat (in two in the calm), its pattern unused
     bool solo = false;                         // the arp track is a soloist: the hook as the head of each part, then phrases of its own
+    bool voice = false;                        // the drone track is a wordless soprano: long phrases above the lead, sung across the part changes
     };
 
     static const Spec* find(const std::string& scene);
@@ -146,6 +147,7 @@ private:
     void emitArp(int bar, std::vector<Event>& out);
     void emitWalk(int bar, std::vector<Event>& out);
     void emitSolo(int bar, std::vector<Event>& out);
+    void emitVoice(int bar, std::vector<Event>& out);
     void emitHeld(int track, int bar, std::vector<Event>& out, int& held, int pitch);
     int tier(int bar) const;
 
@@ -175,6 +177,7 @@ private:
     std::array<float, 16> accent_ {};               // the song's groove: how hard each sixteenth of the bar leans
     int gapBeat_ = -1, stutterBeat_ = -1;
     int walkLast_ = -1;                             // the walk's last note: the next bar's root is found near it
+    int voiceLeft_ = 0, voiceRest_ = 0, voicePitch_ = -1, voiceDir_ = 1; // the singer's phrase, as the soloist's
     int soloLeft_ = 0, soloRest_ = 0, soloPitch_ = -1, soloDir_ = 1; // the phrase: bars left in it, bars of breath, where the line is
 };
 
