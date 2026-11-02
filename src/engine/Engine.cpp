@@ -864,6 +864,9 @@ juce::String Engine::load(double sampleRate, int maxBlock, const Palette& palett
     kickTrack_ = palette.info->trackOf("kick") >= 0 ? palette.info->trackOf("kick") : palette.info->trackOf("pulse");
     duckCurve_.assign(size_t(maxBlock), 0);
     kickHits_.reserve(64);
+    hushCurve_.assign(size_t(maxBlock), 1);
+    hushAt_.reserve(16);
+    hush_ = hushTarget_ = 1;
     return {};
 }
 
@@ -1240,6 +1243,7 @@ void Engine::renderChunk(float* const* out, int numChannels, int offset, int len
                 case Event::Level:   t.gain.setTargetValue(e.value); break;
                 case Event::Filter:  t.filterTarget = e.value; break;
                 case Event::Throw:   if (t.hasEcho) t.echo.throwFor(at, int(e.value * kPPQ * samplesPerTick_)); break;
+                case Event::Hush:    hushAt_.push_back({ at, e.value }); break;
             }
         }
         for (int i = 0; i < numTracks_; ++i) changesDue(i, end - 1);
@@ -1287,6 +1291,17 @@ void Engine::renderChunk(float* const* out, int numChannels, int offset, int len
             duckCurve_[size_t(n)] = mixStage ? duckEnv_ : 0;
         }
         kickHits_.clear();
+    }
+    {   // A stop's silence: everything, the reverb and echo tails too, fades out in 15 ms and back in at the downbeat.
+        const float step = float(1.0 / (0.015 * sampleRate_));
+        size_t k = 0;
+        for (int n = 0; n < len; ++n)
+        {
+            for (; k < hushAt_.size() && hushAt_[k].first <= n; ++k) hushTarget_ = hushAt_[k].second;
+            hush_ += juce::jlimit(-step, step, hushTarget_ - hush_);
+            hushCurve_[size_t(n)] = hush_;
+        }
+        hushAt_.clear();
     }
 
     // One track's sound into the mix and the sends: its low cut, width, pan and duck, then its gain.
@@ -1342,7 +1357,7 @@ void Engine::renderChunk(float* const* out, int numChannels, int offset, int len
         auto& t = tracks_[i];
         // Glide the filter towards its target over about a quarter second.
         t.filterNow += (t.filterTarget - t.filterNow) * juce::jmin(1.0f, float(len / (0.25 * sampleRate_)));
-        for (int n = 0; n < len; ++n) gains_[size_t(n)] = t.gain.getNextValue();
+        for (int n = 0; n < len; ++n) gains_[size_t(n)] = t.gain.getNextValue() * hushCurve_[size_t(n)];
         if (!(enabledTracks & (1 << i)))
         {
             for (auto& slot : t.slots)
@@ -1434,6 +1449,7 @@ void Engine::renderChunk(float* const* out, int numChannels, int offset, int len
                 for (int n = 0; n < len; ++n) b.getWritePointer(c)[n] *= 1 - depth * duckCurve_[size_t(n)];
         };
         duckReturn(delayIn, 0.35f);
+        for (int c = 0; c < 2; ++c) juce::FloatVectorOperations::multiply(delayIn.getWritePointer(c), hushCurve_.data(), len);
         for (int c = 0; c < 2; ++c)
         {
             juce::FloatVectorOperations::addWithMultiply(pa[c], delayIn.getReadPointer(c), returnGain[0], len);
@@ -1447,6 +1463,7 @@ void Engine::renderChunk(float* const* out, int numChannels, int offset, int len
                 for (int n = 0; n < len; ++n) reverbIn.getWritePointer(c)[n] += palette_.shimmer * octaveUp_[c].process(reverbIn.getReadPointer(c)[n]);
         runFx(*reverb_, reverbIn);
         duckReturn(reverbIn, 0.5f);
+        for (int c = 0; c < 2; ++c) juce::FloatVectorOperations::multiply(reverbIn.getWritePointer(c), hushCurve_.data(), len);
         if (mixStage)
             for (int c = 0; c < 2; ++c)
                 for (int n = 0; n < len; ++n) reverbIn.getWritePointer(c)[n] = reverbLowCut_[c].process(reverbIn.getReadPointer(c)[n]);
@@ -1459,6 +1476,7 @@ void Engine::renderChunk(float* const* out, int numChannels, int offset, int len
     if (effects) // the feedback bus (silent unless something feeds it)
     {
         fbBus_.process(fbIn[0], fbIn[1], len);
+        for (int c = 0; c < 2; ++c) juce::FloatVectorOperations::multiply(fbIn[c], hushCurve_.data(), len);
         const float g = juce::Decibels::decibelsToGain(palette_.returnDb[2]);
         for (int c = 0; c < 2; ++c)
         {

@@ -11,7 +11,7 @@ namespace liszt {
 namespace {
 
 constexpr uint8_t bit(int t) { return uint8_t(1u << t); }
-constexpr uint8_t kAll = 0x3F;
+constexpr uint8_t kAll = 0x7F;
 
 // Chord-root transitions in the minor modes, rows/cols = i ii III iv v VI VII.
 // ii is never a target; its row only exists so every row is a distribution.
@@ -218,6 +218,7 @@ float BerlinComposer::levelAt(int track, int bar) const
 {
     if (!active(track, bar)) return 0;
     auto& sec = sectionAt(bar);
+    if (sec.energy >= .6f) return 1; // a big part starts on its whole sound and ends on the stop
     int in = bar - sec.startBar, left = sec.startBar + sec.bars - bar;
     float fadeIn = active(track, sec.startBar - 1) ? 1.0f : std::min(1.0f, (in + 1) / 4.0f);
     float fadeOut = active(track, sec.startBar + sec.bars) ? 1.0f : std::min(1.0f, (left - 1) / 4.0f);
@@ -244,7 +245,8 @@ void BerlinComposer::emitAutomation(int bar, std::vector<Event>& out)
 {
     const int64_t t0 = int64_t(bar) * kBarTicks;
     for (int tr = 0; tr < kNumTracks; ++tr)
-        out.push_back({ t0, Event::Level, uint8_t(tr), 0, levelAt(tr, bar) });
+        // a part entering a big part is at full level by its downbeat (the level glides over a bar)
+        out.push_back({ t0, Event::Level, uint8_t(tr), 0, bigStart(bar + 1) && active(tr, bar + 1) ? 1.0f : levelAt(tr, bar) });
 
     // Slow filter sweeps, each a whole number of bars long (16 or 32), riding on energy.
     struct Sweep { int track; double periodBars, amp, phase; };
@@ -269,6 +271,8 @@ void BerlinComposer::emitPad(int bar, std::vector<Event>& out)
     };
 
     if (!active(Pad, bar)) { if (padChord_ >= 0) release(t); return; }
+    const bool loud = bigStart(bar) || stopBar(bar);
+    if (loud && padChord_ >= 0) release(t); // struck again, all of it
 
     const int c = chordAt(bar);
     if (c != padChord_)
@@ -293,7 +297,7 @@ void BerlinComposer::emitPad(int bar, std::vector<Event>& out)
             next[v] = best;
         }
 
-        const float vel = .45f + .2f * energyAt(bar);
+        const float vel = loud ? .9f : .45f + .2f * energyAt(bar);
         for (int p : padVoices_)
             if (wasSounding && std::find(next.begin(), next.end(), p) == next.end())
                 out.push_back({ t, Event::NoteOff, Pad, uint8_t(p), 0 });
@@ -314,7 +318,8 @@ void BerlinComposer::emitPad(int bar, std::vector<Event>& out)
         padStruck_ = bar;
     }
 
-    if (bar == totalBars() - 1) release(t + kBarTicks);
+    if (stopBar(bar)) release(t + kHit - 20);
+    else if (bar == totalBars() - 1) release(t + kBarTicks);
 }
 
 void BerlinComposer::emitSequence(int track, int bar, std::vector<Event>& out)
@@ -339,16 +344,25 @@ void BerlinComposer::emitSequence(int track, int bar, std::vector<Event>& out)
         }
         return;
     }
+    if (track == Seq && stopBar(bar))
+    {
+        const int64_t t = int64_t(bar) * kBarTicks;
+        const int p = stepPitch(Seq, bar, 0);
+        out.push_back({ t, Event::NoteOn, Seq, uint8_t(p), .95f });
+        out.push_back({ t + kHit - 20, Event::NoteOff, Seq, uint8_t(p), 0 });
+        return;
+    }
     const int stop = fig ? 4 : 16; // the upper sequence stops after the figure's first beat
 
     for (int i = 0; i < stop; ++i)
     {
         // The upper sequence runs in its own length (10, 12, 14) against the 16-step bar.
         const auto& s = pat[size_t(track == Bass ? i : (bar * 16 + i) % len)];
-        if (!s.on || s.rank >= limit) continue;
+        const bool downbeat = i == 0 && track == Seq && bigStart(bar); // a big part's first downbeat always sounds
+        if (!downbeat && (!s.on || s.rank >= limit)) continue;
         const int64_t t = int64_t(bar) * kBarTicks + i * kSixteenth;
-        const int64_t off = t + int64_t(s.gate * kSixteenth);
-        float vel = std::clamp(float(.5 + .35 * e + (s.accent ? .15 : 0) + .06 * (rng_.uniform() - .5)), .05f, 1.0f);
+        const int64_t off = t + int64_t((downbeat && !s.on ? .9f : s.gate) * kSixteenth);
+        float vel = std::clamp(float(.5 + .35 * e + (s.accent ? .15 : 0) + .06 * (rng_.uniform() - .5) + (i == 0 && bigStart(bar) ? .35 : 0)), .05f, 1.0f);
         int p = stepPitch(track, bar, s.deg);
         out.push_back({ t, Event::NoteOn, uint8_t(track), uint8_t(p), vel });
         out.push_back({ off, Event::NoteOff, uint8_t(track), uint8_t(p), 0 });
@@ -402,8 +416,10 @@ void BerlinComposer::emitLeadPhrase(int bar, std::vector<Event>& out)
             p = foldInto(p, kRange[Lead][0], kRange[Lead][1]);
             const int64_t t = int64_t(b0) * kBarTicks + n.start;
             const float vel = std::clamp(.55f + .3f * energyAt(nb) + (k == 0 ? .08f : 0.0f), 0.0f, 1.0f);
+            int64_t off = t + int64_t(n.dur * 0.92);
+            if (!clip(t, off)) continue;
             out.push_back({ t, Event::NoteOn, Lead, uint8_t(p), vel });
-            out.push_back({ t + int64_t(n.dur * 0.92), Event::NoteOff, Lead, uint8_t(p), 0 });
+            out.push_back({ off, Event::NoteOff, Lead, uint8_t(p), 0 });
         }
     }
 }
@@ -430,6 +446,12 @@ void BerlinComposer::generateBar(int bar, std::vector<Event>& out)
     if (active(Lead, bar) && (bar - sec.startBar) % 4 == 0) emitLeadPhrase(bar, out);
     emitSolo(bar, out);
     emitGuitar(bar, out);
+    emitSub(bar, out);
+    if (const int64_t s = silenceFrom(bar); s >= 0)
+    {
+        out.push_back({ s, Event::Hush, 0, 0, 0 });
+        out.push_back({ int64_t(bar + 1) * kBarTicks, Event::Hush, 0, 0, 1 });
+    }
 }
 
 const char* BerlinComposer::endFigure(int bar) const
@@ -437,6 +459,8 @@ const char* BerlinComposer::endFigure(int bar) const
     // The last bar of every part but the final one; into a rise a figure that pushes, into a fall one
     // that stops. All start on the downbeat (the bass keeps its spine), all on the chord they are in.
     if (bar + 1 >= totalBars() || sectionOfBar_[size_t(bar + 1)] == sectionOfBar_[size_t(bar)]) return nullptr;
+    if (stopBar(bar)) return "X...............";
+    if (bigStart(bar + 1)) return "X.......x.x....."; // into a big part from a quiet one: a beat of silence before it
     static const char* up[] = { "X.......x.x.xXXX", "X..x..x..x..x..x", "X.......x...X..." };
     static const char* down[] = { "X..x..x.X.......", "X.x...x.x...X.X." };
     const int si = sectionOfBar_[size_t(bar)];
@@ -472,6 +496,7 @@ void BerlinComposer::emitGuitar(int bar, std::vector<Event>& out)
         }
         return;
     }
+    if (bigStart(bar)) { chord(t0, kBarTicks - 20, .95f); return; }
     const float e = energyAt(bar);
     const bool summit = std::strcmp(sectionAt(bar).name, "Summit") == 0;
     const int in = bar - sectionAt(bar).startBar;
@@ -482,6 +507,61 @@ void BerlinComposer::emitGuitar(int bar, std::vector<Event>& out)
         chord(t0 + 2 * kPPQ, (summit ? 6 : 8) * six - 20, .8f);
         if (summit) { chord(t0 + 14 * six, six - 20, .38f); chord(t0 + 15 * six, six - 20, .42f); }
     }
+}
+
+bool BerlinComposer::stopBar(int bar) const
+{
+    // Kerem, 2026-11-02: "attacks that establish silence at the end of the parts which are just big, and
+    // those main parts start on a big sound". A big part (Song, Theme, Shift, Summit) ends on one attack of
+    // the whole band on the downbeat of its last bar, then nothing until the next part's downbeat.
+    return bar >= 0 && bar + 1 < totalBars() && sectionOfBar_[size_t(bar + 1)] != sectionOfBar_[size_t(bar)]
+        && sectionAt(bar).energy >= .6f;
+}
+
+bool BerlinComposer::bigStart(int bar) const
+{
+    if (bar < 0 || bar >= totalBars()) return false;
+    auto& sec = sectionAt(bar);
+    return bar == sec.startBar && sec.energy >= .6f;
+}
+
+int64_t BerlinComposer::silenceFrom(int bar) const
+{
+    // After a big part's stop, and on the last beat before a big part that follows a quiet one.
+    if (bar < 0 || bar + 1 >= totalBars()) return -1;
+    if (stopBar(bar)) return int64_t(bar) * kBarTicks + kHit;
+    if (bigStart(bar + 1)) return int64_t(bar) * kBarTicks + 12 * kSixteenth;
+    return -1;
+}
+
+bool BerlinComposer::clip(int64_t on, int64_t& off) const
+{
+    // A note that would begin in a silence is dropped; one ringing into it ends where the silence begins.
+    const int b = int(on / kBarTicks);
+    if (const int64_t s = silenceFrom(b); s >= 0 && on >= s) return false;
+    for (int x = b; x <= int(off / kBarTicks) && x < totalBars(); ++x)
+        if (const int64_t s = silenceFrom(x); s >= 0) off = std::min(off, s - 20);
+    return off > on;
+}
+
+void BerlinComposer::emitSub(int bar, std::vector<Event>& out)
+{
+    // The sub (Kerem, 2026-11-02: "sub bass root notes on the long parts, good fat sub bass"): through the
+    // big parts the chord's root, an octave under the bass (E1 to E2), held from one chord change to the
+    // next, struck where a part begins and cut with the band at the stop.
+    const int64_t t = int64_t(bar) * kBarTicks;
+    auto release = [&](int64_t at) { if (subNote_ >= 0) out.push_back({ at, Event::NoteOff, Sub, uint8_t(subNote_), 0 }); subNote_ = -1; };
+    if (!active(Sub, bar)) { release(t); return; }
+    const int p = foldInto(24 + tonicPc_ + degreeSemis(modeAt(bar), chordAt(bar)), kRange[Sub][0], kRange[Sub][1]);
+    const bool begin = bar == sectionAt(bar).startBar;
+    if (p != subNote_ || begin)
+    {
+        release(t);
+        out.push_back({ t, Event::NoteOn, Sub, uint8_t(p), begin ? 1.0f : .85f });
+        subNote_ = p;
+    }
+    if (stopBar(bar)) release(t + kHit - 20);
+    else if (bar == totalBars() - 1) release(t + kBarTicks);
 }
 
 bool BerlinComposer::soloFloor(int bar) const
@@ -578,8 +658,8 @@ std::string BerlinComposer::describe() const
 const SceneInfo& sceneInfo(const std::string& scene)
 {
     static const SceneInfo berlin {
-        "berlin", 6, { "pad", "bass", "seq", "lead", "guitar", "solo" }, { 0, 1, 2, 3, 1, 3 },
-        { { .15f, .35f }, { .05f, .15f }, { .35f, .25f }, { .30f, .35f }, { .05f, .15f }, { .30f, .40f } }, { -1, -1, -1, -1, -1, -1 }, {}, false,
+        "berlin", 7, { "pad", "bass", "seq", "lead", "guitar", "solo", "sub" }, { 0, 1, 2, 3, 1, 3, 1 },
+        { { .15f, .35f }, { .05f, .15f }, { .35f, .25f }, { .30f, .35f }, { .05f, .15f }, { .30f, .40f }, { 0, .03f } }, { -1, -1, -1, -1, -1, -1, -1 }, {}, false,
     };
     // The chorale: each voice its own track (and its own delay), the voices change sound as one.
     static const SceneInfo chorale {

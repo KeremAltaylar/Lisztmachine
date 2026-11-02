@@ -55,3 +55,8 @@ gain seq      4.3
 gain lead    -0.6
 return delay  12
 return reverb 12
+
+# The sub, 2026-11-02 (Kerem: "sub bass root notes on the long parts, good fat sub bass"): the engine's
+# sine (a little second harmonic, held without fading), driven for the harmonics that make it heard.
+sub     -13.0      40  internal/sub   # at 0 it sat 11 dB over the bass; now 2 dB under it
+drive sub  0.55 2500

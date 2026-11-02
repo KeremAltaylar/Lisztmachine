@@ -11,8 +11,8 @@ constexpr int kSixteenth = kPPQ / 4;
 constexpr int kBarTicks = 4 * kPPQ;       // 4/4 throughout this scene
 
 // The Berlin scene's tracks. Other scenes name their own (see SceneInfo).
-enum Track : uint8_t { Pad, Bass, Seq, Lead, Guitar, Solo, kNumTracks };
-inline const char* kTrackNames[kNumTracks] = { "pad", "bass", "seq", "lead", "guitar", "solo" };
+enum Track : uint8_t { Pad, Bass, Seq, Lead, Guitar, Solo, Sub, kNumTracks };
+inline const char* kTrackNames[kNumTracks] = { "pad", "bass", "seq", "lead", "guitar", "solo", "sub" };
 
 constexpr int kMaxTracks = 20;
 
@@ -42,12 +42,12 @@ const SceneInfo& sceneInfo(const std::string& scene);
 
 struct Event
 {
-    enum Type : uint8_t { NoteOff, NoteOn, Level, Filter, Throw }; // order = dispatch order at equal ticks
+    enum Type : uint8_t { NoteOff, NoteOn, Level, Filter, Throw, Hush }; // order = dispatch order at equal ticks
     int64_t tick;
     Type type;
     uint8_t track;
     uint8_t pitch;
-    float value; // NoteOn: velocity 0..1 · Level: gain 0..1 · Filter: cutoff offset -1..1 · Throw: beats into the echo
+    float value; // NoteOn: velocity 0..1 · Level: gain 0..1 · Filter: cutoff offset -1..1 · Throw: beats into the echo · Hush: 0 silence, 1 open
 
     bool operator<(const Event& o) const
     {
@@ -128,8 +128,11 @@ public:
     int chordAt(int bar) const { return chordOfBar_[size_t(bar)]; }
 
     // Pitch ranges, also used by the tests.
-    static constexpr int kRange[kNumTracks][2] = { { 48, 76 }, { 28, 52 }, { 52, 81 }, { 60, 88 }, { 28, 64 }, { 62, 86 } };
+    static constexpr int kRange[kNumTracks][2] = { { 48, 76 }, { 28, 52 }, { 52, 81 }, { 60, 88 }, { 28, 64 }, { 62, 86 }, { 28, 40 } };
     const char* endFigure(int bar) const;           // the part's end: the figure its last bar plays, or nullptr
+    bool stopBar(int bar) const;                    // the last bar of a big part: one attack together, then silence
+    static constexpr int64_t kHit = 3 * kSixteenth; // how long that attack rings
+    int64_t silenceFrom(int bar) const;             // where this bar falls silent until the next downbeat, or -1
 
 private:
     void planForm();
@@ -147,6 +150,9 @@ private:
     void emitLeadPhrase(int bar, std::vector<Event>& out);
     void emitGuitar(int bar, std::vector<Event>& out);
     bool soloFloor(int bar) const;
+    bool bigStart(int bar) const;
+    bool clip(int64_t on, int64_t& off) const;
+    void emitSub(int bar, std::vector<Event>& out);
     void emitSolo(int bar, std::vector<Event>& out);
     void emitAutomation(int bar, std::vector<Event>& out);
 
@@ -164,6 +170,7 @@ private:
 
     std::array<int, 4> padVoices_ {};
     int padChord_ = -1, padStruck_ = 0; // the chord sounding, and the bar it was struck
+    int subNote_ = -1; // the sub's held root
     int soloLeft_ = 0, soloRest_ = 0, soloPitch_ = -1, soloDir_ = 1; // the solo phrase: bars left, bars of breath, where the line is
 };
 

@@ -450,6 +450,9 @@ private:
     float duckEnv_ = 0, duckTarget_ = 0, duckDecay_ = 1;
     int duckRamp_ = 0;
     std::vector<float> duckCurve_;
+    float hush_ = 1, hushTarget_ = 1;               // the whole mix, tracks and returns: 0 at a stop's silence
+    std::vector<float> hushCurve_;
+    std::vector<std::pair<int, float>> hushAt_;    // this chunk's hush events: sample, target
     std::vector<std::pair<int, float>> kickHits_; // this chunk's kicks: sample, velocity
 
     double clickPhase_ = 0, clickFreq_ = 0, clickEnv_ = 0;

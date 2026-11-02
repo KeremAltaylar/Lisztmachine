@@ -67,6 +67,8 @@ int main()
                     CHECK(b < c.totalBars() && inMode(c.modeAt(b), c.tonicPc(), x.pitch),
                           "%s pitch %d not in %s at bar %d", kTrackNames[x.track], x.pitch, c.modeAt(b).name, b);
                     CHECK(x.value > 0 && x.value <= 1, "velocity %f", x.value);
+                    CHECK(!(c.silenceFrom(b) >= 0 && x.tick >= c.silenceFrom(b)),
+                          "%s note %d in a silence at bar %d", kTrackNames[x.track], x.pitch, b);
                     if (x.track == Bass || x.track == Seq)
                         CHECK(x.tick % kSixteenth == 0, "sequencer note off the grid at tick %lld", (long long) x.tick);
                     if (x.track == Lead && x.tick % (2 * kPPQ) == 0)
