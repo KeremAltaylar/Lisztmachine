@@ -19,7 +19,7 @@
   --accent: #b9475c; --accent-ink: #fff6f8; --warn: #a8650a; --meter: #2f8a55; --hot: #c4362a; color-scheme: light }
 body { background: var(--bg); color: var(--ink); font: 14px/1.45 var(--body);
   padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 20px 32px; }
-main { max-width: 1280px; margin: 0 auto; display: grid; gap: 18px; }
+main { max-width: 1280px; margin: 0 auto; display: grid; grid-template-columns: minmax(0, 1fr); gap: 18px; }
 header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 16px; justify-content: space-between; }
 h1 { font: 600 30px/1 var(--display); letter-spacing: .02em; margin: 0; text-wrap: balance; }
 .lede { color: var(--dim); max-width: 62ch; margin: 4px 0 0; }
@@ -134,7 +134,7 @@ let BPM = 150, BAR = 4 * 60 / BPM, SONG = "blackgaze"; // the song, from the man
 let BASE = {}, MASTER = 9.3, RETURNS = {}, FB = null; // FB: the song's feedback bus (beats, amount, feeds), if it has one // the palette's balance (from the manifest); a fader adds to it
 let LABEL = { pad: "Pads", metal: "Metal", perc: "Perc", bass: "Bass", sub: "808", arp: "Lead", chord: "Keys", fx: "Noise", harm: "Choir",
   ground: "Iron", body: "Plate", mallet: "Glass", texture: "Scrape", impact: "Impact", riff: "Guitar", delay: "Echo", reverb: "Reverb", pulse: "Pulse", tick: "Tick", drone: "Drone", feedback: "Feedback" };
-const ORDER = ["riff", "drone", "feedback", "arp", "chord", "pad", "harm", "bass", "sub", "ground", "body", "metal", "perc", "impact", "texture", "fx", "mallet", "pulse", "tick", "delay", "reverb"];
+const ORDER = ["riff", "drone", "feedback", "arp", "chord", "pad", "seq", "lead", "guitar", "harm", "soprano", "alto", "tenor", "bass", "sub", "ground", "body", "metal", "perc", "impact", "texture", "fx", "mallet", "pulse", "tick", "drums", "micro", "blips", "piano", "delay", "reverb"];
 
 const $ = id => document.getElementById(id);
 let man = null, cur = 0, ctx = null, glue = null, sum = null, mAn = null, buffers = {}, sources = [], strips = {};
@@ -165,6 +165,8 @@ async function boot() {
     $("fbAmt").oninput = () => { mix.fb.amount = +$("fbAmt").value; changed(); };
     for (const s in FB.feeds) $("fd-" + s).oninput = () => { mix.fb.feeds[s] = +$("fd-" + s).value; changed(); };
   }
+  // a stem the list above does not know still gets a fader, just before the returns
+  for (const x of man.sections) for (const s of x.stems) if (!ORDER.includes(s)) ORDER.splice(ORDER.length - 2, 0, s);
   const allStems = ORDER.filter(s => man.sections.some(x => x.stems.includes(s)));
   $("rail").innerHTML = man.sections.map((s, k) => `<button type="button" data-k="${k}" aria-pressed="${k === 0}">
     <b>${s.name}</b><small>bars ${Math.round(s.start / BAR) + 1}–${Math.round(s.end / BAR)}</small></button>`).join("");
@@ -234,7 +236,7 @@ function lines() {
     const t = mix.tracks[s]; if (!t) continue;
     if (s === "delay" || s === "reverb" || s === "feedback") { if (t.mute) out.push(`# ${s} bus muted`); else if (t.db) out.push(`return ${s.padEnd(7)}${((RETURNS[s] || 0) + t.db).toFixed(1).padStart(6)}   # was ${(RETURNS[s] || 0).toFixed(1)}`); if (t.lowcut) out.push(`# ${s} bus low cut ${t.lowcut} Hz`); continue; }
     if (t.mute) out.push(`# ${s} muted (${LABEL[s]})`);
-    else if (t.db) out.push(`gain ${s.padEnd(8)}${(BASE[s] + t.db).toFixed(1).padStart(6)}   # was ${BASE[s].toFixed(1)}, ${LABEL[s]} ${fmt(t.db)}`);
+    else if (t.db) out.push(`gain ${s.padEnd(8)}${((BASE[s] ?? 0) + t.db).toFixed(1).padStart(6)}   # was ${(BASE[s] ?? 0).toFixed(1)}, ${LABEL[s]} ${fmt(t.db)}`);
     if (t.lowcut) out.push(`lowcut ${s} ${t.lowcut}`);
   }
   if (FB) {
