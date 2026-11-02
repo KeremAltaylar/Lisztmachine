@@ -1,7 +1,6 @@
 // Checks on the composer alone, over many seeds. Run: liszt_tests
 #include "Composer.h"
 #include "Chorale.h"
-#include "Yours.h"
 #include "Genres.h"
 #include <cmath>
 #include <cstdlib>
@@ -191,46 +190,6 @@ int main()
     CHECK(stepwise / steps > 0.5, "chorale melody only %.0f%% stepwise", 100 * stepwise / steps);
     std::printf("chorale: %d chord changes, %d parallels, melody %.0f%% stepwise\n", chordsChecked, parallels, 100 * stepwise / steps);
 
-    // ---- Let All Be Yours
-    for (seed = 1; seed <= 24; ++seed)
-    {
-        using Y = YoursComposer;
-        Y c(seed), again(seed);
-        auto ev = generateAll(c);
-        auto ev2 = generateAll(again);
-        CHECK(ev.size() == ev2.size() && std::equal(ev.begin(), ev.end(), ev2.begin(), [](auto& a, auto& b) {
-                  return a.tick == b.tick && a.type == b.type && a.track == b.track && a.pitch == b.pitch && a.value == b.value;
-              }), "yours: same seed must give the same piece");
-        const double minutes = c.totalBars() * 4 / c.bpm();
-        CHECK(minutes > 8.5 && minutes < 10.5, "yours length %.1f min", minutes);
-        std::map<std::pair<int, int>, int> held;
-        std::set<std::pair<int, int64_t>> onsets;
-        for (auto& x : ev)
-        {
-            const auto key = std::make_pair(int(x.track), int(x.pitch));
-            if (x.type == Event::NoteOn)
-            {
-                CHECK(held[key] == 0, "yours double trigger track %d pitch %d at tick %lld", x.track, x.pitch, (long long) x.tick);
-                CHECK(x.value > 0 && x.value <= 1, "yours velocity %f", x.value);
-                CHECK(x.pitch >= Y::kRange[x.track][0] && x.pitch <= Y::kRange[x.track][1], "yours track %d pitch %d out of range", x.track, x.pitch);
-                // everything pitched stays in the tonic's phrygian: no note outside the key
-                if (x.track != Y::Hats || x.pitch < 96) // the ticks and the iron are tuned too, to the tonic and its fifth
-                    CHECK(inMode(kPhrygian, c.tonicPc(), x.pitch), "yours track %d pitch %d outside the key", x.track, x.pitch);
-                ++held[key];
-                onsets.insert({ int(x.track), x.tick });
-            }
-            else if (x.type == Event::NoteOff) { CHECK(held[key] == 1, "yours note-off without note-on track %d pitch %d", x.track, x.pitch); --held[key]; }
-        }
-        for (auto& [k, n] : held) CHECK(n == 0, "yours stuck note track %d pitch %d", k.first, k.second);
-        // four on the floor: a kick on every beat wherever the kick plays (drop bars excepted)
-        int beats = 0, missing = 0;
-        for (int bar = 0; bar < c.totalBars(); ++bar)
-            if (c.active(Y::Kick, bar))
-                for (int b = 0; b < 4; ++b) { ++beats; missing += !onsets.count({ int(Y::Kick), int64_t(bar) * kBarTicks + b * kPPQ }); }
-        CHECK(beats > 600 && missing <= beats / 60, "yours: %d of %d beats without a kick", missing, beats);
-    }
-    seed = 0;
-
     // ---- the genre songs
     for (auto* spec : GenreComposer::all())
     {
@@ -299,6 +258,5 @@ int main()
     std::printf("%s (%d failures)\n", failures ? "FAILED" : "all checks passed", failures);
     std::printf("e.g. seed 1: %s\n", BerlinComposer(1).describe().c_str());
     std::printf("      chorale: %s\n", ChoraleComposer(1).describe().c_str());
-    std::printf("      let all be yours: %s\n", YoursComposer(1).describe().c_str());
     return failures ? 1 : 0;
 }

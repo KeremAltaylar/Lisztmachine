@@ -74,7 +74,6 @@ nav button[aria-pressed="true"] { color: var(--ember); }
     <div class="pieces" id="pieces">
       <button class="go" id="piece-chorale" data-piece="chorale" disabled>Chorale</button>
       <button class="go" id="piece-berlin" data-piece="berlin" disabled>Berlin</button>
-      <button class="go" id="piece-yours" data-piece="yours" disabled>Let All Be Yours</button>
       <button class="go" id="piece-jungle" data-piece="jungle" disabled>Liquid</button>
       <button class="go" id="piece-ecstatic" data-piece="ecstatic" disabled>Ecstatic Arpeggios</button>
       <button class="go" id="piece-noir" data-piece="noir" disabled>Noir</button>
@@ -136,9 +135,6 @@ const PIECES = {
   berlin: { name: 'Berlin', study: 'dust', media: 'media/seed1', ranges: [[48, 76], [28, 52], [52, 81], [60, 88]],
     world: { name: 'Sodium Night', lo: [0.2, 0.55, 1.0], hi: [0.92, 0.97, 1.0],  // cold teal night, steel white, sodium accents
       palette: [[0.3, 0.9, 1], [0.5, 0.65, 1], [1, 0.55, 0.15], [0.9, 0.95, 1], [0.2, 1, 0.8], [1, 0.3, 0.55]] } },
-  yours: { name: 'Let All Be Yours', study: 'horizon', strobeBeats: 1, media: 'media/yours1', ranges: [[36, 76], [24, 56], [39, 74], [33, 77]],
-    world: { name: 'Acid', lo: [0.55, 0.15, 1.0], hi: [0.78, 1.0, 0.42],         // ultraviolet shadows, acid green light, blood
-      palette: [[0.6, 1, 0.15], [0.62, 0.2, 1], [1, 0.08, 0.12], [1, 1, 1], [1, 0.15, 0.75], [0.85, 1, 0.3]] } },
   // The genre songs (named for their genre until Kerem names them). Ranges by role from the
   // composer's registers: harmony pad and chords, bass kick sub and bass, rhythm snare hats perc, melody the arpeggio.
   jungle: { name: 'Liquid', study: 'tunnel', strobeBeats: 1, media: 'media/jungle1', ranges: [[36, 86], [22, 64], [42, 62], [60, 86]],
@@ -1913,7 +1909,7 @@ async function boot() {
   device.addEventListener('uncapturederror', e => { window.__errors.push(e.error.message); console.error(e.error.message); });
   device.lost.then(info => fail('The graphics device was lost: ' + info.message + '. Reload the page.'));
 
-  // Which piece: from the start screen (or #chorale / #berlin / #yours in the address).
+  // Which piece: from the start screen (or #chorale / #berlin in the address).
   const piece = PIECES[location.hash.slice(1)] ?? await new Promise(res => {
     for (const b of document.querySelectorAll('[data-piece]')) { b.disabled = false; b.onclick = () => res(PIECES[b.dataset.piece]); }
   });
@@ -2344,7 +2340,7 @@ async function boot() {
     D.cam[3] = (F.hit[1] * (0.05 + 0.35 * e) + pad.kick * 0.25) * CAM.shake / 50;
     let flash = D.fx[0] * Math.exp(-dt / 0.07);
     if (D.strobe && playing) {
-      // a flash on the bass; a piece can limit it (Let All Be Yours: once a beat, or the rolling 16ths whiten every frame)
+      // a flash on the bass; a piece can limit it (once a beat, or rolling 16ths whiten every frame)
       const gap = (piece.strobeBeats ?? 0) * 60 / show.bpm * 0.9;
       if (F.since[1] < dt && e > 0.4 && t - (D.flashAt ?? -9) >= gap) { flash = Math.max(flash, F.vel[1] * (e - 0.2) * 1.2); D.flashAt = t; }
       if (F.since[2] < dt && e > 0.85 && t - (D.flashAt ?? -9) >= gap) { flash = Math.max(flash, 0.35); D.flashAt = t; }

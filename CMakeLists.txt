@@ -48,7 +48,6 @@ endif()
 add_library(liszt_core STATIC
     src/core/Composer.cpp
     src/core/Chorale.cpp
-    src/core/Yours.cpp
     src/core/Genres.cpp)
 target_include_directories(liszt_core PUBLIC src/core)
 
