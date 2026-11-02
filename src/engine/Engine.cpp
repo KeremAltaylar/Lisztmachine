@@ -618,7 +618,7 @@ TrackMix mixFor(const std::string& name)
         { "riff", { .35f, 1.0f, 0, 60 } }, // the guitar: doubled left and right by its own two takes
     };
     for (auto& [n, m] : table) if (name == n) return m;
-    return { 0, 1, 0, 0 }; // the chorale's voices and anything else: as they are
+    return { 0, 1, 0, 0 }; // anything else: as it is
 }
 } // namespace
 
@@ -1039,7 +1039,7 @@ void Engine::start(uint64_t seed, int startBar)
     if (delay_ && reverb_)
     {
         // Their pitch modulation (the delay's tape wobble, the reverb's chorus) reads as detune
-        // under a pure-tuned chorale; Berlin keeps it.
+        // under pure-tuned voices; Berlin keeps it.
         setParameterText(*delay_, "Modulation Depth", palette_.info->pureBuses ? "0 cents" : "8 cents");
         setParameterText(*reverb_, "Reverb Modulation", palette_.info->pureBuses ? "0 %" : "60 %");
         setParameterText(*delay_, "Delay Time Left", juce::String(delaySeconds_[0] * 1000.0, 2) + " ms");

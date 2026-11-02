@@ -72,7 +72,6 @@ nav button[aria-pressed="true"] { color: var(--ember); }
     <p class="meta" id="meta">Choose a piece</p>
     <p class="lede">Ten pieces and eight generative light studies for projecting onto the drummer, blending into each other. Each one reads the music itself: every note, every chord and the level of each part, so the light lands exactly with the sound.</p>
     <div class="pieces" id="pieces">
-      <button class="go" id="piece-chorale" data-piece="chorale" disabled>Chorale</button>
       <button class="go" id="piece-berlin" data-piece="berlin" disabled>Berlin</button>
       <button class="go" id="piece-jungle" data-piece="jungle" disabled>Liquid</button>
       <button class="go" id="piece-ecstatic" data-piece="ecstatic" disabled>Ecstatic Arpeggios</button>
@@ -129,9 +128,6 @@ nav button[aria-pressed="true"] { color: var(--ember); }
 // A colour world per piece: the shadows lean to lo, the light to hi, and the director's cuts recolour
 // the light from its palette.
 const PIECES = {
-  chorale: { name: 'Chorale', study: 'lumen', media: 'media/chorale1', ranges: [[36, 81], [26, 64], [55, 108], [60, 100]],
-    world: { name: 'Cathedral', lo: [0.42, 0.32, 1.0], hi: [1.0, 0.82, 0.55],    // violet shadows, candle gold
-      palette: [[1, 0.66, 0.22], [1, 0.86, 0.5], [0.85, 0.12, 0.18], [0.55, 0.3, 1], [1, 0.95, 0.85], [0.95, 0.45, 0.2]] } },
   berlin: { name: 'Berlin', study: 'dust', media: 'media/seed1', ranges: [[48, 76], [28, 52], [52, 81], [60, 88]],
     world: { name: 'Sodium Night', lo: [0.2, 0.55, 1.0], hi: [0.92, 0.97, 1.0],  // cold teal night, steel white, sodium accents
       palette: [[0.3, 0.9, 1], [0.5, 0.65, 1], [1, 0.55, 0.15], [0.9, 0.95, 1], [0.2, 1, 0.8], [1, 0.3, 0.55]] } },
@@ -159,7 +155,7 @@ const PIECES = {
     world: { name: 'Sunbather', lo: [0.6, 0.15, 0.35], hi: [1.0, 0.8, 0.7],        // rose shadows on black, a pale gold dawn
       palette: [[1, 0.6, 0.65], [1, 0.85, 0.6], [0.9, 0.3, 0.5], [1, 1, 1], [0.7, 0.5, 1], [1, 0.45, 0.35]] } },
 };
-let RANGE = PIECES.chorale.ranges;
+let RANGE = PIECES.berlin.ranges;
 const TAU = [1.2, 0.28, 0.16, 0.4];                          // how long a note-on lights up, seconds
 const L01 = rms => Math.min(1, Math.max(0, (20 * Math.log10(rms + 1e-9) + 54) / 42)); // -54..-12 dBFS
 const lowerBound = (a, t) => { let lo = 0, hi = a.length; while (lo < hi) { const m = (lo + hi) >> 1; if (a[m][0] < t) lo = m + 1; else hi = m; } return lo; };
@@ -1909,7 +1905,7 @@ async function boot() {
   device.addEventListener('uncapturederror', e => { window.__errors.push(e.error.message); console.error(e.error.message); });
   device.lost.then(info => fail('The graphics device was lost: ' + info.message + '. Reload the page.'));
 
-  // Which piece: from the start screen (or #chorale / #berlin in the address).
+  // Which piece: from the start screen (or #berlin / #jungle ... in the address).
   const piece = PIECES[location.hash.slice(1)] ?? await new Promise(res => {
     for (const b of document.querySelectorAll('[data-piece]')) { b.disabled = false; b.onclick = () => res(PIECES[b.dataset.piece]); }
   });

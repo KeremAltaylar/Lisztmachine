@@ -1,5 +1,4 @@
 #include "Composer.h"
-#include "Chorale.h"
 #include "Genres.h"
 #include <algorithm>
 #include <cmath>
@@ -661,22 +660,12 @@ const SceneInfo& sceneInfo(const std::string& scene)
         "berlin", 7, { "pad", "bass", "seq", "lead", "guitar", "solo", "sub" }, { 0, 1, 2, 3, 1, 3, 1 },
         { { .15f, .35f }, { .05f, .15f }, { .35f, .25f }, { .30f, .35f }, { .05f, .15f }, { .30f, .40f }, { 0, .03f } }, { -1, -1, -1, -1, -1, -1, -1 }, {}, false,
     };
-    // The chorale: each voice its own track (and its own delay), the voices change sound as one.
-    static const SceneInfo chorale {
-        "chorale", 10, { "soprano", "alto", "tenor", "bass", "sub", "drums", "micro", "blips", "piano", "guitar" },
-        { 0, 0, 0, 0, 1, 1, 2, 2, 3, 1 },
-        { { 0, .30f }, { 0, .30f }, { 0, .30f }, { 0, .26f }, { 0, .04f }, { .04f, .12f }, { .22f, .12f }, { .28f, .22f }, { .15f, .28f }, { .12f, .20f } },
-        { -1, 0, 0, 0, -1, -1, -1, -1, -1, -1 },
-        { 1, 1, 1, 1, 0, 0, 0, 0, 2, 1 }, // the piano keeps its oscillator tuning: rounding it put its patches an octave off
-        true,
-    };
     if (auto* g = genreSceneInfo(scene)) return *g;
-    return scene == "chorale" ? chorale : berlin;
+    return berlin;
 }
 
 std::unique_ptr<Composer> makeComposer(const std::string& scene, uint64_t seed)
 {
-    if (scene == "chorale") return std::make_unique<ChoraleComposer>(seed);
     if (auto* g = GenreComposer::find(scene)) return std::make_unique<GenreComposer>(*g, seed);
     return std::make_unique<BerlinComposer>(seed);
 }

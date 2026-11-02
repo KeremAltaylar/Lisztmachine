@@ -4,7 +4,7 @@
 //                [--patch bass="Basses/Bass 1"]  (repeatable; any Surge factory patch)
 //                [--from Summit|<bar>] [--bars N]  start at a section or bar; render N bars + tail
 //                [--dry]                           no delay or reverb
-//                [--scene berlin|chorale]          which composer (and its palette, sounds/<scene>.txt)
+//                [--scene berlin|jungle|...]       which composer (and its palette, sounds/<scene>.txt)
 //                [--palette berlin]                sounds/<name>.txt
 //                                                             render a concert (+ .mid and .sections.txt)
 //   liszt_render --audition "Category/Patch" [note] [--pure] hold one note on a Surge patch, measure it
@@ -229,7 +229,7 @@ static int audition(const juce::String& patch, int note, bool pure)
     return 0;
 }
 
-static std::string sceneName = "berlin"; // --scene berlin|chorale
+static std::string sceneName = "berlin"; // --scene, one of kScenes
 
 static void writeMidi(uint64_t seed, const juce::File& file)
 {
