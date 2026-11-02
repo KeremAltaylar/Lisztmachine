@@ -11,8 +11,8 @@ constexpr int kSixteenth = kPPQ / 4;
 constexpr int kBarTicks = 4 * kPPQ;       // 4/4 throughout this scene
 
 // The Berlin scene's tracks. Other scenes name their own (see SceneInfo).
-enum Track : uint8_t { Pad, Bass, Seq, Lead, Guitar, kNumTracks };
-inline const char* kTrackNames[kNumTracks] = { "pad", "bass", "seq", "lead", "guitar" };
+enum Track : uint8_t { Pad, Bass, Seq, Lead, Guitar, Solo, kNumTracks };
+inline const char* kTrackNames[kNumTracks] = { "pad", "bass", "seq", "lead", "guitar", "solo" };
 
 constexpr int kMaxTracks = 20;
 
@@ -128,7 +128,7 @@ public:
     int chordAt(int bar) const { return chordOfBar_[size_t(bar)]; }
 
     // Pitch ranges, also used by the tests.
-    static constexpr int kRange[kNumTracks][2] = { { 48, 76 }, { 28, 52 }, { 52, 81 }, { 60, 88 }, { 28, 64 } };
+    static constexpr int kRange[kNumTracks][2] = { { 48, 76 }, { 28, 52 }, { 52, 81 }, { 60, 88 }, { 28, 64 }, { 62, 86 } };
     const char* endFigure(int bar) const;           // the part's end: the figure its last bar plays, or nullptr
 
 private:
@@ -146,6 +146,8 @@ private:
     void emitSequence(int track, int bar, std::vector<Event>& out);
     void emitLeadPhrase(int bar, std::vector<Event>& out);
     void emitGuitar(int bar, std::vector<Event>& out);
+    bool soloFloor(int bar) const;
+    void emitSolo(int bar, std::vector<Event>& out);
     void emitAutomation(int bar, std::vector<Event>& out);
 
     int tonicPc_ = 4;
@@ -161,7 +163,8 @@ private:
     std::vector<MotifNote> motif_;
 
     std::array<int, 4> padVoices_ {};
-    int padChord_ = -1;
+    int padChord_ = -1, padStruck_ = 0; // the chord sounding, and the bar it was struck
+    int soloLeft_ = 0, soloRest_ = 0, soloPitch_ = -1, soloDir_ = 1; // the solo phrase: bars left, bars of breath, where the line is
 };
 
 } // namespace liszt

@@ -7,7 +7,7 @@ CHECK = "--check" in sys.argv  # only the rebuild check, no mp3s
 base = wav[:-4]
 names = [l.split()[2] for l in open(base + ".sections.txt").read().splitlines()[1:]]
 times = [float(l.split()[0]) for l in open(base + ".sections.txt").read().splitlines()[1:]]
-stems = [s for s in "pad pulse metal tick perc bass sub arp chord fx harm ground body mallet texture impact riff drone seq lead guitar soprano alto tenor drums micro blips piano delay reverb feedback".split()
+stems = [s for s in "pad pulse metal tick perc bass sub arp chord fx harm ground body mallet texture impact riff drone seq lead solo guitar soprano alto tenor drums micro blips piano delay reverb feedback".split()
          if os.path.exists(f"{base}.{s}.wav")]
 os.makedirs(f"{page}/media", exist_ok=True)
 
@@ -25,7 +25,7 @@ sr = 48000
 LOOK = 72  # PeakLimiter look_
 mix = sf.read(wav, dtype="float32")[0]
 LABELS = dict(chorale=dict(soprano="Soprano", alto="Alto", tenor="Tenor", bass="Bass Voice", sub="Sub", drums="Logs", micro="Micro", blips="Blips", piano="Piano", guitar="Guitar"),
-              berlin=dict(pad="Pads", seq="Sequence", lead="Lead", guitar="Guitar"),
+              berlin=dict(pad="Pads", seq="Sequence", lead="Lead", solo="Soloist", guitar="Power Synth"),
               doom=dict(ground="Log", body="Skin", mallet="Bowl", texture="Chain", chord="Brass", fx="Unsettler"),
               halftime=dict(ground="Low Drums", body="Hand Drums", mallet="Bowl", texture="Chain", impact="Plate", perc="Deep Metal", fx="Unsettler", drone="Cello"),
               jungle=dict(ground="Low Logs", body="Hand Drums", mallet="Glass", texture="Rattle", impact="Plate", perc="Deep Metal", fx="Unsettler", chord="E.Piano", harm="Choir", riff="Brass Synth", drone="Voice Synth"),

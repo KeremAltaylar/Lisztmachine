@@ -11,7 +11,7 @@ namespace liszt {
 namespace {
 
 constexpr uint8_t bit(int t) { return uint8_t(1u << t); }
-constexpr uint8_t kAll = 0x1F;
+constexpr uint8_t kAll = 0x3F;
 
 // Chord-root transitions in the minor modes, rows/cols = i ii III iv v VI VII.
 // ii is never a target; its row only exists so every row is a distribution.
@@ -63,17 +63,18 @@ void BerlinComposer::planForm()
 {
     struct T { const char* name; int bars; float energy; uint16_t layers; bool theme; };
     static const T plan[] = {
-        { "Drift",     16, .15f, bit(Pad), false },
-        { "Pulse",     16, .30f, uint8_t(bit(Pad) | bit(Bass)), false },
-        { "Motion",    32, .50f, uint8_t(bit(Pad) | bit(Bass) | bit(Seq)), false },
+        // 2026-11-02 (Kerem: "shorten Berlin"): 288 bars to 176, about six and a half minutes; the Return
+        // is gone and the quiet parts are half as long. The soloist answers the lead and has the Shift to itself.
+        { "Drift",      8, .15f, bit(Pad), false },
+        { "Pulse",      8, .30f, uint8_t(bit(Pad) | bit(Bass)), false },
+        { "Motion",    16, .50f, uint8_t(bit(Pad) | bit(Bass) | bit(Seq)), false },
         { "Song",      32, .62f, kAll, false },
-        { "Haze",      16, .35f, uint8_t(bit(Pad) | bit(Seq)), false },
-        { "Return",    32, .72f, uint8_t(bit(Pad) | bit(Bass) | bit(Seq)), true },
+        { "Haze",       8, .35f, uint8_t(bit(Pad) | bit(Seq)), false },
         { "Theme",     32, .82f, kAll, true },
-        { "Shift",     32, .70f, kAll, false },
+        { "Shift",     16, .70f, uint8_t(kAll & ~bit(Lead)), false },
         { "Summit",    32, 1.0f, kAll, true },
-        { "Dissolve",  32, .30f, uint8_t(bit(Pad) | bit(Seq)), false },
-        { "Afterglow", 16, .05f, bit(Pad), false },
+        { "Dissolve",  16, .30f, uint8_t(bit(Pad) | bit(Seq) | bit(Solo)), false },
+        { "Afterglow",  8, .05f, bit(Pad), false },
     };
 
     int bar = 0;
@@ -301,6 +302,16 @@ void BerlinComposer::emitPad(int bar, std::vector<Event>& out)
                 out.push_back({ t, Event::NoteOn, Pad, uint8_t(p), vel });
         padVoices_ = next;
         padChord_ = c;
+        padStruck_ = bar;
+    }
+    else if (bar - padStruck_ >= 4)
+    {
+        // The sampled horns and tuba fade out within 14 s: a chord held longer is struck again every
+        // four bars, or a long chord in the calm parts went silent (20 s of nothing in the Pulse).
+        const float vel = .45f + .2f * energyAt(bar);
+        for (int p : padVoices_) out.push_back({ t, Event::NoteOff, Pad, uint8_t(p), 0 });
+        for (int p : padVoices_) out.push_back({ t, Event::NoteOn, Pad, uint8_t(p), vel });
+        padStruck_ = bar;
     }
 
     if (bar == totalBars() - 1) release(t + kBarTicks);
@@ -356,8 +367,7 @@ void BerlinComposer::emitSequence(int track, int bar, std::vector<Event>& out)
 void BerlinComposer::emitLeadPhrase(int bar, std::vector<Event>& out)
 {
     auto& sec = sectionAt(bar);
-    const int phrase = (bar - sec.startBar) / 4;
-    if (phrase % 3 == 2 && energyAt(bar) < .8f) return; // breathe: every third phrase rests
+    if (soloFloor(bar)) return; // the soloist's turn
 
     const bool summit = std::strcmp(sec.name, "Summit") == 0;
     for (int half = 0; half < 2; ++half)
@@ -418,6 +428,7 @@ void BerlinComposer::generateBar(int bar, std::vector<Event>& out)
     if (active(Bass, bar)) emitSequence(Bass, bar, out);
     if (active(Seq, bar)) emitSequence(Seq, bar, out);
     if (active(Lead, bar) && (bar - sec.startBar) % 4 == 0) emitLeadPhrase(bar, out);
+    emitSolo(bar, out);
     emitGuitar(bar, out);
 }
 
@@ -473,6 +484,87 @@ void BerlinComposer::emitGuitar(int bar, std::vector<Event>& out)
     }
 }
 
+bool BerlinComposer::soloFloor(int bar) const
+{
+    // Where the lead plays too, they take turns by four-bar phrase: the soloist answers every third
+    // phrase, every other one at the summit. Without the lead the floor is the soloist's.
+    if (!active(Solo, bar)) return false;
+    if (!active(Lead, bar)) return true;
+    auto& sec = sectionAt(bar);
+    const int phrase = (bar - sec.startBar) / 4;
+    return std::strcmp(sec.name, "Summit") == 0 ? phrase % 2 == 1 : phrase % 3 == 2;
+}
+
+void BerlinComposer::emitSolo(int bar, std::vector<Event>& out)
+{
+    // The soloist (Kerem, 2026-11-02: "add a lead soloist"): phrases of its own, two to four bars with a
+    // bar to breathe, answering the lead's motif and alone through the Shift and the Dissolve. Mostly steps
+    // of the mode, now and then a leap to a chord tone and back the other way, chord tones on the beats;
+    // long notes in the calm, eighths as it moves, runs of sixteenths at the top; every phrase ends long
+    // on a chord tone. Straight time, one voice. A part's last bar belongs to the band's figure.
+    if (!active(Solo, bar)) { soloLeft_ = soloRest_ = 0; soloPitch_ = -1; return; }
+    auto playable = [&](int b) { return b >= 0 && b < totalBars() && soloFloor(b) && !endFigure(b); };
+    if (!playable(bar)) { soloLeft_ = soloRest_ = 0; return; }
+    if (!playable(bar - 1)) soloRest_ = 0; // a turn begins at once
+    const float e = energyAt(bar);
+    bool start = false;
+    if (soloLeft_ == 0)
+    {
+        if (soloRest_ > 0) { --soloRest_; return; }
+        soloLeft_ = rng_.range(2, e > .7f ? 4 : 3);
+        start = true;
+    }
+    const bool last = --soloLeft_ == 0 || !playable(bar + 1);
+    if (last) { soloLeft_ = 0; soloRest_ = e > .8f ? 0 : 1; }
+
+    const int64_t t0 = int64_t(bar) * kBarTicks, q = kPPQ, h = kPPQ / 2;
+    std::vector<int64_t> on;
+    for (int b = 0; b < (last ? 3 : 4); ++b)
+    {
+        const int64_t s = b * q;
+        const double u = rng_.uniform();
+        if (e < .45f) { if (u < .5) on.push_back(s); else if (u < .75 && b < 2) { on.push_back(s); ++b; } else if (u < .85) on.push_back(s + h); }
+        else if (e < .8f) { if (u < .5) { on.push_back(s); on.push_back(s + h); } else if (u < .8) on.push_back(s); else if (u < .9) on.push_back(s + h); }
+        else
+        {
+            if (u < .4) { on.push_back(s); on.push_back(s + h); }
+            else if (u < .7) for (int k = 0; k < 4; ++k) on.push_back(s + k * q / 4);
+            else on.push_back(s);
+        }
+    }
+    if (on.empty()) on.push_back(0);
+
+    auto& m = modeAt(bar);
+    const int c = chordAt(bar);
+    auto isCT = [&](int p) {
+        for (int d : { 0, 2, 4 }) if ((tonicPc_ + degreeSemis(m, c + d)) % 12 == p % 12) return true;
+        return false;
+    };
+    auto toCT = [&](int p, int d) { for (int k = 0; k < 7; ++k) { if (isCT(p + d * k)) return p + d * k; if (isCT(p - d * k)) return p - d * k; } return p; };
+    auto stepIn = [&](int p, int d) { int x = p + d; while (!inMode(m, tonicPc_, x)) x += d; return x; };
+    const int lo = kRange[Solo][0], hi = kRange[Solo][1];
+    int p = soloPitch_ < 0 ? toCT(lo + (hi - lo) * 2 / 5, 1) : soloPitch_;
+    const int64_t cap = e < .45f ? 2 * q : q; // how long a note may ring before a rest
+    for (size_t i = 0; i < on.size(); ++i)
+    {
+        const bool onBeat = on[i] % q == 0, fin = last && i + 1 == on.size();
+        if (p > hi - 4) soloDir_ = -1;
+        else if (p < lo + 4) soloDir_ = 1;
+        else if (rng_.chance(.15)) soloDir_ = -soloDir_;
+        if (start && i == 0) p = toCT(p, soloDir_);                                                  // a phrase begins on a chord tone
+        else if (rng_.chance(.12)) { p = toCT(p + soloDir_ * rng_.range(5, 7), soloDir_); soloDir_ = -soloDir_; } // a leap, then back
+        else { const int n = stepIn(p, soloDir_); p = onBeat || fin ? toCT(n, soloDir_) : n; }
+        while (p > hi) p -= 12;
+        while (p < lo) p += 12;
+        const int64_t next = i + 1 < on.size() ? on[i + 1] : kBarTicks;
+        const int64_t len = fin ? kBarTicks - on[i] - 40 : std::min(next - on[i], cap) - 20;
+        const float vel = std::clamp(.55f + .3f * e + (onBeat ? .06f : 0.0f), .05f, 1.0f);
+        out.push_back({ t0 + on[i], Event::NoteOn, Solo, uint8_t(p), vel });
+        out.push_back({ t0 + on[i] + len, Event::NoteOff, Solo, uint8_t(p), 0 });
+    }
+    soloPitch_ = p;
+}
+
 std::string BerlinComposer::describe() const
 {
     static const char* names[] = { "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B" };
@@ -486,8 +578,8 @@ std::string BerlinComposer::describe() const
 const SceneInfo& sceneInfo(const std::string& scene)
 {
     static const SceneInfo berlin {
-        "berlin", 5, { "pad", "bass", "seq", "lead", "guitar" }, { 0, 1, 2, 3, 1 },
-        { { .15f, .35f }, { .05f, .15f }, { .35f, .25f }, { .30f, .35f }, { .05f, .15f } }, { -1, -1, -1, -1, -1 }, {}, false,
+        "berlin", 6, { "pad", "bass", "seq", "lead", "guitar", "solo" }, { 0, 1, 2, 3, 1, 3 },
+        { { .15f, .35f }, { .05f, .15f }, { .35f, .25f }, { .30f, .35f }, { .05f, .15f }, { .30f, .40f } }, { -1, -1, -1, -1, -1, -1 }, {}, false,
     };
     // The chorale: each voice its own track (and its own delay), the voices change sound as one.
     static const SceneInfo chorale {

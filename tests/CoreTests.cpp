@@ -46,7 +46,7 @@ int main()
               }), "same seed must give the same concert");
 
         double minutes = c.totalBars() * 4 / c.bpm();
-        CHECK(minutes > 8.5 && minutes < 11.5, "length %.1f min", minutes);
+        CHECK(minutes > 5.5 && minutes < 7.5, "length %.1f min", minutes);
 
         std::map<std::pair<int, int>, int> sounding; // (track, pitch) -> count
         size_t e = 0;

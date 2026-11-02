@@ -134,7 +134,7 @@ let BPM = 150, BAR = 4 * 60 / BPM, SONG = "blackgaze"; // the song, from the man
 let BASE = {}, MASTER = 9.3, RETURNS = {}, FB = null; // FB: the song's feedback bus (beats, amount, feeds), if it has one // the palette's balance (from the manifest); a fader adds to it
 let LABEL = { pad: "Pads", metal: "Metal", perc: "Perc", bass: "Bass", sub: "808", arp: "Lead", chord: "Keys", fx: "Noise", harm: "Choir",
   ground: "Iron", body: "Plate", mallet: "Glass", texture: "Scrape", impact: "Impact", riff: "Guitar", delay: "Echo", reverb: "Reverb", pulse: "Pulse", tick: "Tick", drone: "Drone", feedback: "Feedback" };
-const ORDER = ["riff", "drone", "feedback", "arp", "chord", "pad", "seq", "lead", "guitar", "harm", "soprano", "alto", "tenor", "bass", "sub", "ground", "body", "metal", "perc", "impact", "texture", "fx", "mallet", "pulse", "tick", "drums", "micro", "blips", "piano", "delay", "reverb"];
+const ORDER = ["riff", "drone", "feedback", "arp", "chord", "pad", "seq", "lead", "solo", "guitar", "harm", "soprano", "alto", "tenor", "bass", "sub", "ground", "body", "metal", "perc", "impact", "texture", "fx", "mallet", "pulse", "tick", "drums", "micro", "blips", "piano", "delay", "reverb"];
 
 const $ = id => document.getElementById(id);
 let man = null, cur = 0, ctx = null, glue = null, sum = null, mAn = null, buffers = {}, sources = [], strips = {};
