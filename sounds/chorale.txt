@@ -14,21 +14,21 @@
 # part   gain   bright  patch
 #   gain     dB for this patch: from the mean of two held notes (40 and 64), to -22 dB, minus 8 for four voices
 #   bright   spectral centroid in Hz, measured (orders dark -> bright over the piece)
-voices  -11.1    300  Keys/Organ 2
-voices    0.0    400  Pads/Still
-voices   -0.2   1000  Pads/Retro Choir
-voices   -3.6   1500  Pads/Sunday
-voices   -4.1   2700  Pads/Subtle Comb Strings
+# 2026-11-02 (Kerem: "improve the Chorale as well"): the Surge voices out, four of the new synths,
+# each with its detune and wobble off; beating at E2 / E4 / E5: Six Sines 6/2/0 %, scrooo 16/3/16 %,
+# FB-7999 5/2/1 %, OB-Xf 11/7/8 %, all within 5 cents. Gain: as before (to -22 dB, minus 8 for four).
+voices   -8.0    332  vst/Six Sines/|Op 1 Feedback Active=1|Op 1 Feedback Level=0.5|Main Env Release=0.6
+voices   -7.2   1125  vst/scrooo/Pad: Basso Aaah
+voices   -5.2   1520  vst/fb7999/CHOIR|OSC2 Detune=0|MG Osc=0|Delay Mod. Intensity=0
+voices   -3.8   2180  vst/OB-Xf/|Osc 2 Volume=0|Filter Cutoff=0.45|Filter Resonance=0.15|Filter Env Amount=0.3|Filter Env Attack=0.5|Filter Env Decay=0.6|Filter Env Sustain=0.6|Amp Env Attack=0.5|Amp Env Release=0.5
 
 # The sub: the engine's sine, under the chorale bass where the music is highest.
 sub      -6.0     40  internal/sub
 
-# Deep drums: sparse pulses now (every other downbeat, a backbeat now and then, fills at section ends).
-drums   -18.0    200  Percussion/Kick Tech 1
-drums    -3.6    230  Percussion/Kick 909ish
-drums   -21.7    260  Percussion/Kick Tech 2
-drums    -8.4    300  Percussion/Synth Tom 1
-drums    -8.0    320  Percussion/Synth Tom 2
+# Deep drums: sparse pulses (every other downbeat, a backbeat now and then, fills at section ends).
+# 2026-11-02: the Surge kicks and toms out (the rule: no kick, snare or hi-hat from the machine);
+# struck logs instead, the engine's modal percussion.
+drums   -26.0    250  internal/modal-log
 
 # Micro percussion and the rhythm sentences: the engine's impulses (sine clicks 1-15 kHz, noise
 # ticks, pitched sine blips), sample-exact and never out of tune.
@@ -43,11 +43,12 @@ piano     1.3   1765  Keys/DX EP
 # In-mix corrections from seed 1, per section (voices / guitar+drums, dB RMS): Clarinet in the Theme
 # -23.2 under Uni Saw FB -18.7, Flute in the Breakdown -18.1: Clarinet +3, Flute -2, Uni Saw FB -5.
 # Balance between the voices (dB), set from their loudness in a full render.
-# Measured in seed 1 before: soprano -28.2, alto -29.1, tenor -30.5, bass -33.1 dB RMS.
-gain soprano  0.0
-gain alto     0.5
-gain tenor    1.8
-gain bass     4.0
+# 2026-11-02: set again for the new voices against the old render (soprano +5.4, alto +3.9, tenor +1.5,
+# bass -0.8). Measured in seed 1 before: soprano -28.2, alto -29.1, tenor -30.5, bass -33.1 dB RMS.
+gain soprano  5.4
+gain alto     4.4
+gain tenor    3.3
+gain bass     3.2
 gain sub     -6.0
 gain micro    7.0
 gain blips   11.0
@@ -62,7 +63,7 @@ delay alto    1.0  0.40 0.22
 delay tenor   1.5  0.38 0.20
 delay bass    2.0  0.30 0.15
 delay blips   0.75 0.35 0.20
-master 6.8
+master 8.3
 
 # 2026-10-29: an amp and its cabinet on the melodic parts (gain, presence Hz, mix)
 amp bass   0.40 1800 0.60
