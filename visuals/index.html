@@ -61,11 +61,12 @@ nav button[aria-pressed="true"] { color: var(--ember); }
 .amt { display: inline-flex; align-items: center; gap: 8px; color: var(--ink); font-variant-numeric: tabular-nums; }
 .amt input { width: 140px; accent-color: var(--ember); }
 .cam .amt input { width: 110px; }
-/* The voice: the machine's own subtitles, at the bottom edge (Kerem stands in the middle). */
+/* The voice: the machine's own subtitles, at the bottom or top edge (Kerem stands in the middle). */
 #voice { position: fixed; left: 0; right: 0; bottom: 10vh; display: grid; justify-items: center; gap: 0.35em; text-align: center;
   padding: 0 max(16px, env(safe-area-inset-right, 0px)) 0 max(16px, env(safe-area-inset-left, 0px));
   pointer-events: none; opacity: 0; transition: opacity 1.2s; text-shadow: 0 0 0.12em var(--void), 0 0 0.35em var(--void), 0 0 0.8em var(--void), 0 0 1.6em var(--void); }
 #voice.on { opacity: 1; }
+#voice.top { bottom: auto; top: 10vh; }
 #voice p { margin: 0; max-width: 32ch; text-wrap: balance; font: italic 500 clamp(22px, 3.3vw, 46px)/1.15 var(--display); color: var(--ink); }
 @media (prefers-reduced-motion: reduce) { #voice { transition: none; } }
 .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
@@ -91,7 +92,7 @@ nav button[aria-pressed="true"] { color: var(--ember); }
       <button class="go" id="piece-concert" data-piece="concert" disabled>The whole concert</button>
     </div>
     <button class="go" id="go" hidden disabled>Loading…</button>
-    <p class="keys"><kbd>1</kbd>–<kbd>8</kbd> study · <kbd>G</kbd> new look · <kbd>Space</kbd> pause · <kbd>←</kbd><kbd>→</kbd> 10 s · <kbd>↑</kbd><kbd>↓</kbd> section · <kbd>S</kbd> strobe on/off · <kbd>B</kbd> feedback on/off · <kbd>K</kbd> test drum hit · <kbd>[</kbd><kbd>]</kbd> pad sensitivity · <kbd>,</kbd><kbd>.</kbd> pad effect · <kbd>P</kbd> hits: affect / layer / off · <kbd>M</kbd> metronome on/off · <kbd>C</kbd> code in the picture on/off · <kbd>V</kbd> the machine's voice on/off · <kbd>H</kbd> hide controls · <kbd>F</kbd> full screen</p>
+    <p class="keys"><kbd>1</kbd>–<kbd>8</kbd> study · <kbd>G</kbd> new look · <kbd>Space</kbd> pause · <kbd>←</kbd><kbd>→</kbd> 10 s · <kbd>↑</kbd><kbd>↓</kbd> section · <kbd>S</kbd> strobe on/off · <kbd>B</kbd> feedback on/off · <kbd>K</kbd> test drum hit · <kbd>[</kbd><kbd>]</kbd> pad sensitivity · <kbd>,</kbd><kbd>.</kbd> pad effect · <kbd>P</kbd> hits: affect / layer / off · <kbd>M</kbd> metronome on/off · <kbd>C</kbd> code in the picture on/off · <kbd>V</kbd> the machine's voice: bottom, top, off · <kbd>H</kbd> hide controls · <kbd>F</kbd> full screen</p>
     <p class="err" id="err" hidden></p>
   </div>
 </div>
@@ -2785,8 +2786,8 @@ async function boot() {
       [0.6, "The chord changes once every few years. People travel there to hear one note become another.", 0, 20],
     ],
   };
-  const VOICE = { on: true, until: 0, said: '' };
-  try { VOICE.on = localStorage.getItem('lisztmachine-voice') !== '0'; } catch {}
+  const VOICE = { on: true, top: false, until: 0, said: '' };
+  try { const v = localStorage.getItem('lisztmachine-voice'); VOICE.on = v !== '0'; VOICE.top = v === 'top'; } catch {}
   function voiceTick(t) {
     const now = performance.now() / 1000;
     if (VOICE.until && now > VOICE.until) { $('voice').classList.remove('on'); VOICE.until = 0; }
@@ -2802,14 +2803,15 @@ async function boot() {
       window.__voiceLog?.push(key);
     }
   }
-  const setVoice = on => {
-    VOICE.on = on;
+  const setVoice = (on, top) => {   // V cycles: bottom, top, off (Kerem, 2026-11-03: "place the subtitles up also")
+    VOICE.on = on; VOICE.top = on && top;
     if (!on) { $('voice').classList.remove('on'); VOICE.until = 0; }
-    $('voice-go').textContent = on ? 'Voice on' : 'Voice off'; $('voice-go').setAttribute('aria-pressed', on);
-    try { localStorage.setItem('lisztmachine-voice', on ? '1' : '0'); } catch {}
+    $('voice').classList.toggle('top', VOICE.top);
+    $('voice-go').textContent = !on ? 'Voice off' : VOICE.top ? 'Voice top' : 'Voice bottom'; $('voice-go').setAttribute('aria-pressed', on);
+    try { localStorage.setItem('lisztmachine-voice', !on ? '0' : VOICE.top ? 'top' : '1'); } catch {}
   };
-  $('voice-go').onclick = () => setVoice(!VOICE.on);
-  setVoice(VOICE.on);
+  $('voice-go').onclick = () => !VOICE.on ? setVoice(true, false) : !VOICE.top ? setVoice(true, true) : setVoice(false);
+  setVoice(VOICE.on, VOICE.top);
 
   let last = performance.now(), visT = 0, frameNo = 0, fps = 60, inFlight = 0, gpuMs = 0;
   window.__gpu = () => ({ inFlight, gpuMs, frames: frameNo });
