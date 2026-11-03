@@ -70,7 +70,7 @@ nav button[aria-pressed="true"] { color: var(--ember); }
   <div class="card">
     <h1>Lisztmachine</h1>
     <p class="meta" id="meta">Choose a piece</p>
-    <p class="lede">Ten pieces and eight generative light studies for projecting onto the drummer, blending into each other. Each one reads the music itself: every note, every chord and the level of each part, so the light lands exactly with the sound.</p>
+    <p class="lede">Eight pieces, one by one or the whole concert without a stop, and eight generative light studies for projecting onto the drummer, blending into each other. Each one reads the music itself: every note, every chord and the level of each part, so the light lands exactly with the sound.</p>
     <div class="pieces" id="pieces">
       <button class="go" id="piece-berlin" data-piece="berlin" disabled>Berlin</button>
       <button class="go" id="piece-jungle" data-piece="jungle" disabled>Liquid</button>
@@ -80,6 +80,7 @@ nav button[aria-pressed="true"] { color: var(--ember); }
       <button class="go" id="piece-halftime" data-piece="halftime" disabled>Halftime</button>
       <button class="go" id="piece-doom" data-piece="doom" disabled>Doom</button>
       <button class="go" id="piece-blackgaze" data-piece="blackgaze" disabled>Blackgaze</button>
+      <button class="go" id="piece-concert" data-piece="concert" disabled>The whole concert</button>
     </div>
     <button class="go" id="go" hidden disabled>Loading…</button>
     <p class="keys"><kbd>1</kbd>–<kbd>8</kbd> study · <kbd>G</kbd> new look · <kbd>Space</kbd> pause · <kbd>←</kbd><kbd>→</kbd> 10 s · <kbd>↑</kbd><kbd>↓</kbd> section · <kbd>S</kbd> strobe on/off · <kbd>B</kbd> feedback on/off · <kbd>K</kbd> test drum hit · <kbd>[</kbd><kbd>]</kbd> pad sensitivity · <kbd>,</kbd><kbd>.</kbd> pad effect · <kbd>P</kbd> hits: affect / layer / off · <kbd>M</kbd> metronome on/off · <kbd>H</kbd> hide controls · <kbd>F</kbd> full screen</p>
@@ -154,6 +155,9 @@ const PIECES = {
   blackgaze: { name: 'Blackgaze', study: 'score', strobeBeats: 1, hits: 'affect', media: 'media/blackgaze1', ranges: [[36, 86], [22, 66], [42, 62], [64, 88]],
     world: { name: 'Sunbather', lo: [0.6, 0.15, 0.35], hi: [1.0, 0.8, 0.7],        // rose shadows on black, a pale gold dawn
       palette: [[1, 0.6, 0.65], [1, 0.85, 0.6], [0.9, 0.3, 0.5], [1, 1, 1], [0.7, 0.5, 1], [1, 0.45, 0.35]] } },
+  // 2026-11-03 (Kerem: "a concert song that includes all 45 minutes, so I can practice the concert non stop"):
+  // the eight songs back to back from tools/concert.py; each one switches in its own study, colours and tempo.
+  concert: { name: 'The whole concert', concert: true, media: 'media/concert1' },
 };
 let RANGE = PIECES.berlin.ranges;
 const TAU = [1.2, 0.28, 0.16, 0.4];                          // how long a note-on lights up, seconds
@@ -167,6 +171,7 @@ class Features {
     this.pad = this.notes.filter(n => n[2] === 0);
     this.duration = show.levels.length / show.levelRate;
     this.secLen = 4 * 60 / show.bpm;
+    this.songT = 0;   // where the current song began: beats count from here (the concert changes tempo per song)
     this.pitch = [0.5, 0.5, 0.5, 0.5];
     this.chord = [0, 0, 0, 0];
     this.hit = [0, 0, 0, 0];
@@ -1045,7 +1050,7 @@ STUDIES.push({
         const mm = Math.floor(s / 60), ss = (s % 60).toFixed(3).padStart(6, '0');
         text(`${mm}:${ss}  ${PART[tr]}  ${String(p).padStart(3)}  ${hz(p).padStart(7)}  ${v.toFixed(2)}`, 28, 40 + k * 22, 0, 0.18 + 0.7 * (k / 29) ** 3, 0, 0, 1);
       }
-      const beat = t * F.show.bpm / 60;
+      const beat = (t - F.songT) * F.show.bpm / 60;
       const kinds = ['CURL', 'LORENZ', 'AIZAWA', 'THOMAS', 'HALVORSEN'];
       text(`${F.section.name.toUpperCase()}   BAR ${Math.floor(beat / 4) + 1}.${Math.floor(beat % 4) + 1}   ${F.show.bpm} BPM   ${kinds[Math.min(4, Math.floor(D.gene[0] * 5))]}   GEN ${D.gen}`,
         28, 1040, 0, 0.8, 0, 0, 1);
@@ -1870,7 +1875,7 @@ STUDIES.push({
       put(s - t, s + d - t, p, tr + Math.min(v, 0.999));
     }
     const spb = 60 / F.show.bpm;
-    for (let b = Math.ceil((t - 10.5) / spb); b * spb < t + 2.9; b++) put(b * spb - t, 0, 0, 4 + (b % 4 === 0 ? 0.9 : 0.2));
+    for (let b = Math.ceil((t - F.songT - 10.5) / spb); F.songT + b * spb < t + 2.9; b++) put(F.songT + b * spb - t, 0, 0, 4 + (b % 4 === 0 ? 0.9 : 0.2));
     put(0, 0, 0, 5);
     for (let k = 0; k < pad.hits.length; k++) {
       const h = pad.hits[k], age = padAge(h);
@@ -1906,29 +1911,36 @@ async function boot() {
   device.lost.then(info => fail('The graphics device was lost: ' + info.message + '. Reload the page.'));
 
   // Which piece: from the start screen (or #berlin / #jungle ... in the address).
-  const piece = PIECES[location.hash.slice(1)] ?? await new Promise(res => {
+  let piece = PIECES[location.hash.slice(1)] ?? await new Promise(res => {
     for (const b of document.querySelectorAll('[data-piece]')) { b.disabled = false; b.onclick = () => res(PIECES[b.dataset.piece]); }
   });
   $('pieces').hidden = true;
   $('go').hidden = false;
   $('meta').textContent = 'Loading the ' + piece.name + '…';
-  RANGE = piece.ranges;
-  const MEDIA = piece.media;
-  const [show, audioData] = await Promise.all([
-    fetch(MEDIA + '.show.json').then(r => { if (!r.ok) throw new Error('show data ' + r.status); return r.json(); }),
-    fetch(MEDIA + '.mp3').then(r => { if (!r.ok) throw new Error('audio ' + r.status); return r.arrayBuffer(); }),
-  ]).catch(e => { fail('Could not load the concert (' + e.message + ').'); return []; });
+  const title = piece.name, concert = piece.concert;
+  const show = await fetch(piece.media + '.show.json').then(r => { if (!r.ok) throw new Error('show data ' + r.status); return r.json(); })
+    .catch(e => { fail('Could not load the concert (' + e.message + ').'); });
   if (!show) return;
+  // One recording per song; a single piece is a concert of one.
+  const songs = show.songs ?? [{ piece: Object.keys(PIECES).find(k => PIECES[k] === piece), media: piece.media, t: 0, bpm: show.bpm, key: show.key }];
+  const songIndex = t => { let k = 0; songs.forEach((s, i) => { if (s.t <= t + 1e-6) k = i; }); return k; };
+  piece = PIECES[songs[0].piece];
+  RANGE = piece.ranges;
   const F = window.__F = new Features(show);
   // Web Audio rather than an <audio> element: the artifact sandbox refused the element's blob URL,
   // so the clock never started. The context's output timestamp is also the time actually heard.
   const actx = new AudioContext();
-  const pcm = await actx.decodeAudioData(audioData).catch(e => { fail('Could not decode the recording (' + e.message + ').'); });
-  if (!pcm) return;
+  // Decoded on demand, and only the song playing and the next one kept (a decoded song is ~100 MB).
+  let pcms = {};
+  const pcmFor = k => pcms[k] ??= fetch(songs[k].media + '.mp3')
+    .then(r => { if (!r.ok) throw new Error('audio ' + r.status); return r.arrayBuffer(); })
+    .then(b => actx.decodeAudioData(b));
+  const first = await pcmFor(0).catch(e => { fail('Could not load the recording (' + e.message + ').'); });
+  if (!first) return;
   const out = actx.createGain();
   out.gain.value = location.hash === '#silent' ? 0 : 1;   // #silent: for checking the page without sound
   out.connect(actx.destination);
-  let src = null, startAt = 0, startT = 0;
+  let srcs = [], startAt = 0, startT = 0, run = 0, queued = -1;
   const heard = now => {
     const ts = actx.getOutputTimestamp?.();
     if (ts && ts.performanceTime > 0) return ts.contextTime + (now - ts.performanceTime) / 1000;
@@ -2032,23 +2044,42 @@ async function boot() {
 
   // The clock is the audio: the position of what is coming out of the speakers right now.
   const sec = F.show.sections;
-  let playing = false, musicT = (sec.find(s => ['Summit', 'Apotheosis', 'Possession', 'Ascension', 'Black', 'Computation', 'Submersion', 'Supercodex', 'Possessed', 'Rebirth', 'Gravity'].includes(s.name)) ?? sec[0]).t + 14;
+  let playing = false, musicT = concert ? 0 : (sec.find(s => ['Summit', 'Apotheosis', 'Possession', 'Ascension', 'Black', 'Computation', 'Submersion', 'Supercodex', 'Possessed', 'Rebirth', 'Gravity'].includes(s.name)) ?? sec[0]).t + 14;
   const clock = now => {
     if (!playing) return musicT;
     musicT = Math.max(startT, startT + heard(now) - startAt);
     if (musicT >= F.duration) { stop(); musicT = F.duration - 0.01; }
     return musicT;
   };
-  const start = from => {
-    src = actx.createBufferSource();
-    src.buffer = pcm;
-    src.connect(out);
+  // Each song's recording is scheduled on the audio clock where the last one ends, so the concert runs without a gap.
+  const play = (k, buf) => {
+    const s = actx.createBufferSource();
+    s.buffer = buf;
+    s.connect(out);
+    const at = startAt + songs[k].t - startT;
+    s.start(Math.max(at, actx.currentTime), Math.max(0, startT - songs[k].t));
+    srcs.push(s);
+    queued = k;
+  };
+  const start = async from => {
+    const my = ++run, k = songIndex(from);
+    const buf = await pcmFor(k).catch(e => { fail('Could not load the recording (' + e.message + ').'); });
+    if (!buf || my !== run) return;
     startAt = actx.currentTime + 0.05;
     startT = from;
-    src.start(startAt, from);
     playing = true;
+    play(k, buf);
   };
-  const stop = () => { if (src) { src.onended = null; try { src.stop(); } catch {} src = null; } playing = false; };
+  // Called every frame: the next song decoded and scheduled well before this one ends, the rest let go.
+  const queueNext = t => {
+    const k = songIndex(t), j = k + 1;
+    if (!playing || j >= songs.length || queued >= j) return;
+    for (const i of Object.keys(pcms)) if (+i !== k && +i !== j) delete pcms[i];
+    const my = run;
+    pcmFor(j).then(buf => { if (my === run && playing && queued < j) play(j, buf); }).catch(e => console.error(e));
+  };
+  window.__audio = () => ({ queued, sources: srcs.length, decoded: Object.keys(pcms) });
+  const stop = () => { run++; for (const s of srcs) { try { s.stop(); } catch {} } srcs = []; queued = -1; playing = false; };
   const seek = t => {
     musicT = Math.max(0, Math.min(F.duration - 0.1, t));
     if (playing) { stop(); start(musicT); }
@@ -2073,12 +2104,12 @@ async function boot() {
   const form = $('form');
   sec.forEach(s => {
     const d = document.createElement('div');
-    d.style.flexGrow = s.bars; d.style.height = Math.round(18 + 82 * s.energy) + '%'; d.title = s.name;
+    d.style.flexGrow = (sec[sec.indexOf(s) + 1]?.t ?? F.duration) - s.t; d.style.height = Math.round(18 + 82 * s.energy) + '%'; d.title = s.name;
     form.insertBefore(d, $('head'));
   });
   form.onclick = e => { const r = form.getBoundingClientRect(); seek((e.clientX - r.left) / r.width * F.duration); };
   const mmss = t => Math.floor(t / 60) + ':' + String(Math.floor(t % 60)).padStart(2, '0');
-  $('meta').textContent = piece.name + ' · seed ' + show.seed + ' · ' + show.key;
+  $('meta').textContent = title + ' · seed ' + show.seed + ' · ' + show.key;
 
   let hudTimer = 0, hudHidden = false;
   const hud = $('hud');
@@ -2161,8 +2192,8 @@ async function boot() {
   setInterval(() => {
     if (!metro.on || !playing) { if (metro.nodes.length) metroClear(); metro.from = -1; return; }
     const spb = 60 / F.show.bpm;
-    if (metro.from !== startAt) { metroClear(); metro.from = startAt; metro.next = Math.ceil(startT / spb - 1e-6); } // started or sought
-    for (let at; (at = startAt + metro.next * spb - startT) < actx.currentTime + 0.12; metro.next++) {
+    if (metro.from !== startAt + '/' + F.songT) { metroClear(); metro.from = startAt + '/' + F.songT; metro.next = Math.ceil((Math.max(startT, F.songT) - F.songT) / spb - 1e-6); } // started, sought, or a new song
+    for (let at; (at = startAt + F.songT + metro.next * spb - startT) < actx.currentTime + 0.12; metro.next++) {
       if (at < actx.currentTime) continue;
       const down = metro.next % 4 === 0, o = actx.createOscillator(), env = actx.createGain();
       o.frequency.value = down ? 1760 : 1320;
@@ -2182,12 +2213,28 @@ async function boot() {
   };
   $('metro').onclick = () => setMetro(!metro.on);
   setLayer(piece.hits || 'affect'); // 2026-10-31 (Kerem): the hits act on the picture in every song, no drawn layer (P still cycles)
-  const pieceHash = [...piece.name].reduce((a, ch) => (a * 31 + ch.charCodeAt(0)) >>> 0, 7);
-  const worldHue = (() => {
+  let pieceHash, worldHue;
+  const pieceLook = () => {
+    pieceHash = [...piece.name].reduce((a, ch) => (a * 31 + ch.charCodeAt(0)) >>> 0, 7);
     let x = 0, y = 0;
     for (const [r, g, b] of [piece.world.lo, piece.world.hi]) { x += 2 * r - g - b; y += Math.sqrt(3) * (g - b); }
-    return Math.hypot(x, y) > 0.1 ? Math.atan2(y, x) / (2 * Math.PI) + 0.5 : (pieceHash % 997) / 997;   // + 0.5: the opposite hue
-  })();
+    worldHue = Math.hypot(x, y) > 0.1 ? Math.atan2(y, x) / (2 * Math.PI) + 0.5 : (pieceHash % 997) / 997;   // + 0.5: the opposite hue
+  };
+  pieceLook();
+  // The concert: at each song its own study, colours, hits, pitch ranges and tempo.
+  let songK = 0;
+  const enterSong = k => {
+    songK = k;
+    piece = PIECES[songs[k].piece];
+    RANGE = piece.ranges;
+    show.bpm = songs[k].bpm;
+    F.secLen = 4 * 60 / show.bpm;
+    F.songT = songs[k].t;
+    setLayer(piece.hits || 'affect');
+    pieceLook();
+    choose(STUDIES.find(s => s.id === piece.study) ?? study);
+    if (concert) $('meta').textContent = title + ' · ' + (k + 1) + '/' + songs.length + ' · ' + songs[k].key;
+  };
   const hitLayer = () => {
     if (pad.layer === 'off') return 0;
     const si = F.si || 0;
@@ -2303,7 +2350,6 @@ async function boot() {
   // The director: camera moves, strobe, colour and the feedback network, from the music's events.
   // Calm sections drift; loud ones whip to a new angle on every chord (and every bar at the top),
   // keep spinning between cuts, and flash on the bass.
-  const PALETTE = piece.world.palette;
   const D = { cam: [0, 0, 1, 0], fx: [0, 0, 0, 0], col: [1, 1, 1, 0], target: [0, 0, 1], spin: 0, cut: 0, chord: -1, bar: -1, si: -1, strobe: true, invertUntil: 0,
     feedback: true, gene: new Float32Array(16), fbg: new Float32Array(12), gen: 0, salt: Math.random() * 1000 };   // a fresh lineage every time the page opens
   const hash01 = k => { const x = Math.sin(k * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); };
@@ -2316,7 +2362,7 @@ async function boot() {
   };
   roll();
   function direct(t, dt) {
-    const e = F.energy, bar = Math.floor(t * show.bpm / 240);
+    const e = F.energy, bar = Math.floor((t - F.songT) * show.bpm / 240);
     const sectionStart = F.si !== D.si && D.si >= 0;
     if (F.count[0] !== D.chord || (e > 0.75 && bar !== D.bar) || sectionStart) {
       D.cut++;
@@ -2324,7 +2370,7 @@ async function boot() {
       const cu = CAM.cuts / 100;
       D.target = [D.cam[0] + (r(1) - 0.5) * 6.0 * (0.3 + e) * cu, (r(2) - 0.4) * 0.9 * e * cu, Math.max(0.85, 1 + (r(3) * 0.9 - 0.45) * cu)];
       D.spin = (r(8) - 0.5) * 2.4 * e * cu;
-      D.col = [...PALETTE[Math.floor(r(4) * PALETTE.length)], Math.max(0, Math.min(1, (e - 0.35) * 2.2))];
+      D.col = [...piece.world.palette[Math.floor(r(4) * piece.world.palette.length)], Math.max(0, Math.min(1, (e - 0.35) * 2.2))];
       if (sectionStart) roll();
       else for (let k = 0; k < Math.round(4 * LOOK.churn / 100); k++) D.gene[Math.floor(r(k + 5) * 16)] = r(k + 15);
     }
@@ -2512,9 +2558,11 @@ async function boot() {
       if (tw >= 1) { study = next; next = null; tw = 0; } }
 
     const t = clock(now);
+    if (songIndex(t) !== songK) enterSong(songIndex(t));
+    queueNext(t);
     F.update(t);
     direct(t, dt);
-    const bpm = show.bpm, beats = t * bpm / 60;
+    const bpm = show.bpm, beats = (t - F.songT) * bpm / 60;
     const padArr = new Float32Array(36);
     pad.kick = 0;
     const PK = padK();
@@ -2531,9 +2579,10 @@ async function boot() {
     for (const s of next ? [study, next] : [study]) {
       use(s);
       s.cpu?.(g, F, t, D, pad, padAge);
+      // the shaders' music time (u.beats * 60 / u.bpm) is the concert's; the beat and bar phases are the song's
       Udata.set([visT, dt, beats % 1, (beats / 4) % 1, s.W, s.H, F.energy, F.progress,
         ...F.lv.slice(0, 4), F.lv[4], F.lv[5], F.lv[6], F.si, ...F.hit, ...F.pitch, ...F.since, ...F.chord, ...F.count,
-        beats, frameNo, bpm, s.W / s.H, ...D.cam, ...D.fx, ...D.col, ...geneNow, ...padArr, ...journey(STUDIES.indexOf(s) + 1, dt)]);
+        t * bpm / 60, frameNo, bpm, s.W / s.H, ...D.cam, ...D.fx, ...D.col, ...geneNow, ...padArr, ...journey(STUDIES.indexOf(s) + 1, dt)]);
       device.queue.writeBuffer(s.U, 0, Udata);
       s.frame(g, enc, (next ? 0.5 : 1) * (0.4 + 0.6 * Q));   // two studies at once: half the particles each; less when frames are late
     }
