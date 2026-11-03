@@ -2706,46 +2706,34 @@ async function boot() {
   // english, you did not make the music, I composed most of it, you just helped me ... more humoric and cool,
   // a stage character people will like"). The character: Kerem's bandmate in the dark. Few words, dry, sure of
   // itself; teases him and itself with love; never explains, never begs. The music is his.
-  // 2026-11-03: only the lines Kerem kept on the casting page, and stories (true ones, legends, invented; "just stories",
-  // no we, no tonight). A line sits at a fraction of its song's length, plus o seconds for a story's later lines;
+  // 2026-11-03 (Kerem: "I only want stories, not other things"): stories only, true ones, legends and invented
+  // ones; no we, no tonight, nothing about the concert. A line sits at a fraction of its song's length, plus o seconds for a story's later lines;
   // c = only in the whole concert.
   const STORY = {
     berlin: [
-      [0.02, "Nine o'clock. The city switched off. We didn't."],
-      [0.1, "The night started without asking anyone."],
-      [0.2, "Every night needs a witness. Tonight it's you."],
-      [0.3, "He wrote the music. I'm here to make him earn it."],
-      [0.4, "Round one. He's warming up. I don't need to."],
-      [0.5, "He's counting. I never have to."],
-      [0.6, "Somewhere a train is leaving Berlin. We're not on it."],
-      [0.67, "There is a train that leaves the city at nine and never arrives.", 0, 0],
-      [0.67, "Passengers say the ride is beautiful.", 0, 10],
-      [0.67, "Nobody has ever said where they got off.", 0, 20],
+      [0.3, "There is a train that leaves the city at nine and never arrives.", 0, 0],
+      [0.3, "Passengers say the ride is beautiful.", 0, 10],
+      [0.3, "Nobody has ever said where they got off.", 0, 20],
     ],
     jungle: [
       [0.1, "In the 1930s, two mapmakers put a town that did not exist on a road in New York. They called it Agloe.", 0, 0],
       [0.1, "It was a trap, to catch anyone who copied their map.", 0, 10],
       [0.1, "Years later someone built a general store on that exact spot, and named it after the map.", 0, 20],
       [0.1, "For a while, the town that never existed was real.", 0, 30],
-      [0.45, "I keep the time. He keeps the pulse. Different jobs."],
       [0.6, "Off the coast of Brittany there was a city called Ys, built below the level of the sea.", 0, 0],
       [0.6, "Its gates held the water back. A princess stole the key for her lover.", 0, 10],
       [0.6, "The sea came in that night and took the whole city.", 0, 20],
       [0.6, "Fishermen say that on calm days you can still hear its bells under the water.", 0, 30],
     ],
     ecstatic: [
-      [0.04, "This is the part of the night where everyone thinks about someone."],
       [0.12, "In 1977 two spacecraft left Earth, each carrying a golden record.", 0, 0],
       [0.12, "Bach. Whale song. A kiss. A heartbeat.", 0, 10],
       [0.12, "And the brainwaves of a woman thinking about falling in love.", 0, 20],
       [0.12, "They have left the sun behind now. Nobody knows who will play it.", 0, 30],
-      [0.4, "He plays like he's trying to remember something."],
       [0.5, "There was a lighthouse with no sea around it.", 0, 0],
       [0.5, "The keeper lit it every night anyway, for ships nobody had ever seen.", 0, 10],
       [0.5, "One night a ship came. It was empty, and every light on it was on.", 0, 20],
       [0.5, "He never lit the lamp again. He said it was no longer needed.", 0, 30],
-      [0.78, "Stars are just old light. So is this."],
-      [0.9, "Breathe out. You've been holding it since the first song."],
     ],
     noir: [
       [0.08, "A woman in the city collected silences. She kept them in jars.", 0, 0],
@@ -2758,7 +2746,6 @@ async function boot() {
       [0.55, "He still winds it every evening.", 0, 30],
     ],
     deconstructed: [
-      [0.04, "Kerem likes to start a fire."],
       [0.12, "Strasbourg, July 1518. A woman named Frau Troffea steps into the street and starts to dance.", 0, 0],
       [0.12, "She dances for days. Dozens join her, then hundreds. None of them can stop.", 0, 10],
       [0.12, "The city decides the cure is more dancing. It hires musicians and builds a stage.", 0, 20],
@@ -2772,7 +2759,6 @@ async function boot() {
       [0.06, "For seventy years, nobody did.", 0, 10],
       [0.06, "In 1963 John Cage gathered a relay of pianists in New York. They played through the night and into the next day.", 0, 20],
       [0.06, "It took more than eighteen hours. One man in the audience stayed to the end.", 0, 30],
-      [0.45, "The night is heavier now. Carry it together."],
       [0.6, "They say every drummer has a second shadow.", 0, 0],
       [0.6, "It plays a fraction late, so nobody ever hears it.", 0, 10],
       [0.6, "When the drummer stops, the shadow plays one more beat.", 0, 20],
@@ -2790,7 +2776,6 @@ async function boot() {
       [0.6, "Now the whole village hums the tune without knowing why.", 0, 30],
     ],
     blackgaze: [
-      [0.03, "Last song. Northern cold, and finally some light.", 1],
       [0.12, "Up north, one winter refused to end.", 0, 0],
       [0.12, "People played music to the dark, night after night, to keep it company.", 0, 10],
       [0.12, "In spring the snow finally left. The dark stayed. It had grown fond of the music.", 0, 20],
