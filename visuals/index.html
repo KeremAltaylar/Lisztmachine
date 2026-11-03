@@ -83,7 +83,7 @@ nav button[aria-pressed="true"] { color: var(--ember); }
       <button class="go" id="piece-concert" data-piece="concert" disabled>The whole concert</button>
     </div>
     <button class="go" id="go" hidden disabled>Loading…</button>
-    <p class="keys"><kbd>1</kbd>–<kbd>8</kbd> study · <kbd>G</kbd> new look · <kbd>Space</kbd> pause · <kbd>←</kbd><kbd>→</kbd> 10 s · <kbd>↑</kbd><kbd>↓</kbd> section · <kbd>S</kbd> strobe on/off · <kbd>B</kbd> feedback on/off · <kbd>K</kbd> test drum hit · <kbd>[</kbd><kbd>]</kbd> pad sensitivity · <kbd>,</kbd><kbd>.</kbd> pad effect · <kbd>P</kbd> hits: affect / layer / off · <kbd>M</kbd> metronome on/off · <kbd>H</kbd> hide controls · <kbd>F</kbd> full screen</p>
+    <p class="keys"><kbd>1</kbd>–<kbd>8</kbd> study · <kbd>G</kbd> new look · <kbd>Space</kbd> pause · <kbd>←</kbd><kbd>→</kbd> 10 s · <kbd>↑</kbd><kbd>↓</kbd> section · <kbd>S</kbd> strobe on/off · <kbd>B</kbd> feedback on/off · <kbd>K</kbd> test drum hit · <kbd>[</kbd><kbd>]</kbd> pad sensitivity · <kbd>,</kbd><kbd>.</kbd> pad effect · <kbd>P</kbd> hits: affect / layer / off · <kbd>M</kbd> metronome on/off · <kbd>C</kbd> code in the picture on/off · <kbd>H</kbd> hide controls · <kbd>F</kbd> full screen</p>
     <p class="err" id="err" hidden></p>
   </div>
 </div>
@@ -116,6 +116,7 @@ nav button[aria-pressed="true"] { color: var(--ember); }
     <span id="pad-state">Off</span>
     <button id="metro" title="M" aria-pressed="false">Metronome off</button>
     <label class="amt" for="metro-vol">Metronome volume <input id="metro-vol" type="range" min="-24" max="24" step="1" value="12"> <span id="metro-vol-v">+12 dB</span></label>
+    <button id="code" title="C" aria-pressed="false">Code off</button>
   </div>
 </div>
 
@@ -633,6 +634,7 @@ struct M { a: vec4f, b: vec4f, t0: vec4f, t1: vec4f, t2: vec4f, c: vec4f, o: vec
 @group(0) @binding(4) var smp: sampler;
 @group(0) @binding(5) var X: texture_2d<f32>;       // the outer loop's input: this frame after the inner loop
 @group(0) @binding(6) var prevO: texture_2d<f32>;   // and the outer loop's own last frame
+@group(0) @binding(7) var CODE: texture_2d<f32>;    // the code layer: glyphs over a dark halo, alpha = coverage; m.p.w its strength
 struct VO { @builtin(position) pos: vec4f, @location(0) uv: vec2f };
 @vertex fn vs(@builtin(vertex_index) i: u32) -> VO {
   var p = array<vec2f, 3>(vec2f(-1.0, -1.0), vec2f(3.0, -1.0), vec2f(-1.0, 3.0));
@@ -696,7 +698,15 @@ fn tapf(q: vec2f, t: vec4f, sharp: bool) -> vec3f {
   if (m.a.w > 1.5) { f = max(f, tapf(q, m.t1, false)); }
   if (m.a.w > 2.5) { f = max(f, tapf(q, m.t2, false)); }
   f = max(hueTurn(f, m.b.x) * m.a.z - m.a.y * (0.5 + 0.5 * luma(f)), vec3f(0.0));   // dim generations die back to black, so the recursion never hazes
-  return vec4f(min(max(c, f), vec3f(16.0)), 1.0);   // max, not sum: the recursion keeps the exposure
+  // the code is written into this generation, so the next ones carry it on: it trails, folds and turns with the light
+  // It reads on any ground: lit glyphs in a dark halo where the picture is dark, black ink where it is bright.
+  let k = textureSampleLevel(CODE, smp, i.uv, 0.0);
+  let bg = max(c, f);                                                  // max, not sum: the recursion keeps the exposure
+  let light = smoothstep(0.35, 0.8, luma(bg));
+  let ink = clamp(luma(k.rgb) * k.a * 2.2, 0.0, 1.0) * m.p.w;          // the glyphs (the halo is black)
+  var o = bg * (1.0 - k.a * m.p.w * 0.7 * (1.0 - light));               // only ever darker: anything brighter would grow in the loop
+  o = mix(o, mix(k.rgb * 1.6, vec3f(0.02), light), ink);
+  return vec4f(min(o, vec3f(16.0)), 1.0);
 }
 // The outer loop: a second, slower recursion around the first. It feeds on the inner loop's output, so
 // the inner recursion's patterns are themselves recursed: longer memory, its own zoom, turn and water.
@@ -2034,12 +2044,22 @@ async function boot() {
     compBG = [0, 1].map(j => g.bind(pComp, [postIn, fbov[j], smp, views[0], postU], [0, 1, 2, 3, 4]));
     g.fbViews = fbv;
     g.mipViews = views;
+    CODE.resize();
     mixBG = {};
   }
+  // The code layer's canvas and texture, the size of the picture (filled in below, at "The code in the picture").
+  const CODE = { cv: document.createElement('canvas'), resize() {
+    this.cv.width = canvas.width; this.cv.height = canvas.height;
+    this.tex?.destroy();
+    this.tex = device.createTexture({ size: [canvas.width, canvas.height], format: 'rgba8unorm', usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT });
+    this.view = this.tex.createView();
+    this.typed = -1;   // redrawn at the new size on the next frame
+  } };
+  CODE.c2 = CODE.cv.getContext('2d');
   // The mix pass's bind group depends on which two studies are on and which feedback buffer is read.
   const mixGroup = (a, b, j) => {
     const key = a.id + b.id + j;
-    return mixBG[key] ??= g.bind(pMix, [mixU, a.view, b.view, g.fbViews[1 - j], smp], [0, 1, 2, 3, 4]);
+    return mixBG[key] ??= g.bind(pMix, [mixU, a.view, b.view, g.fbViews[1 - j], smp, CODE.view], [0, 1, 2, 3, 4, 7]);
   };
 
   // The clock is the audio: the position of what is coming out of the speakers right now.
@@ -2134,6 +2154,7 @@ async function boot() {
     else if (e.key === '[') { setThr(1.25); }
     else if (e.key === ']') { setThr(0.8); }
     else if (e.key === 'g' || e.key === 'G') { roll(); }
+    else if (e.key === 'c' || e.key === 'C') $('code').click();
     else if (e.key === 'h' || e.key === 'H') { hudHidden = !hudHidden; hud.classList.toggle('gone', hudHidden); }
     else if (e.key === 'f' || e.key === 'F') { document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen?.().catch(() => {}); }
     else return;
@@ -2540,6 +2561,110 @@ async function boot() {
 
   // Never more than two frames in flight: when the GPU falls behind, skip a frame rather than queue it.
   // Queued frames pile up into seconds of lag and then a frozen page (measured on the laptop GPU).
+  // ---- The code in the picture (C) ----------------------------------------------------------------
+  // 2026-11-03 (Kerem: "fuse the source code of the song and project to the visuals some times ... a
+  // closable feature ... especially show the changes in the code, the chord changes, the camera movement
+  // changes"). When something changes, the code that made it is typed into the picture: the song's own C++
+  // (its spec, its form, the function voicing its chords, from tools/code.py) and this page's own director,
+  // genome and studies (their live source, via toString), with the change as a diff, - before, + after.
+  // Off by default; when off, nothing is drawn or uploaded and the shader multiplies the layer by 0.
+  Object.assign(CODE, { on: false, block: null, born: 0, typed: -1, last: -99, seen: null });
+  try { CODE.on = localStorage.getItem('lisztmachine-code') === '1'; } catch {}
+  const NOTE = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+  const noteName = p => NOTE[p % 12] + (Math.floor(p / 12) - 1);
+  const fx = (v, n = 2) => v.toFixed(n);
+  const srcOf = s => (CODE.src?.[songs[songK].piece] ?? {})[s] ?? [];
+  const fileOf = () => (CODE.src?.[songs[songK].piece] ?? {}).file ?? 'src/core';
+  const fnLines = fn => fn.toString().split('\n');
+  const around = (lines, re, before = 2, after = 3) => { const i = Math.max(0, lines.findIndex(l => re.test(l))); return lines.slice(Math.max(0, i - before), i + after); };
+  const code = (lines, mark) => lines.map(l => ({ t: l, k: mark?.test(l) ? '>' : ' ' }));
+  const builders = {
+    song: () => ({ title: fileOf() + ' · ' + songs[songK].key, lines: [...code(srcOf('spec').slice(0, 9)),
+      { t: 'song = "' + piece.name + '";' + (songs.length > 1 ? '   // ' + (songK + 1) + ' of ' + songs.length : ''), k: '+' }] }),
+    section: (a, b) => ({ title: fileOf() + ' · the form', lines: [...code(srcOf('form'), new RegExp('"' + b.name + '"')),
+      ...(a ? [{ t: 'section = "' + a.name + '";  energy = ' + fx(a.energy), k: '-' }] : []),
+      { t: 'section = "' + b.name + '";  energy = ' + fx(b.energy) + ';  bars = ' + b.bars, k: '+' }] }),
+    chord: (a, b) => {
+      const pad = srcOf('pad'), at = (F.count[0] * 5) % Math.max(1, pad.length - 7);
+      return { title: fileOf() + ' · emitPad', lines: [...code(pad.slice(at, at + 7)),
+        { t: 'pad = { ' + a.map(noteName).join(' ') + ' };', k: '-' }, { t: 'pad = { ' + b.map(noteName).join(' ') + ' };', k: '+' }] };
+    },
+    camera: (a, b) => ({ title: 'visuals · direct()', lines: [...code(around(fnLines(direct), /D\.target = \[/, 1, 2), /D\.target = \[/),
+      { t: 'D.target = [' + a.map(v => fx(v)).join(', ') + '];', k: '-' }, { t: 'D.target = [' + b.map(v => fx(v)).join(', ') + '];', k: '+' },
+      { t: 'D.spin = ' + fx(D.spin, 3) + ';  D.cut = ' + D.cut + ';', k: '+' }] }),
+    genome: (a, b) => ({ title: 'visuals · roll()  generation ' + D.gen, lines: [...code(fnLines(roll).slice(0, 5)),
+      { t: 'gene = [' + Array.from(a.slice(0, 8), v => fx(v)).join(' ') + ' …];', k: '-' },
+      { t: 'gene = [' + Array.from(b.slice(0, 8), v => fx(v)).join(' ') + ' …];', k: '+' }] }),
+    study: (a, b) => ({ title: 'visuals · ' + b.name, lines: [{ t: 'choose(STUDIES[' + STUDIES.indexOf(b) + ']);   // ' + a.name + ' → ' + b.name, k: '+' },
+      ...code(fnLines(b.frame).slice(0, 8))] }),
+  };
+  const show_ = (kind, ...args) => {
+    const b = builders[kind](...args);
+    const ind = Math.min(...b.lines.filter(l => l.t.trim()).map(l => l.t.match(/^\s*/)[0].length));
+    for (const l of b.lines) l.t = l.t.slice(l.k === ' ' || l.k === '>' ? ind : 0).slice(0, 66);
+    const r = hash01(D.salt + CODE.last * 3.7 + kind.length);
+    Object.assign(CODE, { block: b, born: performance.now() / 1000, typed: -1, x: r < 0.5 ? 0.04 : 0.5, y: hash01(r * 91) < 0.5 ? 0.08 : 0.52 });
+  };
+  // What changed this frame, the most important first; the small changes only now and then.
+  function codeTick(t) {
+    const now = performance.now() / 1000, s = CODE.seen;
+    const cur = { song: songK, si: F.si, sec: F.section, chord: F.chord.filter(p => p > 0).join(), notes: F.chord.filter(p => p > 0),
+      cut: D.cut, target: D.target.slice(), gen: D.gen, gene: D.gene.slice(), study: next ?? study };
+    CODE.seen = cur;
+    if (!CODE.on || !s || !playing) return;
+    const free = now - CODE.last > 7, maybe = free && hash01(D.cut * 1.7 + D.gen) < 0.5;
+    let ev = null;
+    if (cur.song !== s.song) ev = ['song'];
+    else if (cur.si !== s.si) ev = ['section', s.sec, cur.sec];
+    else if (cur.study !== s.study) ev = ['study', s.study, cur.study];
+    else if (cur.gen !== s.gen && free) ev = ['genome', s.gene, cur.gene];
+    else if (cur.chord !== s.chord && cur.notes.length && s.notes.length && maybe) ev = ['chord', s.notes, cur.notes];
+    else if (cur.cut !== s.cut && maybe) ev = ['camera', s.target, cur.target];
+    if (ev) { CODE.last = now; show_(...ev); window.__codeLog?.push(ev[0]); }
+  }
+  // Typed in at 900 characters a second, held, then faded by the shader (no redraw while it fades).
+  CODE.level = () => {
+    if (!CODE.on || !CODE.block) return 0;
+    const age = performance.now() / 1000 - CODE.born, total = CODE.block.lines.reduce((a, l) => a + l.t.length + 1, 0);
+    const typed = Math.min(total, Math.floor(age * 900));
+    if (typed !== CODE.typed) { CODE.typed = typed; CODE.draw(typed); }
+    const hold = total / 900 + 5;
+    if (age > hold + 1.5) { CODE.block = null; return 0; }
+    return 0.9 * Math.min(1, Math.max(0, (hold + 1.5 - age) / 1.5));
+  };
+  CODE.draw = n => {
+    const { c2, cv, block: b } = CODE;
+    const fs = Math.max(12, Math.round(cv.height / 42)), lh = Math.round(fs * 1.45);
+    c2.clearRect(0, 0, cv.width, cv.height);
+    c2.font = '500 ' + fs + 'px "Geist Mono", ui-monospace, Menlo, Consolas, monospace';
+    c2.textBaseline = 'top';
+    const x0 = Math.round(CODE.x * cv.width), y0 = Math.round(CODE.y * cv.height);
+    const ink = { ' ': 'rgba(150,150,145,1)', '>': 'rgba(255,255,250,1)', '-': 'rgba(150,90,80,1)', '+': 'rgba(255,190,110,1)' };
+    c2.shadowColor = 'rgba(0,0,0,1)'; c2.shadowBlur = fs * 0.8;
+    c2.fillStyle = 'rgba(150,150,145,1)';
+    c2.fillText('// ' + b.title, x0, y0);
+    let left = n;
+    b.lines.forEach((l, i) => {
+      if (left <= 0) return;
+      const txt = (l.k === ' ' ? '  ' : l.k + ' ') + l.t, part = txt.slice(0, left);
+      left -= txt.length + 1;
+      const y = y0 + (i + 1.4) * lh;
+      c2.fillStyle = ink[l.k];
+      c2.fillText(part, x0, y);
+      if (l.k === '-') { const w = c2.measureText(part).width; c2.fillRect(x0 + fs * 1.2, y + fs * 0.55, w - fs * 1.2, Math.max(1, fs / 14)); }
+    });
+    device.queue.copyExternalImageToTexture({ source: cv }, { texture: CODE.tex }, [cv.width, cv.height]);
+  };
+  const setCode = on => {
+    CODE.on = on; CODE.block = null;
+    $('code').textContent = on ? 'Code on' : 'Code off'; $('code').setAttribute('aria-pressed', on);
+    try { localStorage.setItem('lisztmachine-code', on ? '1' : '0'); } catch {}
+    if (on && playing) show_('song');
+  };
+  $('code').onclick = () => setCode(!CODE.on);
+  setCode(CODE.on);
+  fetch('media/code.json').then(r => r.ok ? r.json() : null).then(j => { CODE.src = j; }).catch(() => {});
+
   let last = performance.now(), visT = 0, frameNo = 0, fps = 60, inFlight = 0, gpuMs = 0;
   window.__gpu = () => ({ inFlight, gpuMs, frames: frameNo });
   function frame(now) {
@@ -2562,6 +2687,7 @@ async function boot() {
     queueNext(t);
     F.update(t);
     direct(t, dt);
+    try { codeTick(t); } catch (e) { console.error(e); window.__errors.push('code layer: ' + e.message); CODE.block = null; }   // never stops the picture
     const bpm = show.bpm, beats = (t - F.songT) * bpm / 60;
     const padArr = new Float32Array(36);
     pad.kick = 0;
@@ -2575,6 +2701,7 @@ async function boot() {
     padArr.set([pad.agit, pad.bright, PK.dur, hitLayer()], 32);
     if (frameNo % 15 === 0) padStatus();
     const blend = network(dt, visT, canvas.width / canvas.height);
+    try { M[31] = CODE.level(); } catch (e) { console.error(e); CODE.block = null; M[31] = 0; }
     const enc = device.createCommandEncoder();
     for (const s of next ? [study, next] : [study]) {
       use(s);
