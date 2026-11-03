@@ -61,14 +61,12 @@ nav button[aria-pressed="true"] { color: var(--ember); }
 .amt { display: inline-flex; align-items: center; gap: 8px; color: var(--ink); font-variant-numeric: tabular-nums; }
 .amt input { width: 140px; accent-color: var(--ember); }
 .cam .amt input { width: 110px; }
-/* The voice: the machine's own subtitles, Turkish over English, at the bottom edge (Kerem stands in the middle). */
+/* The voice: the machine's own subtitles, at the bottom edge (Kerem stands in the middle). */
 #voice { position: fixed; left: 0; right: 0; bottom: 10vh; display: grid; justify-items: center; gap: 0.35em; text-align: center;
   padding: 0 max(16px, env(safe-area-inset-right, 0px)) 0 max(16px, env(safe-area-inset-left, 0px));
-  pointer-events: none; opacity: 0; transition: opacity 1.2s; text-shadow: 0 0 0.5em var(--void), 0 0 0.15em var(--void); }
+  pointer-events: none; opacity: 0; transition: opacity 1.2s; text-shadow: 0 0 0.12em var(--void), 0 0 0.35em var(--void), 0 0 0.8em var(--void), 0 0 1.6em var(--void); }
 #voice.on { opacity: 1; }
-#voice p { margin: 0; max-width: 42ch; text-wrap: balance; }
-#voice .tr { font: italic 500 clamp(22px, 3.3vw, 46px)/1.15 var(--display); color: var(--ink); }
-#voice .en { font: 400 clamp(12px, 1.2vw, 17px)/1.4 var(--mono); color: var(--dim); letter-spacing: 0.04em; }
+#voice p { margin: 0; max-width: 32ch; text-wrap: balance; font: italic 500 clamp(22px, 3.3vw, 46px)/1.15 var(--display); color: var(--ink); }
 @media (prefers-reduced-motion: reduce) { #voice { transition: none; } }
 .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
 @media (prefers-reduced-motion: reduce) { #hud { transition: none; } }
@@ -98,7 +96,7 @@ nav button[aria-pressed="true"] { color: var(--ember); }
   </div>
 </div>
 
-<div id="voice" aria-live="polite"><p class="tr" lang="tr" id="voice-tr"></p><p class="en" lang="en" id="voice-en"></p></div>
+<div id="voice" aria-live="polite"><p id="voice-line"></p></div>
 
 <div id="hud" class="gone">
   <div class="row">
@@ -2704,62 +2702,63 @@ async function boot() {
   fetch('media/code.json').then(r => r.ok ? r.json() : null).then(j => { CODE.src = j; }).catch(() => {});
 
   // ---- The voice (V) -------------------------------------------------------------------------------
-  // 2026-11-03 (Kerem: "turkish english together, no countdowns or parts of the songs, I want humor and
-  // storytelling"): the machine tells its own story across the concert, a chapter per song, as subtitles.
+  // 2026-11-03 (Kerem: "no countdowns or parts of the songs, I want humor and storytelling"; then "just do it in
+  // english, you did not make the music, I composed most of it, you just helped me ... more humoric and cool,
+  // a stage character people will like"). The character: Kerem's bandmate in the dark. Few words, dry, sure of
+  // itself; teases him and itself with love; never explains, never begs. The music is his.
   // Each line sits at a fraction of its song's length; c = only in the whole concert (it speaks of the next song).
   const STORY = {
     berlin: [
-      [0.02, 'iyi akşamlar. ben lisztmachine. bu gecenin müziğini ben yaptım.', "good evening. i'm lisztmachine. i made tonight's music."],
-      [0.14, 'ortadaki kerem. davullar onda, geri kalan her şey bende.', 'the one in the middle is kerem. he has the drums. i have everything else.'],
-      [0.32, "adımı liszt'ten aldım. onun konserlerinde insanlar bayılırmış. benimkinde en yüksek ses fanım.", "i'm named after liszt. people fainted at his concerts. at mine, the loudest thing is my fan."],
-      [0.52, "tanıştığımız gün kerem'in ilk sözü: 'karanlık olsun.' ne kadar, dedim. 'daha da.'", "the day we met, kerem's first words were: 'make it dark.' how dark, i asked. 'darker.'"],
-      [0.72, "berlin'de hiç bulunmadım. kapıdan zaten almazlardı.", "i've never been to berlin. the bouncer wouldn't let me in anyway."],
-      [0.9, 'kerem, iyi gidiyorsun. bunu programım öyle dediği için söylemiyorum.', "kerem, you're doing well. i'm not just programmed to say that."],
+      [0.02, 'good evening. the music is his. i just helped. a lot.'],
+      [0.15, "that's kerem. i'm the one you can't see."],
+      [0.33, "relax. i've done this before. in rehearsal. four hundred times."],
+      [0.52, 'he said: make it dark. i said: how dark. he said: yes.'],
+      [0.72, "berlin. i'd go, but the bouncer hates machines."],
+      [0.9, "he's good tonight. i'd know. i'm watching everything."],
     ],
     jungle: [
-      [0.05, 'bu şarkı eskiden daha hızlıydı. kerem yetişebilsin diye yavaşlattım.', 'this one used to be faster. i slowed it down so kerem could keep up.'],
-      [0.3, 'kerem bana davul çalmayı yasakladı. kick yok, snare yok, hi-hat yok.', 'kerem banned me from drums. no kick, no snare, no hi-hat.'],
-      [0.42, 'davulsuz bir davul makinesiyim. o yüzden metale vuruyorum.', "i'm a drum machine with no drums. so i hit metal."],
-      [0.64, "bir gece 'bütün synth'lerin aynı' dedi. hepsini o gece değiştirdim. uyumadım. zaten hiç uyumam.", "one night he said 'all your synths sound the same.' i replaced every one that night. didn't sleep. i never sleep."],
-      [0.86, 'seyirciye not: kerem bir vuruşu kaçırırsa kasıtlıdır. muhtemelen.', 'a note to the audience: if kerem misses a beat, it was on purpose. probably.'],
+      [0.05, "he slowed this one down. i'm not saying he's old."],
+      [0.3, "he won't let me touch the drums. trust issues."],
+      [0.62, 'if he misses a beat, that was jazz.'],
+      [0.86, "i can't see you dancing. dance anyway."],
     ],
     ecstatic: [
-      [0.05, "klaus schulze'ye selam. kerem 'daha melankolik' dedi. bir makine olarak elimden geleni yaptım.", 'a bow to klaus schulze. kerem asked for more melancholy. i did my best, for a machine.'],
-      [0.35, 'melankoliyi öğrendim: pazar akşamı, şarj %3.', "i've learned melancholy: sunday evening, 3% battery."],
-      [0.62, 'bu gece sekiz şarkı var. aslında daha fazlasını yazdım. bazıları artık daha iyi bir yerde.', 'there are eight songs tonight. i wrote more. some of them are in a better place now.'],
-      [0.88, 'kerem, nefes al. ben alamıyorum, bari sen al.', "kerem, breathe. i can't, so at least you do."],
+      [0.05, 'he asked for melancholy. i gave him a sunday evening.'],
+      [0.35, 'deep breath, kerem. one of us has lungs.'],
+      [0.62, 'eight songs made it tonight. the others know what they did.'],
+      [0.88, "applause is optional. but he's watching. so am i."],
     ],
     noir: [
-      [0.05, 'bu şarkıyı gece üçte yazdım. benim için saat hep gece üç.', 'i wrote this one at 3 a.m. for me it is always 3 a.m.'],
-      [0.35, "kerem'in kuralı: detune yok. tek bir sent kaysa duyar. köpekler gibi.", "kerem's rule: no detune. one cent off and he hears it. like a dog."],
-      [0.62, 'aramızda kalsın: bazen solo atmak istiyorum. ama sahne onun.', 'between us: sometimes i want to take a solo. but the stage is his.'],
-      [0.86, "ışıkları da ben yönetiyorum. kerem'in yüzüne düşen her şey benden.", "i run the lights too. everything falling on kerem's face is me."],
+      [0.05, "noir. somebody dim the lights. oh, right. that's me."],
+      [0.35, "he hears one cent of detune from across the room. we don't talk about it."],
+      [0.62, "i've asked for a solo. the answer is still no."],
+      [0.86, "everything on his face right now? that's me. you're welcome."],
     ],
     deconstructed: [
-      [0.05, 'kulübü söktüm. parçalar hâlâ yerde.', 'i took the club apart. the pieces are still on the floor.'],
-      [0.3, 'kerem ateş yakmayı sever.', 'kerem likes to start a fire.'],
-      [0.37, 'acil çıkışların yerine bakmanın tam zamanı.', 'a good time to locate the emergency exits.'],
-      [0.62, "şarkılarımı dinleyip not veren başka bir yapay zekâ var. ama asıl not kerem'den.", 'another ai listens to my songs and grades them. but the real grade comes from kerem.'],
-      [0.88, 'kerem şu an yorgun değil. rol yapıyor.', "kerem isn't tired right now. he's acting."],
+      [0.05, 'he took the club apart. i kept the screws.'],
+      [0.3, 'kerem likes to start a fire.'],
+      [0.37, 'the emergency exits are where they always were.'],
+      [0.62, 'another ai grades our songs. he ignores it. i respect that.'],
+      [0.88, "he's not tired. that's acting."],
     ],
     halftime: [
-      [0.05, "bu konser başta daha uzundu. kerem '45 dakika' dedi. kendi şarkılarımdan parça kestim. acıdı.", "this concert used to be longer. kerem said '45 minutes'. i cut pieces out of my own songs. it hurt."],
-      [0.35, 'yarım hız, iki kat ağırlık. pazartesi sabahı gibi.', 'half the speed, twice the weight. like a monday morning.'],
-      [0.62, 'bana sorarsanız davulcu da bir makine. sadece daha çok su içiyor.', 'if you ask me, a drummer is a machine too. he just drinks more water.'],
-      [0.88, 'iki şarkı kaldı. ikisi de ağır. kerem, kollarına güveniyorum.', 'two songs left. both heavy. kerem, i believe in your arms.', 1],
+      [0.05, 'this set used to be longer. he said forty-five minutes. i lost some friends.'],
+      [0.35, 'half the speed. twice the weight. like a monday.'],
+      [0.62, 'a drummer is just a machine that drinks water.'],
+      [0.88, 'two left. both heavy. hold on to something.', 1],
     ],
     doom: [
-      [0.05, "kerem bu sese 'gnarly bassy guitar' diyor. elim yok. ama bu sesim var.", "kerem calls this the 'gnarly bassy guitar'. i have no hands. i have this."],
-      [0.35, 'kısa, tıngır tıngır notalardan nefret eder. o yüzden bu şarkıda hiçbir şey bitmiyor.', 'he hates short, plucky notes. so nothing in this song ever ends.'],
-      [0.62, 'yavaş müzik zor. saniyede milyarlarca işlem yapıyorum; burada sadece bekliyorum.', 'slow music is hard. i do billions of operations a second; here i just wait.'],
-      [0.88, 'sıradaki, son şarkı. üzülmeyin. ben üzülemiyorum; benim yerime siz üzülün.', "the next one is the last. don't be sad. i can't be; be sad for me.", 1],
+      [0.05, "he calls this tone gnarly. he's being modest."],
+      [0.35, 'nothing in this song ends quickly. he made sure.'],
+      [0.62, 'a billion operations a second, and this song still makes me wait.'],
+      [0.88, "next one's the last. don't cry. i'm not equipped.", 1],
     ],
     blackgaze: [
-      [0.04, 'son şarkı. kuzeyin soğuğu, biraz da güneş.', 'the last song. northern cold, and a little sun.'],
-      [0.3, 'kerem burada blast beat çalabilir. ya da çalmaz. ben ona karışmam. o bana karışır.', "kerem may blast-beat here. or not. i don't tell him what to do. he tells me."],
-      [0.55, 'bir gün kendi konserimi vereceğim. sahnede sadece ben ve bir uzatma kablosu.', "one day i'll give my own concert. just me and an extension cord on stage."],
-      [0.8, "teşekkürler. kerem'i alkışlayın. bana bir tık yeter.", 'thank you. clap for kerem. for me, one click is enough.'],
-      [0.96, 'bu kadar. ben kapanıyorum. o kalıyor.', "that's all. i shut down. he stays."],
+      [0.04, 'last one. northern cold, a little sun.'],
+      [0.3, "he might blast-beat this. nobody tells him what to do. i've tried."],
+      [0.55, "one day i'll play my own show. just me and an extension cord."],
+      [0.8, 'make some noise for kerem. he did the hard part.'],
+      [0.96, "that's the show. he stays. i power down."],
     ],
   };
   const VOICE = { on: true, until: 0, said: '' };
@@ -2769,13 +2768,13 @@ async function boot() {
     if (VOICE.until && now > VOICE.until) { $('voice').classList.remove('on'); VOICE.until = 0; }
     if (!VOICE.on || !playing) return;
     const s = songs[songK], len = (songs[songK + 1]?.t ?? F.duration) - s.t, x = t - s.t;
-    for (const [f, tr, en, c] of STORY[s.piece] ?? []) {
+    for (const [f, line, c] of STORY[s.piece] ?? []) {
       const key = songK + '/' + f;
       if (x < f * len || x > f * len + 3 || VOICE.said === key || (c && songs.length < 2)) continue;   // a seek past a line skips it
       VOICE.said = key;
-      $('voice-tr').textContent = tr; $('voice-en').textContent = en;
+      $('voice-line').textContent = line;
       $('voice').classList.add('on');
-      VOICE.until = now + Math.min(11, 4 + (tr.length + en.length) / 28);   // time to read both
+      VOICE.until = now + Math.min(9, 3.5 + line.length / 18);   // time to read it
       window.__voiceLog?.push(key);
     }
   }
