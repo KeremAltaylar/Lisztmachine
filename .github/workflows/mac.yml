@@ -42,9 +42,9 @@ jobs:
         run: |
           mkdir -p render
           R="$(find build -name liszt_render -type f -perm -u+x | head -1)"
-          "$R" --seed 1 --seconds 60 --out "$PWD/render/seed1-60s.wav"
+          # Berlin's palette is plugin synths only (OB-Xf, TAL, FB-3300), which this machine does not have
           "$R" --scene jungle --seed 1 --seconds 60 --out "$PWD/render/jungle1-60s.wav"
-          "$R" --scene triphop --seed 1 --from 60 --bars 24 --out "$PWD/render/triphop1-dexed.wav" | grep -E "dexed|rendered"
+          "$R" --scene noir --seed 1 --seconds 60 --out "$PWD/render/noir1-60s.wav"
 
       - name: Package the app
         run: |
