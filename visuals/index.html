@@ -52,6 +52,10 @@ nav button[aria-pressed="true"] { color: var(--ember); }
 .form { position: relative; display: flex; align-items: flex-end; gap: 2px; height: 30px; cursor: pointer; }
 .form div { flex: 1 1 0; min-width: 0; background: var(--rule); }
 .form div.code { box-shadow: inset 0 2px 0 var(--ember); }   /* the code score: the sections where code may appear */
+.songs { position: relative; height: 17px; margin-bottom: -6px; }   /* the whole concert: which song is where */
+.songs span { position: absolute; bottom: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; padding: 0 4px 4px 0;
+  font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase; color: oklch(0.82 0.1 var(--h)); border-bottom: 3px solid oklch(0.6 0.13 var(--h)); }
+.songs i { position: absolute; bottom: 0; height: 9px; min-width: 6px; border-radius: 1px; }   /* the metronome's glide into the next song */
 .form .head { position: absolute; top: -3px; bottom: -3px; width: 1px; background: var(--ember); pointer-events: none; }
 .pad { font-size: 12px; color: var(--dim); }
 .pad button { padding: 4px 10px; border: 1px solid var(--rule); color: var(--ink); }
@@ -104,6 +108,7 @@ nav button[aria-pressed="true"] { color: var(--ember); }
     <div class="now" id="now"></div>
     <nav id="studies"></nav>
   </div>
+  <div class="songs" id="songs" hidden></div>
   <div class="form" id="form"><div class="head" id="head"></div></div>
   <div class="row pad cam">
     <span>Camera</span>
@@ -2151,10 +2156,15 @@ async function boot() {
     b.onclick = () => choose(s);
     nav.append(b);
   });
+  // a hue per song, for the concert's timeline (Kerem, 2026-11-04: "show some song colors ... so I can understand the
+  // songs and transitions"); neighbours far apart on the wheel, each near its world's colour
+  const HUE = { berlin: 195, jungle: 250, ecstatic: 310, noir: 25, deconstructed: 130, halftime: 275, doom: 50, blackgaze: 350 };
+  const songCol = (k, l = 0.6, c = 0.13) => 'oklch(' + l + ' ' + c + ' ' + (HUE[songs[k].piece] ?? 75) + ')';
   const form = $('form');
   sec.forEach(s => {
     const d = document.createElement('div');
     d.style.flexGrow = (sec[sec.indexOf(s) + 1]?.t ?? F.duration) - s.t; d.style.height = Math.round(18 + 82 * s.energy) + '%'; d.title = s.name;
+    if (concert) d.style.background = songCol(songIndex(s.t), 0.36, 0.06);
     if (codeScore[sec.indexOf(s)]) { d.className = 'code'; d.title += ' · code ' + Math.round(codeScore[sec.indexOf(s)].q * 100) + '%'; }
     form.insertBefore(d, $('head'));
   });
@@ -2266,6 +2276,21 @@ async function boot() {
   });
   // beat n of song k, in concert time; Infinity once it reaches the next song (whose beat 0 takes over). The click
   // keeps its own song k, from the audio clock: the frame loop's song change can come a beat or more late.
+  if (concert) {
+    const pct = t => t / F.duration * 100 + '%', box = $('songs');
+    songs.forEach((s, k) => {
+      const e = document.createElement('span'), end = songs[k + 1]?.t ?? F.duration;
+      e.textContent = PIECES[s.piece].name; e.title = PIECES[s.piece].name + ' · ' + s.bpm + ' bpm';
+      e.style.setProperty('--h', HUE[s.piece] ?? 75); e.style.left = pct(s.t); e.style.width = 'calc(' + pct(end - s.t) + ' - 2px)';
+      box.append(e);
+      if (!ramps[k]) return;
+      const g = document.createElement('i'), t0 = ramps[k].times[0];
+      g.style.left = pct(t0); g.style.width = pct(end - t0); g.style.background = 'linear-gradient(90deg, ' + songCol(k) + ', ' + songCol(k + 1) + ')';
+      g.title = 'Metronome glide ' + s.bpm + ' → ' + songs[k + 1].bpm + ' bpm';
+      box.append(g);
+    });
+    box.hidden = false;
+  }
   const beatT = (k, n) => {
     const s = songs[k], r = ramps[k], t = !r || n < r.j ? s.t + n * 60 / s.bpm : r.times[n - r.j] ?? Infinity;
     return t < (songs[k + 1]?.t ?? Infinity) - 1e-6 ? t : Infinity;
