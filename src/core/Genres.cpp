@@ -41,7 +41,7 @@ const G::Spec kJungle {
     .progs = { { { 0, 3, 6, 2 }, { 2, 3, 0, 0 }, { 0, 4, 3, 6 } } }, .preRoot = 6,
     .form = { { { "Rainfall", 16, .15f, "PAT" }, { "Warm Front", 16, .35f, "PADHTMW" }, { "Roller", 48, .65f, "PKSHCBUADTGYMW" },
                 { "Undertow", 32, .40f, "PADFTMW" },
-                { "Liquid Gold", 64, 1.0f, "PKSHCBUADFTGYMRIW" }, { "Tide", 16, .15f, "PARTW" } } },
+                { "Liquid Gold", 48, 1.0f, "PKSHCBUADFTGYMRIW" }, { "Tide", 16, .15f, "PARTW" } } },
     // the two-step's weight drives the pulse; rides and a shuffle of ticks around the live breaks
     .pulse = part("X.........X.....", "X.........X.....", "X.........X..x.."),
     .metal = part("", "..1...2...1...2.", "..1.2.1...1.3.2."),
@@ -71,9 +71,9 @@ const G::Spec kEcstatic {
     .progs = { { { 0, 5, 3, 4 }, { 0, 6, 5, 6 }, { 0, 2, 5, 4 } } }, .preRoot = 4,
     // 2026-11-01 (Kerem: "too many synths, rewrite it"): one sound per part, the chords gone (the sequence,
     // the pad and the choir carry the harmony), the sequence an octave deeper, the sharp part changes
-    .form = { { { "Dawn", 16, .15f, "PAT" }, { "Continuum", 16, .35f, "PATM" }, { "Lattice", 32, .55f, "PAHTRM" },
-                { "Suspension", 32, .40f, "PAFTGYMR" }, 
-                { "Computation", 48, 1.0f, "PKSHCBUAFTGYMRI" }, { "Halo", 24, .20f, "PART" } } },
+    .form = { { { "Dawn", 16, .15f, "PAT" }, { "Continuum", 16, .35f, "PATM" }, { "Lattice", 24, .55f, "PAHTRM" },
+                { "Suspension", 24, .40f, "PAFTGYMR" }, 
+                { "Computation", 40, 1.0f, "PKSHCBUAFTGYMRI" }, { "Halo", 16, .20f, "PART" } } },
     // no break here: the sequence is the rhythm; the pulse only lands at the summit
     .pulse = part("", "", "X...X...X...X..."),
     .metal = part("", "", "......1.......2."),
@@ -99,9 +99,9 @@ const G::Spec kNoir {
     .progs = { { { 0, 5, 4, 0 }, { 0, 5, 1, 4 }, { 0, 6, 5, 4 } } }, .preRoot = 4,
     // 2026-11-01 (Kerem): the guitar stabs out, a second pad (the drone track) where they were; a
     // contrabass walking under a saxophone solo
-    .form = { { { "Rain", 8, .15f, "PFT" }, { "Cigarette", 16, .30f, "PHDT" }, { "Roads", 24, .55f, "PKSHCBUDLTGYM" },
+    .form = { { { "Rain", 8, .15f, "PFT" }, { "Cigarette", 16, .30f, "PHDT" }, { "Roads", 16, .55f, "PKSHCBUDLTGYM" },
                 { "Hollow Hall", 16, .35f, "PDAFT" }, 
-                { "Cathedral of Smoke", 32, 1.0f, "PKSHCBUADFTGYMIW" }, { "Last Light", 16, .25f, "PDALTW" } } },
+                { "Cathedral of Smoke", 24, 1.0f, "PKSHCBUADFTGYMIW" }, { "Last Light", 8, .25f, "PDALTW" } } },
     .pulse = part("X.........X.....", "X.......X.X.....", "X.....x.X.X....."),
     .metal = part("", "..........1.....", "......1...2...3."), // far bells
     .tick = part("..g...g...g...g.", "x.g.x.g.x.g.x.g2", "xgxgx2xgxgxgx2xg"),
@@ -125,9 +125,9 @@ const G::Spec kDeconstructed {
     .progs = { { { 0, 1, 5, 6 }, { 0, 3, 1, 0 }, { 0, 6, 5, 1 } } }, .preRoot = 1,
     // 2026-11-01 (Kerem): the big parts start sharp, the build before each one obvious (spec.build);
     // the low logs in more parts and busier
-    .form = { { { "Shatter", 16, .20f, "PDFTRG" }, { "Glass", 16, .40f, "PCKDTGYMR" }, { "Fracture", 48, .80f, "KSCBDULTGYMR" },
+    .form = { { { "Shatter", 16, .20f, "PDFTRG" }, { "Glass", 16, .40f, "PCKDTGYMR" }, { "Fracture", 32, .80f, "KSCBDULTGYMR" },
                 { "Cathedral", 32, .40f, "PDAFTG" }, 
-                { "Rebirth", 48, 1.0f, "PKSHCBUADFTGYMIR" }, { "Wound", 32, .30f, "PDATRG" } } },
+                { "Rebirth", 40, 1.0f, "PKSHCBUADFTGYMIR" }, { "Wound", 16, .30f, "PDATRG" } } },
     .pulse = part("X.......X..x....", "X..x.....X.x..x.", "X..x.X...X.xx..xX....x..X..x.X.."),
     .metal = part("", "......1...2.1...", "...1..2...3.1.21"),
     .tick = part("", "x...x.x...x...x.", "x.xxx.x.x.xxx.xx"),
@@ -150,8 +150,8 @@ const G::Spec kHalftime {
     .progs = { { { 0, 5, 3, 4 }, { 0, 3, 4, 0 }, { 5, 3, 4, 4 } } }, .preRoot = 4,
     // 2026-11-01 (Kerem): Breath a lot longer; the low and the mid percussion in more parts; Gravity and
     // Fall gone, the song ends in Breath; a bowed cello section (the drone track) holds the chords
-    .form = { { { "Smoke", 16, .15f, "PFT" }, { "Weight", 32, .35f, "PHBUTGY" }, { "Halftime", 48, .60f, "PKSHCBUDTGYMW" },
-                { "Hollow", 32, .40f, "PAFTYW" }, { "Mass", 64, .85f, "PKSHCBUADTGYMIRW" }, { "Breath", 24, .25f, "PATW" } } },
+    .form = { { { "Smoke", 16, .15f, "PFT" }, { "Weight", 24, .35f, "PHBUTGY" }, { "Halftime", 40, .60f, "PKSHCBUDTGYMW" },
+                { "Hollow", 24, .40f, "PAFTYW" }, { "Mass", 48, .85f, "PKSHCBUADTGYMIRW" }, { "Breath", 24, .25f, "PATW" } } },
     // halftime: the tempo is 170, the body feels 85 (the live snare on three); the metal answers around it
     .pulse = part("X...............", "X.........x.....", "X.........x...x.X......x..x....."),
     .metal = part("..........1.....", "......1...2.....", "......1...2...3.......1...2..1.3"),
@@ -177,9 +177,9 @@ const G::Spec kDoom {
     // and the summit is all of the low end playing it as one.
     .bpmLo = 74, .bpmHi = 78, .mode = &kPhrygian, .tonics = { 1, 2, 11, 9, 4 }, // 2026-10-31 (Kerem): a little faster
     .progs = { { { 0, 1, 0, 5 }, { 0, 5, 3, 1 }, { 0, 3, 1, 0 } } }, .preRoot = 1,
-    .form = { { { "Feedback", 8, .15f, "RFTW" }, { "Procession", 16, .45f, "PRBUTGW" }, { "Monolith", 24, .70f, "PRBUDCKSTGYMW" },
+    .form = { { { "Feedback", 8, .15f, "RFTW" }, { "Procession", 16, .45f, "PRBUTGW" }, { "Monolith", 16, .70f, "PRBUDCKSTGYMW" },
                 { "Shroud", 16, .40f, "PAFTW" }, 
-                { "Monument", 32, 1.0f, "PRBUDCKSTGYMAFIW" }, { "Dust", 8, .15f, "RFTW" } } },
+                { "Monument", 24, 1.0f, "PRBUDCKSTGYMAFIW" }, { "Dust", 8, .15f, "RFTW" } } },
     .pulse = part("X...............", "X.......X.......", "X.......X...x..."),
     .metal = part("", "..........1.....", "......1.......2."), // far bells, chains
     .tick = part("", "", ""),
@@ -197,6 +197,37 @@ const G::Spec kDoom {
     .riff = G::RiffStyle::Sludge, .riffLo = 30, .summit = G::Summit::Unison, .legato = true, .gaze = true,
 };
 
+const G::Spec kStoner {
+    .scene = "stoner", .title = "Working Class Curse",
+    // 2026-11-04 (Kerem: "a faster doom, a completely different song, fast; take Doom's instruments, add
+    // Colin Stetson like delayed saxophones, a faster stoner with high feedback saxophones"): after Kyuss,
+    // Fu Manchu and Stetson's New History Warfare. The riff drives in muted eighths with chords on the
+    // push; a low saxophone circles the chord tones in sixteenths without a breath, into long echoes and
+    // the feedback bus, and an alto howls long notes over it (the drone track, as a singer). Dorian: the
+    // minor with its bright sixth, the blues of it.
+    .bpmLo = 142, .bpmHi = 146, .mode = &kDorian, .tonics = { 2, 4, 0, 9, 7 },
+    .progs = { { { 0, 0, 3, 6 }, { 0, 6, 3, 0 }, { 0, 3, 0, 4 } } }, .preRoot = 6,
+    .form = { { { "Shift Whistle", 16, .25f, "ATW" }, { "Clock In", 16, .55f, "PRBUTGYA" },
+                { "Overtime", 32, .80f, "PRBUDCKSTGYMAW" }, { "Lunch Break", 16, .35f, "PAFTW" },
+                { "Strike", 48, 1.0f, "PRBUDCKSTGYMAFIW" }, { "Last Shift", 16, .20f, "ARTW" } } },
+    .pulse = part("X.......X.......", "X.....X...X.....", "X.....X...X...x."),
+    .metal = part("", "..........1.....", "......1.......2."), // chains, as in Doom
+    .tick = part("", "", ""),
+    .perc = part("", "....1.......1...", "....1..1....1.2."), // struck iron on his backbeat's neighbours
+    .bass = part("x---------------", "x-x-x-x-x-x-x-x-", "x-x-x-x-x-x-5-x-"), // eighths under the riff
+    .chord = part("", "x-------------------------------", "x-------------------------------"),
+    .sub = part("x---------------", "x-------x-------", "x-------x---^---"),
+    .ground = part("", "1.......1.......", "1.....1...1...2."),
+    .body = part("", "..o...o...o...o.", "..o.o.o...o.o.oo"),
+    .mallet = part("", "1...............", "1.......3......."),
+    .texture = part("x---------------", "x---------------", "x-------x-------"),
+    // the low saxophone: sixteenths in the drive, eighths in the calm, a cycle against the bar
+    .arpRate = { 8, 16, 16 }, .arpLenLo = 7, .arpLenHi = 11, .arpDensLo = .85f, .arpDensHi = 1.0f, .arpGate = .9f,
+    .arpLo = 40, .arpHi = 64, .percLo = 33, .percHi = 48, .ext = 0, .hook = false,
+    .swing = .04f, .riff = G::RiffStyle::Stoner, .riffLo = 33, .summit = G::Summit::Unison, .gaze = true,
+    .voice = true,
+};
+
 const G::Spec kBlackgaze {
     .scene = "blackgaze", .title = "Blackgaze",
     // after Deafheaven, Alcest and Lantlos: tremolo-picked open chords (root, fifth, ninth) as a wall,
@@ -208,8 +239,8 @@ const G::Spec kBlackgaze {
     // tremolo carries a melody on its top string.
     .bpmLo = 150, .bpmHi = 158, .mode = &kAeolian, .tonics = { 4, 11, 9, 2, 6 },
     .progs = { { { 0, 5, 2, 6 }, { 5, 6, 0, 0 }, { 0, 3, 5, 6 } } }, .preRoot = 6,
-    .form = { { { "Haze", 16, .20f, "PFTRG" }, { "Rise", 32, .50f, "PRBUTGYCA" }, { "Storm", 48, .80f, "PRBUKSCDTGYI" },
-                { "Clearing", 32, .35f, "PAFTG" }, { "Sunbather", 64, 1.0f, "PRBUKSCDTGYAFI" },
+    .form = { { { "Haze", 16, .20f, "PFTRG" }, { "Rise", 24, .50f, "PRBUTGYCA" }, { "Storm", 40, .80f, "PRBUKSCDTGYI" },
+                { "Clearing", 24, .35f, "PAFTG" }, { "Sunbather", 48, 1.0f, "PRBUKSCDTGYAFI" },
                 { "Afterglow", 16, .20f, "PRT" } } },
     .pulse = part("X.......X.......", "X...X...X...X...", "X.X.X.X.X.X.X.X."), // the blast's weight, as ghost pumps
     .metal = part("", "..............1.", "......1.......2."),
@@ -234,7 +265,7 @@ bool is(const char* a, const char* b) { return std::strcmp(a, b) == 0; }
 
 const std::vector<const G::Spec*>& GenreComposer::all()
 {
-    static const std::vector<const Spec*> v = { &kJungle, &kEcstatic, &kNoir, &kDeconstructed, &kHalftime, &kDoom, &kBlackgaze };
+    static const std::vector<const Spec*> v = { &kStoner, &kJungle, &kEcstatic, &kNoir, &kDeconstructed, &kHalftime, &kDoom, &kBlackgaze };
     return v;
 }
 
@@ -1323,6 +1354,26 @@ void GenreComposer::makeRiff()
                     mel->push_back(d);
                 }
             }
+            break;
+        }
+        case RiffStyle::Stoner:
+        {
+            // fast stoner (Working Class Curse): the root chugged in muted eighths under open chords, one
+            // on the push (the and of two, or of three); the first bar turns to the third or the fourth,
+            // the second bar's back half runs the minor's dark degrees, power chords all
+            static const int runs[][4] = { { 2, 3, 4, 3 }, { 2, 3, 2, -1 }, { 6, 4, 3, 2 }, { 3, 4, 6, 4 } };
+            const int push = rng_.chance(.5) ? 6 : 10, turn = rng_.chance(.5) ? 2 : 3;
+            const int* run = runs[rng_.range(0, 3)];
+            for (int half = 0; half < 2; ++half)
+            {
+                const int b = half * 16;
+                add(b, 2, 0, 1.0f, false);
+                for (int s = 2; s < (half ? 8 : 12); s += 2)
+                    if (s == push) add(b + s, 2, 0, .9f, false);
+                    else add(b + s, 1, 0, .65f, true);
+                if (!half) { add(12, 2, turn, .9f, false); add(14, 1, 0, .7f, true); }
+            }
+            for (int k = 0; k < 4; ++k) add(24 + 2 * k, 2, run[k], k == 3 ? 1.0f : .85f, false);
             break;
         }
         default: break; // the drone follows the chords, bar by bar

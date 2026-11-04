@@ -64,14 +64,15 @@ void BerlinComposer::planForm()
     static const T plan[] = {
         // 2026-11-02 (Kerem: "shorten Berlin"): 288 bars to 176, about six and a half minutes; the Return
         // is gone and the quiet parts are half as long. The soloist answers the lead and has the Shift to itself.
+        // 2026-11-04 (Kerem: "shorten the songs"): 176 to 144: the Song, the Theme and the Summit 24 bars, the Shift 8.
         { "Drift",      8, .15f, bit(Pad), false },
         { "Pulse",      8, .30f, uint8_t(bit(Pad) | bit(Bass)), false },
         { "Motion",    16, .50f, uint8_t(bit(Pad) | bit(Bass) | bit(Seq)), false },
-        { "Song",      32, .62f, kAll, false },
+        { "Song",      24, .62f, kAll, false },
         { "Haze",       8, .35f, uint8_t(bit(Pad) | bit(Seq)), false },
-        { "Theme",     32, .82f, kAll, true },
-        { "Shift",     16, .70f, uint8_t(kAll & ~bit(Lead)), false },
-        { "Summit",    32, 1.0f, kAll, true },
+        { "Theme",     24, .82f, kAll, true },
+        { "Shift",      8, .70f, uint8_t(kAll & ~bit(Lead)), false },
+        { "Summit",    24, 1.0f, kAll, true },
         { "Dissolve",  16, .30f, uint8_t(bit(Pad) | bit(Seq) | bit(Solo)), false },
         { "Afterglow",  8, .05f, bit(Pad), false },
     };

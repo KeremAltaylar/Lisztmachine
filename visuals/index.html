@@ -83,9 +83,10 @@ nav button[aria-pressed="true"] { color: var(--ember); }
   <div class="card">
     <h1>Lisztmachine</h1>
     <p class="meta" id="meta">Choose a piece</p>
-    <p class="lede">Eight pieces, one by one or the whole concert without a stop, and eight generative light studies for projecting onto the drummer, blending into each other. Each one reads the music itself: every note, every chord and the level of each part, so the light lands exactly with the sound.</p>
+    <p class="lede">Nine pieces, one by one or the whole concert without a stop, and eight generative light studies for projecting onto the drummer, blending into each other. Each one reads the music itself: every note, every chord and the level of each part, so the light lands exactly with the sound.</p>
     <div class="pieces" id="pieces">
       <button class="go" id="piece-berlin" data-piece="berlin" disabled>Berlin</button>
+      <button class="go" id="piece-stoner" data-piece="stoner" disabled>Working Class Curse</button>
       <button class="go" id="piece-jungle" data-piece="jungle" disabled>Liquid</button>
       <button class="go" id="piece-ecstatic" data-piece="ecstatic" disabled>Ecstatic Arpeggios</button>
       <button class="go" id="piece-noir" data-piece="noir" disabled>Noir</button>
@@ -167,6 +168,10 @@ const PIECES = {
   halftime: { name: 'Halftime', study: 'horizon', strobeBeats: 1, media: 'media/halftime1', ranges: [[36, 86], [22, 64], [42, 62], [60, 86]],
     world: { name: 'Gravity', lo: [0.25, 0.1, 0.7], hi: [0.95, 0.9, 1.0],         // indigo weight, pale light
       palette: [[0.5, 0.4, 1], [0.95, 0.9, 1], [1, 0.25, 0.4], [0.3, 0.8, 1], [1, 1, 1], [0.8, 0.3, 1]] } },
+  // 2026-11-04: fast stoner and Stetson saxophones; the one study no other song has
+  stoner: { name: 'Working Class Curse', study: 'pattern', strobeBeats: 1, media: 'media/stoner1', ranges: [[36, 86], [22, 64], [33, 62], [40, 82]],
+    world: { name: 'Rust', lo: [0.45, 0.22, 0.05], hi: [1.0, 0.82, 0.5],           // oil black, rust, sodium amber over the yard
+      palette: [[1, 0.6, 0.15], [0.85, 0.35, 0.08], [1, 0.85, 0.5], [1, 0.95, 0.85], [0.4, 0.15, 0.05], [0.95, 0.7, 0.3]] } },
   doom: { name: 'Doom', study: 'lumen', strobeBeats: 2, media: 'media/doom1', ranges: [[36, 86], [22, 64], [33, 62], [55, 80]],
     world: { name: 'Pyre', lo: [0.35, 0.03, 0.02], hi: [1.0, 0.55, 0.25],          // coal-black and blood shadows, fire through smoke
       palette: [[1, 0.35, 0.08], [0.9, 0.1, 0.05], [1, 0.7, 0.35], [1, 0.95, 0.85], [0.5, 0.05, 0.1], [1, 0.5, 0.15]] } },
@@ -2158,7 +2163,7 @@ async function boot() {
   });
   // a hue per song, for the concert's timeline (Kerem, 2026-11-04: "show some song colors ... so I can understand the
   // songs and transitions"); neighbours far apart on the wheel, each near its world's colour
-  const HUE = { berlin: 195, jungle: 250, ecstatic: 310, noir: 25, deconstructed: 130, halftime: 275, doom: 50, blackgaze: 350 };
+  const HUE = { berlin: 195, stoner: 70, jungle: 250, ecstatic: 310, noir: 25, deconstructed: 130, halftime: 275, doom: 50, blackgaze: 350 };
   const songCol = (k, l = 0.6, c = 0.13) => 'oklch(' + l + ' ' + c + ' ' + (HUE[songs[k].piece] ?? 75) + ')';
   const form = $('form');
   sec.forEach(s => {
@@ -2777,6 +2782,12 @@ async function boot() {
       [0.3, "There is a train that leaves the city at nine and never arrives.", 0, 0],
       [0.3, "Passengers say the ride is beautiful.", 0, 10],
       [0.3, "Nobody has ever said where they got off.", 0, 20],
+    ],
+    stoner: [
+      [0.12, "John Henry drove steel for the railroad, with a hammer in each hand.", 0, 0],
+      [0.12, "One morning the company brought a steam drill to the mountain, to do the work of ten men.", 0, 10],
+      [0.12, "He raced it through the rock from sunrise to dusk, and he beat it.", 0, 20],
+      [0.12, "Then he laid the hammer down and died with it still warm. The drill kept the job.", 0, 30],
     ],
     jungle: [
       [0.1, "In the 1930s, two mapmakers put a town that did not exist on a road in New York. They called it Agloe.", 0, 0],

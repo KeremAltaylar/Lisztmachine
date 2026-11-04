@@ -4,7 +4,7 @@
 
 namespace liszt {
 
-// The genre songs (liquid, ecstatic arpeggios, noir, deconstructed club, halftime, doom, blackgaze),
+// The genre songs (working class curse, liquid, ecstatic arpeggios, noir, deconstructed club, halftime, doom, blackgaze),
 // each named for its genre until Kerem names it. One
 // composer plays them all from a table per genre (Genres.cpp): the form, a drum machine of step
 // patterns per energy tier (each part on its own grid, so triplets run against sixteenths),
@@ -37,8 +37,9 @@ public:
     enum GTrack : uint8_t { Pad, Pulse, Metal, Tick, Perc, Bass, Sub, Arp, Chord, Fx, Harm, Ground, Body, Mallet, Texture, Impact, Riff, Drone, kGenreTracks };
     // How the riff is played: doom (power chords, long, the flat second and the tritone around them),
     // chug (palm-muted sixteenths, chords on the syncopations), tremolo (blackgaze: every sixteenth
-    // picked, root, fifth and ninth), sludge (one huge chord a bar, let ring), drone (re-picked whole notes).
-    enum class RiffStyle : uint8_t { None, Doom, Chug, Tremolo, Sludge, Drone };
+    // picked, root, fifth and ninth), sludge (one huge chord a bar, let ring), drone (re-picked whole notes), stoner (fast: muted eighths, chords
+    // on the push, a run in the second bar).
+    enum class RiffStyle : uint8_t { None, Doom, Chug, Tremolo, Sludge, Drone, Stoner };
     // How the summit establishes itself (not by transposing what came before): the theme comes home
     // doubled; the riff, bass and 808 lock in unison; a pedal: the low end holds the tonic while the
     // chords move over it; half time: everything at half speed, twice the weight; a new theme of its own.

@@ -106,9 +106,9 @@ protected:
 // A scene by name (kScenes); anything else is Berlin. The genre songs are named for their genre
 // until Kerem names them.
 std::unique_ptr<Composer> makeComposer(const std::string& scene, uint64_t seed);
-inline const char* kScenes[] = { "berlin", "jungle", "ecstatic", "noir", "deconstructed", "halftime",
+inline const char* kScenes[] = { "berlin", "stoner", "jungle", "ecstatic", "noir", "deconstructed", "halftime",
                                  "doom", "blackgaze" };
-inline const char* kSceneTitles[] = { "Berlin", "Liquid", "Ecstatic Arpeggios", "Noir", "Deconstructed Club",
+inline const char* kSceneTitles[] = { "Berlin", "Working Class Curse", "Liquid", "Ecstatic Arpeggios", "Noir", "Deconstructed Club",
                                       "Halftime", "Doom", "Blackgaze" };
 
 // Berlin-school scene: drone pad, sequenced bass, polymetric upper sequence and a

@@ -7,7 +7,7 @@ the visuals page plays them back to back from the 'songs' list.
 """
 import json, os
 
-ORDER = [('berlin', 'seed1'), ('jungle', 'jungle1'), ('ecstatic', 'ecstatic1'), ('noir', 'noir1'),
+ORDER = [('berlin', 'seed1'), ('stoner', 'stoner1'), ('jungle', 'jungle1'), ('ecstatic', 'ecstatic1'), ('noir', 'noir1'),
          ('deconstructed', 'deconstructed1'), ('halftime', 'halftime1'), ('doom', 'doom1'), ('blackgaze', 'blackgaze1')]
 media = os.path.join(os.path.dirname(__file__), '..', 'visuals', 'media')
 

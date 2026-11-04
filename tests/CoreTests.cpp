@@ -45,7 +45,7 @@ int main()
               }), "same seed must give the same concert");
 
         double minutes = c.totalBars() * 4 / c.bpm();
-        CHECK(minutes > 5.5 && minutes < 7.5, "length %.1f min", minutes);
+        CHECK(minutes > 4.5 && minutes < 7.5, "length %.1f min", minutes);
 
         std::map<std::pair<int, int>, int> sounding; // (track, pitch) -> count
         size_t e = 0;
@@ -116,7 +116,7 @@ int main()
                       return a.tick == b.tick && a.type == b.type && a.track == b.track && a.pitch == b.pitch && a.value == b.value;
                   }), "%s: same seed must give the same piece", spec->scene);
             const double minutes = c.totalBars() * 4 / c.bpm();
-            CHECK(minutes > 4 && minutes < 8, "%s length %.1f min (the concert is 45)", spec->scene, minutes);
+            CHECK(minutes > 3.5 && minutes < 6, "%s length %.1f min (the concert is about 43)", spec->scene, minutes);
             std::map<std::pair<int, int>, int> held;
             int notes[G::kGenreTracks] = {}, slides = 0, subHeld = 0;
             // a walk's approach and a solo's passing note may leave the key: by a half step into the track's next note
@@ -147,7 +147,8 @@ int main()
             CHECK(slides > 10, "%s: the 808 never slides (%d)", spec->scene, slides);
             CHECK(notes[G::Harm] > 20, "%s: the choir never sings", spec->scene);
             // the fills throw their last hit into the echo
-            CHECK(std::count_if(ev.begin(), ev.end(), [](auto& x) { return x.type == Event::Throw && x.value > 0; }) > 10, "%s: no echo throws", spec->scene);
+            const auto throws = std::count_if(ev.begin(), ev.end(), [](auto& x) { return x.type == Event::Throw && x.value > 0; });
+            CHECK(throws > c.totalBars() / 16, "%s: %d echo throws in %d bars", spec->scene, int(throws), c.totalBars()); // one a 16-bar phrase
             // the summit plays the home progression, four bars a chord (a new theme brings its own)
             for (auto& s : c.sections())
                 if (s.restoreTheme && spec->summit != G::Summit::NewTheme)

@@ -14,3 +14,4 @@ dc-erhu-trio.sfz: a wrapper of the erhu 05-erhu_sul_tasto with the trio on and a
 lm-cello.sfz: Bigcat cello "01- Bowed (velocity layer)" with note_offset=12, because its samples are mapped an octave low (C1_p = the open C string at 65 Hz sits on key 24) and so sounded an octave high; sfizz applies note_offset with the opposite sign (copy it into `lib/Karoryfer_Bigcat_cello.v1.001/Karoryfer_Bigcat_cello/Programs/`).
 
 - `noir-sax.sfz` (Weresax/Programs): Sax.sfz with its vibrato on (cc111 55, unsteady 40, uneven pitch 20), for the Noir solo.
+- `wcc-bass-sax.sfz` (Weresax/Programs): Sax.sfz an octave down (note_offset=-12 plus transpose=-12: each key plays the sample an octave above, pitched down), no vibrato: the low saxophone of Working Class Curse. Measured pitch-true from E2 (40) to E4 (64), beating 2-8 %.

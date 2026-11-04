@@ -1,0 +1,129 @@
+# Lisztmachine sound palette: Working Class Curse (fast stoner after Kyuss and Fu Manchu, saxophones after Colin Stetson).
+# 2026-11-04 (Kerem: "take examples from Doom for instruments, add Colin Stetson like delayed saxophones, high feedback"):
+# Doom's palette (its guitars, bass guitar, 808, choir, iron and modal percussion), the arp a low saxophone and the
+# drone track an alto howling long notes, both into long echoes and the feedback bus.
+# Tracks: pad pulse metal tick perc bass sub arp chord fx harm.
+# Patches from the earlier palettes, re-measured held at C4 (basses C3) with pure tuning, 2026-10-26: beating 1-15 %
+# (Semihaunt left out: 39 %, EP 1 left out: 43-51 %). Gain: a held note to -22 dB RMS (pads and chords -27, they play 3-4 notes).
+# part   gain   bright  patch
+
+pulse    0.0      60  internal/none
+metal    -6.5    1063  3rd/Malfunction/Drums/Tuning Drums
+metal    -7.4     997  3rd/Malfunction/Drums/Inharmonic Attack 2
+tick     0.0    6000  internal/click
+perc     -0.7    1486  3rd/Cybersoda/Drums/Perc 8
+perc     8.4     431  3rd/Emu/Drums/Mort Noisey Drum
+fx       -5.7     286  FX/Unsettler
+
+# 2026-10-29 evening: this song's own synths (pitch-true, beating <= 15 %, none shared with another song)
+pad      -9.0     277  3rd/Nick Moritz/Pads/Nightmare
+pad     -20.5     654  3rd/Databroth/Pads/Feed
+chord    -5.6     268  3rd/Luna/Brass/Brassy Sync
+chord    -3.0    1040  Brass/Reso Brassy
+chord    -7.1     879  3rd/Emu/Synths/Disto Brass Pass
+
+# Echoes: beats, feedback, mix
+delay chord 1.5 0.40 0.20
+
+# Balance (to be measured in the mix)
+gain pulse   0.0
+gain metal   6.0
+gain tick    14.9
+gain perc    -3.4
+gain pad     11.0  # Doom's, Kerem's mix
+gain bass    0.0  # Doom's +7.0, minus 7: the eighths sum 7 dB hotter than Doom's held notes (2026-11-04, measured)
+gain sub     -2.4  # Doom's, Kerem's mix
+gain arp     -3.0
+gain drone   0.0
+gain chord   -5.1
+gain fx      1.9  # Doom's, Kerem's mix
+master 1.0  # Kerem's faders sum hot (round 2: -6.0 LUFS at 9.6; round 3: -7.7 at 4.0): 1.0 for about -10, PLR 8.6
+amp bass  0.79 1800 0.75
+amp chord 0.79 2500 0.85
+amp pad   0.40 2000 0.45
+drive metal 0.30 4500
+drive perc  0.30 6000
+crush tick  8 3 0.3
+comp perc -22 4 5 80 0.4
+duck metal 0.15
+duck tick 0.2
+duck perc 0.25
+delay metal 0.75 0.55 0.35 throws
+delay perc  1.0 0.5 0.3 throws
+
+# 2026-10-29: the 808, the choir, deep metal, darker synths
+sub      0.0      60  internal/808
+metal    6.9     783  3rd/Malfunction/Drums/Gong
+perc     -0.6     287  3rd/Vospi/Drums/Modular Drum
+harm     -3.2     740  3rd/Giana Brotherz/Pads/Deep Choir
+harm    -10.6    3541  3rd/Bluelight/Vox/Gregorian Rant Poly
+gain harm    -0.1  # Doom's, Kerem's mix
+amp harm  0.40 2200 0.35
+drive sub  0.55 2500
+duck sub 0.30
+lowcut bass 90
+
+# The percussion section (modal: struck and shaken objects, tuned to the chords)
+ground   0.0    1000  internal/modal-log
+body     0.0    1000  internal/modal-skin
+mallet   0.0    1000  internal/modal-bowl
+texture  0.0    1000  internal/modal-chain
+impact   0.0    1000  internal/modal-plate
+gain ground  -21.6
+gain body    -12.5
+gain mallet  -29.9
+gain texture -19.2
+gain impact -4.0
+comp body -24 3 8 90 0.35
+duck body 0.2
+duck mallet 0.15
+delay mallet 0.75 0.4 0.25
+delay impact 1.5 0.55 0.4 throws
+
+# Sampled instruments (CC0: Karoryfer, D. Smolken, VSCO 2 CE; jSteelDrum: Unlicense), played by sfizz
+chord    21.8    1019  sfz/vsco2/TenorTrombone-sus.sfz
+pad      21.9     720  sfz/vsco2/Tuba-sus.sfz
+bass     24.5     900  sfz/Karoryfer.Growlybass.v1.002/Growlybass/growlybass_angry.sfz
+
+# 2026-10-30: the riff (the engine's guitar: two takes, left and right, the fifths pure) into a fuzz and a cabinet
+riff    19.0    1000  sfz/Karoryfer_Black_And_Green_Guitars_1000/Programs/doom-baritone.sfz
+gain riff    5.5  # Doom's, Kerem's mix
+drive riff 0.85 2500
+amp riff  0.70 1800 1.0 45 -2 3600 6 1100
+
+# 2026-10-31 (Kerem: the bass guitar's low hits are the tone, "Gnarly bassy guitar tone"; the other
+# tones' envelopes too short, long sustains and releases; a glue reverb for all, shimmerish, 25 % wet;
+# the engine guitar's overdrive sounded electronic, an organic gnarly guitar instead): the bass guitar
+# only (the synth basses out), the riff on the sampled guitars (both, left and right) an octave down
+# into the same fuzz and amp, the trombone held instead of staccato, every Surge sound's release at
+# least these seconds, every track into the reverb, and into it an octave up too (the shimmer)
+release pad   4.0
+release harm  4.0
+release chord 3.0
+send all reverb 0.25
+shimmer 0.5
+return reverb 17.6  # 7.5 put the reverb 9.5 dB under the dry tracks (25 % wet); Kerem's mix +10.1 on it
+return delay 12  # Doom's, Kerem's mix
+
+# 2026-10-31 night (Kerem: a little faster, every note ringing into the next, a feedback channel the
+# guitar and the bass feed whose amount he sets, "over exaggerate the feedback"; a second, drone guitar
+# for long chords, a third effect): the drone = the same guitars with their pitched feedback up, held
+# through each chord; the feedback bus = a ping-pong at a dotted eighth (beats, amount: over 1 it
+# swells and holds), fed by the guitars and the bass, set in the Doom Mixer
+feedback 0.75 0.99  # Doom's, Kerem's mix
+feed riff   0.69
+feed bass   0.49
+return feedback 6.3
+
+# 2026-11-04: the saxophones (Karoryfer Weresax, CC0). The low one circles the chords in sixteenths: the alto an
+# octave down (wcc-bass-sax.sfz, copy it into lib/Weresax/Programs/), a dotted-eighth echo held high, and the
+# feedback bus; the alto (no vibrato) howls long phrases over the riff, a slower echo, longer.
+arp     13.2    2170  sfz/Weresax/Programs/wcc-bass-sax.sfz
+drone   13.2    2170  sfz/Weresax/Programs/Sax.sfz
+drive arp  0.35 3200
+delay arp   0.75 0.80 0.40
+delay drone 1.5  0.85 0.45
+send arp reverb 0.30
+send drone reverb 0.45
+feed arp    0.70
+feed drone  0.55
