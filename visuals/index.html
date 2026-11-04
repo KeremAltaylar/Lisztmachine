@@ -2224,7 +2224,7 @@ async function boot() {
   // The metronome (M, 2026-11-01 Kerem): a click on every beat of whichever song plays, the bar's
   // first one higher and louder. Scheduled ahead on the audio clock, the same clock as the recording,
   // so it sits on the song's grid whatever the frame rate; closing it cancels what is scheduled.
-  const metro = { on: false, next: 0, from: -1, nodes: [] };
+  const metro = { on: false, k: 0, next: 0, from: -1, nodes: [] };
   // its own fader (2026-11-01 Kerem: +12 dB, and a volume fader), then a soft clip, so a loud click
   // rounds off instead of clipping the output with the music
   const metroBus = actx.createGain(), metroClip = actx.createWaveShaper();
@@ -2241,12 +2241,48 @@ async function boot() {
   try { const v = localStorage.getItem('lisztmachine-metro-db'); if (v !== null) metroDb = +v; } catch {}
   setMetroVol(metroDb);
   $('metro-vol').oninput = e => setMetroVol(+e.target.value);
+  // Between songs (Kerem, 2026-11-04: "so abrupt ... I adapt to the tempo shift before the next song starts"): over
+  // the song's last 12-24 s the click glides from its tempo to the next song's, a whole number of bars, landing on
+  // the next song's first beat. The recording does not glide, so the click leaves it there on purpose.
+  // Tempo over the ramp: b0 + (b1 - b0) u + c u (1 - u), c chosen so the bars come out whole; the start bar is
+  // the one that keeps c, the bend, smallest.
+  const ramps = songs.map((s, k) => {
+    const n1 = songs[k + 1], spb = 60 / s.bpm, mean = (s.bpm + (n1?.bpm ?? 0)) / 2;
+    let best = null;
+    for (let j = n1 ? Math.floor((n1.t - 12 - s.t) / spb / 4) * 4 : 0; j > 0 && n1.t - s.t - j * spb <= 24; j -= 4) {
+      const D = n1.t - s.t - j * spb, N = Math.max(4, Math.round(mean * D / 240) * 4), c = 6 * (N * 60 / D - mean);
+      if (!best || Math.abs(c) < Math.abs(best.c)) best = { j, D, N, c };
+    }
+    if (!best) return null;
+    const { j, D, N, c } = best, b0 = s.bpm, b1 = n1.bpm, t0 = s.t + j * spb;
+    const phi = u => D / 60 * (b0 * u + (b1 - b0) * u * u / 2 + c * (u * u / 2 - u * u * u / 3));   // beats since t0
+    const times = [t0];
+    for (let i = 1; i < N; i++) {
+      let lo = 0, hi = 1;
+      for (let it = 0; it < 40; it++) { const m = (lo + hi) / 2; if (phi(m) < i) lo = m; else hi = m; }
+      times.push(t0 + lo * D);
+    }
+    return { j, times };
+  });
+  // beat n of song k, in concert time; Infinity once it reaches the next song (whose beat 0 takes over). The click
+  // keeps its own song k, from the audio clock: the frame loop's song change can come a beat or more late.
+  const beatT = (k, n) => {
+    const s = songs[k], r = ramps[k], t = !r || n < r.j ? s.t + n * 60 / s.bpm : r.times[n - r.j] ?? Infinity;
+    return t < (songs[k + 1]?.t ?? Infinity) - 1e-6 ? t : Infinity;
+  };
   const metroClear = () => { metro.nodes.forEach(n => { try { n.stop(); } catch {} }); metro.nodes = []; };
   setInterval(() => {
     if (!metro.on || !playing) { if (metro.nodes.length) metroClear(); metro.from = -1; return; }
-    const spb = 60 / F.show.bpm;
-    if (metro.from !== startAt + '/' + F.songT) { metroClear(); metro.from = startAt + '/' + F.songT; metro.next = Math.ceil((Math.max(startT, F.songT) - F.songT) / spb - 1e-6); } // started, sought, or a new song
-    for (let at; (at = startAt + F.songT + metro.next * spb - startT) < actx.currentTime + 0.12; metro.next++) {
+    if (metro.from !== startAt) {   // started or sought
+      metroClear(); metro.from = startAt;
+      const k = metro.k = songIndex(startT);
+      metro.next = Math.max(0, Math.min(Math.ceil((startT - songs[k].t) * songs[k].bpm / 60 - 1e-6), ramps[k]?.j ?? Infinity));
+      while (beatT(k, metro.next) < startT - 1e-6) metro.next++;
+    }
+    for (let at; ; metro.next++) {
+      let bt = beatT(metro.k, metro.next);
+      if (bt === Infinity && songs[metro.k + 1]) { metro.k++; metro.next = 0; bt = songs[metro.k].t; }
+      if ((at = startAt + bt - startT) >= actx.currentTime + 0.12) break;
       if (at < actx.currentTime) continue;
       const down = metro.next % 4 === 0, o = actx.createOscillator(), env = actx.createGain();
       o.frequency.value = down ? 1760 : 1320;
