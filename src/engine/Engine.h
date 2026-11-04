@@ -126,6 +126,7 @@ public:
     void set(double seconds, float feedback, float mix, bool throwsOnly = false);
     void process(float* left, float* right, int numSamples);
     void throwFor(int at, int samples) { throwAt_ = at; throwLeft_ = samples; } // in this block, from sample `at`
+    void letGo(float to, float step) { fb_ = juce::jmax(juce::jmin(fb_, to), fb_ - step); } // the song's end: ease the feedback down
 
 private:
     std::vector<float> l_, r_;
@@ -146,6 +147,7 @@ public:
     void prepare(double sampleRate);
     void set(double seconds, float feedback) { d_ = juce::jlimit(1, int(l_.size()) - 1, int(std::lround(seconds * sr_))); fb_ = juce::jlimit(0.0f, 1.5f, feedback); }
     void process(float* left, float* right, int numSamples);
+    void letGo(float to, float step) { fb_ = juce::jmax(juce::jmin(fb_, to), fb_ - step); }
 
 private:
     std::vector<float> l_, r_;
@@ -442,7 +444,7 @@ private:
     std::vector<Event> events_;
     size_t head_ = 0;
     int nextBar_ = 0;
-    int64_t pos_ = 0, endSample_ = 0;
+    int64_t pos_ = 0, endSample_ = 0, quiet_ = 0; // quiet_: samples of silence after the last bar
     double samplesPerTick_ = 1;
     std::atomic<bool> playing_ { false }, finished_ { false }, panic_ { false };
 

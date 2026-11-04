@@ -1093,6 +1093,7 @@ void Engine::start(uint64_t seed, int startBar)
     duckRamp_ = 0;
     for (auto& t : tracks_) for (auto& f : t.hp) f.z1 = f.z2 = 0;
     bar = startBar;
+    quiet_ = 0;
     finished_ = false;
     panic_ = true;
     playing_ = true;
@@ -1500,7 +1501,21 @@ void Engine::renderChunk(float* const* out, int numChannels, int offset, int len
     if (playing && numChannels >= 4) renderClick(out, numChannels, offset, len);
 
     if (playing) { pos_ = end; seconds = double(pos_) / sampleRate_; }
-    if (playing && nextBar_ >= composer_->totalBars() && head_ >= events_.size() && pos_ > endSample_ + int64_t(12 * sampleRate_)) // the reverb and delay tails
+    // 2026-11-04 (Kerem: "you cut the end of Working Class Curse abrupt; wait for total silence"): the
+    // feedback bus at 0.99 still rang at -29 dB when a fixed 12 s tail ran out. After the last bar every
+    // echo eases its feedback to 0.6 over two seconds, and the song ends after half a second under -70 dB.
+    if (playing && pos_ > endSample_)
+    {
+        const float step = 0.4f * float(len / (2.0 * sampleRate_));
+        fbBus_.letGo(0.6f, step);
+        for (auto& t : tracks_) if (t.hasEcho) t.echo.letGo(0.6f, step);
+        // and every sound lets go of its notes at the last bar: Doom's drone guitar held one past its note-off forever
+        if (end - len <= endSample_)
+            for (auto& t : tracks_) for (auto& slot : t.slots) slot.midi.addEvent(juce::MidiMessage::allNotesOff(1), 0);
+        quiet_ = post < 3.2e-4f ? quiet_ + len : 0;
+    }
+    if (playing && nextBar_ >= composer_->totalBars() && head_ >= events_.size()
+        && (quiet_ > int64_t(sampleRate_ / 2) || pos_ > endSample_ + int64_t(60 * sampleRate_))) // the reverb and delay tails
     {
         finished_ = true;
         playing_ = false;
