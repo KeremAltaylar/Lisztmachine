@@ -336,7 +336,8 @@ void GenreComposer::planForm()
         for (int i = 0; i < t.bars; ++i)
         {
             sectionOfBar_.push_back(int(sections_.size()) - 1);
-            const float k = std::min(1.0f, float(i + 1) / (t.bars * 0.5f));
+            const bool whole = bar > 0 && t.energy >= .6f && t.energy > prev + .1f; // drives(): at full energy from its downbeat
+            const float k = whole ? 1.0f : std::min(1.0f, float(i + 1) / (t.bars * 0.5f));
             energyOfBar_.push_back(prev + (t.energy - prev) * k);
         }
         bar += t.bars;
@@ -585,7 +586,7 @@ float GenreComposer::levelAt(int track, int bar) const
     auto& sec = sectionAt(bar);
     const int in = bar - sec.startBar, left = sec.startBar + sec.bars - bar;
     const float fade = track == Pad || track == Fx || track == Sub || track == Chord || track == Harm ? 4.0f : 2.0f;
-    const float fadeIn = spec_.build || active(track, bar - in - 1) || (bar == 0 && track != Pad) ? 1.0f : std::min(1.0f, (in + 1) / fade);
+    const float fadeIn = spec_.build || drives(sectionOfBar_[size_t(bar)]) || active(track, bar - in - 1) || (bar == 0 && track != Pad) ? 1.0f : std::min(1.0f, (in + 1) / fade);
     const float fadeOut = active(track, bar + left) ? 1.0f : std::min(1.0f, left / fade);
     return std::min(fadeIn, fadeOut);
 }
@@ -1529,6 +1530,32 @@ void GenreComposer::planEnds()
         endFig_[size_t(end)] = f;
         if ((nx.restoreTheme || nx.energy - sec.energy >= .3f) && sec.bars >= 8) endFig_[size_t(end - 1)] = f == 2 ? 3 : 2;
     }
+
+    // 2026-11-05 (Kerem: "more deterministic part starts, not rising the volume gradually; for main and
+    // driving parts, after the attack and silence it should start full blast as a whole part, for all
+    // songs"): the last bar before a driving part is one hit of the whole band on its downbeat, then
+    // silence to the next downbeat (a build's 2, 4, 8 move a bar earlier), as Berlin's big parts do.
+    for (int si = 1; si < int(sections_.size()); ++si)
+    {
+        const auto& sec = sections_[size_t(si - 1)];
+        if (!drives(si) || sec.bars < 4) continue;
+        const int end = sec.startBar + sec.bars - 1;
+        if (spec_.build && sec.bars >= 8)
+            for (int k = 0; k < 3; ++k) endFig_[size_t(end - 3 + k)] = 6 + k;
+        endFig_[size_t(end)] = 9;
+        drop_[size_t(end)] = 0; // the whole band on the stop
+    }
+
+    // 2026-11-05 (Kerem: "each song starts with one component, not 3-4 voices; in 10 seconds or so they
+    // reach their start"): the first part's layers come in one at a time, in the order its form names
+    // them, the last about ten seconds in.
+    std::vector<uint32_t> entries;
+    for (const char* s = spec_.form[0].layers; *s; ++s)
+        if (const char one[2] = { *s, 0 }; layersOf(one)) entries.push_back(layersOf(one));
+    const int k = int(entries.size()), span = std::max(1, int(std::lround(10.0 * bpm_ / 240.0)));
+    for (int i = 1; i < k; ++i)
+        for (int b = 0; b < std::min(int(std::lround(double(i * span) / (k - 1))), sections_[0].bars - 1); ++b)
+            drop_[size_t(b)] |= entries[size_t(i)];
 }
 
 bool GenreComposer::buildsWith(int track, int bar) const
@@ -1543,7 +1570,8 @@ void GenreComposer::emitAttack(int bar, std::vector<Event>& out)
 {
     if (!attackBar(bar)) return;
     static const char* kEnds[] = { "X..x..x.X.......", "X.......x.x.xXXX", "X..x..x..x..x..x", "X.x...x.x...X.X.", "X.......x...X...", "........X..x..X.",
-                                   "X.......X.......", "X...X...X...X...", "X.X.X.X.X.X.X.X." }; // the build: 2, 4, 8
+                                   "X.......X.......", "X...X...X...X...", "X.X.X.X.X.X.X.X.", // the build: 2, 4, 8
+                                   "X..............." }; // the stop before a driving part
     const int f = endFig_[size_t(bar)];
     const char* fig = kEnds[f];
     const int64_t t0 = int64_t(bar) * kBarTicks, six = kSixteenth;
@@ -1557,7 +1585,7 @@ void GenreComposer::emitAttack(int bar, std::vector<Event>& out)
         out.push_back({ t + len, Event::NoteOff, uint8_t(track), uint8_t(p), 0 });
     };
     const bool riffHere = spec_.riff != RiffStyle::None && (active(Riff, bar) || (final && active(Riff, bar + 1)) || buildsWith(Riff, bar)); // the guitar may enter with it
-    auto on = [&](int track) { return active(track, bar) || buildsWith(track, bar); }; // a build brings in the next part's low end
+    auto on = [&](int track) { return active(track, bar) || buildsWith(track, bar) || (f == 9 && active(track, bar + 1)); }; // a build, and a stop, bring in the next part's
     for (size_t k = 0; k < at.size(); ++k)
     {
         const int i = at[k];
@@ -1567,7 +1595,7 @@ void GenreComposer::emitAttack(int bar, std::vector<Event>& out)
         const int b = walk ? bar + 1 : bar;
         const int64_t t = t0 + i * six;
         const int64_t len = (lastHit ? std::min(3, 16 - i) : at[k + 1] - i) * six - 12;
-        const float vel = f >= 6 ? .7f + .12f * float(f - 6) + .06f * float(i) / 15 : (.6f + .4f * float(i) / 15) * (accent ? 1.0f : .8f);
+        const float vel = f >= 6 ? std::min(1.0f, .7f + .12f * float(f - 6) + .06f * float(i) / 15) : (.6f + .4f * float(i) / 15) * (accent ? 1.0f : .8f);
         const int r = lowRootAt(b), diff = degreeSemis(m, r + walk) - degreeSemis(m, r);
         if (riffHere) powerChord(Riff, t, len, riffRoot(b, walk), over(b, walk, 4), .5f + .5f * vel, out);
         if (on(Bass)) note(Bass, t, len, up(lowPitch(b, 0, 40, 51, 36) + diff, 40), vel);
@@ -1618,6 +1646,11 @@ void GenreComposer::generateBar(int bar, std::vector<Event>& out)
     emitImpact(bar, out);
     emitRiff(bar, out);
     emitAttack(bar, out);
+    if (attackBar(bar) && endFig_[size_t(bar)] == 9) // the stop: silence, the tails too, from beat two to the downbeat
+    {
+        out.push_back({ int64_t(bar) * kBarTicks + 4 * kSixteenth, Event::Hush, 0, 0, 0 });
+        out.push_back({ int64_t(bar + 1) * kBarTicks, Event::Hush, 0, 0, 1 });
+    }
     emitHeld(Fx, bar, out, fxHeld_, active(Fx, bar) ? foldInto(48 + tonicAt(bar), 48, 59) : -1);
 }
 

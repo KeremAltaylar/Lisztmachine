@@ -134,6 +134,8 @@ private:
     // a figure the low instruments play together; the drums stop around it.
     void planEnds();
     bool attackBar(int bar) const { return endFig_[size_t(bar)] >= 0; }
+    // a main, driving part (.6 and up, clearly louder than the one before): it starts whole, after a stop
+    bool drives(int si) const { return si > 0 && sections_[size_t(si)].energy >= .6f && sections_[size_t(si)].energy > sections_[size_t(si - 1)].energy + .1f; }
     bool buildsWith(int track, int bar) const; // a build bar: the track plays it because the next part has it
     void emitAttack(int bar, std::vector<Event>& out);
     bool summitHalftime(int bar) const;
