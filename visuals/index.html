@@ -52,6 +52,8 @@ nav button[aria-pressed="true"] { color: var(--ember); }
 .form { position: relative; display: flex; align-items: flex-end; gap: 2px; height: 30px; cursor: pointer; }
 .form div { flex: 1 1 0; min-width: 0; background: var(--rule); }
 .form div.code { box-shadow: inset 0 2px 0 var(--ember); }   /* the code score: the sections where code may appear */
+.form div.img { box-shadow: inset 0 -2px 0 var(--ink); }    /* the image score: the sections with the photographs */
+.form div.code.img { box-shadow: inset 0 2px 0 var(--ember), inset 0 -2px 0 var(--ink); }
 .songs { position: relative; height: 17px; margin-bottom: -6px; }   /* the whole concert: which song is where */
 .songs span { position: absolute; bottom: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; padding: 0 4px 4px 0;
   font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase; color: oklch(0.82 0.1 var(--h)); border-bottom: 3px solid oklch(0.6 0.13 var(--h)); }
@@ -135,6 +137,7 @@ nav button[aria-pressed="true"] { color: var(--ember); }
     <label class="amt" for="metro-vol">Metronome volume <input id="metro-vol" type="range" min="-24" max="24" step="1" value="12"> <span id="metro-vol-v">+12 dB</span></label>
     <button id="code" title="C" aria-pressed="false">Code off</button>
     <button id="voice-go" title="V" aria-pressed="false">Voice off</button>
+    <button id="images" title="I" aria-pressed="false">Images off</button>
   </div>
 </div>
 
@@ -170,6 +173,7 @@ const PIECES = {
       palette: [[0.5, 0.4, 1], [0.95, 0.9, 1], [1, 0.25, 0.4], [0.3, 0.8, 1], [1, 1, 1], [0.8, 0.3, 1]] } },
   // 2026-11-04: fast stoner and Stetson saxophones; the one study no other song has
   stoner: { name: 'Working Class Curse', study: 'pattern', strobeBeats: 1, media: 'media/stoner1', ranges: [[36, 86], [22, 64], [33, 62], [40, 82]],
+    images: [1, 2, 3, 4, 5, 6].map(k => `media/img/stoner/${k}.jpg`),   // 2026-11-05: Library of Congress FSA/OWI photographs, public domain
     world: { name: 'Rust', lo: [0.45, 0.22, 0.05], hi: [1.0, 0.82, 0.5],           // oil black, rust, sodium amber over the yard
       palette: [[1, 0.6, 0.15], [0.85, 0.35, 0.08], [1, 0.85, 0.5], [1, 0.95, 0.85], [0.4, 0.15, 0.05], [0.95, 0.7, 0.3]] } },
   doom: { name: 'Doom', study: 'lumen', strobeBeats: 2, media: 'media/doom1', ranges: [[36, 86], [22, 64], [33, 62], [55, 80]],
@@ -183,6 +187,10 @@ const PIECES = {
   // the eight songs back to back from tools/concert.py; each one switches in its own study, colours and tempo.
   concert: { name: 'The whole concert', concert: true, media: 'media/concert1' },
 };
+// 2026-11-05: each song's photographs for the image layer, public domain (Library of Congress FSA/OWI and
+// Gottlieb, NASA, NOAA, US Forest Service, the Met, old maps and prints, via Wikimedia Commons), one per story
+for (const [k, n] of Object.entries({ berlin: 4, jungle: 4, ecstatic: 4, noir: 4, deconstructed: 4, halftime: 4, doom: 4, blackgaze: 2 }))
+  PIECES[k].images = Array.from({ length: n }, (_, i) => `media/img/${k}/${i + 1}.jpg`);
 let RANGE = PIECES.berlin.ranges;
 const TAU = [1.2, 0.28, 0.16, 0.4];                          // how long a note-on lights up, seconds
 const L01 = rms => Math.min(1, Math.max(0, (20 * Math.log10(rms + 1e-9) + 54) / 42)); // -54..-12 dBFS
@@ -647,9 +655,10 @@ fn padLayer(uv: vec2f) -> vec4f {
 // The mix pass: blends the outgoing and incoming studies (with an interference term halfway), then
 // feeds the previous frame back through up to three transforms. Its own module: no U here.
 const MIX = /* wgsl */`
-struct M { a: vec4f, b: vec4f, t0: vec4f, t1: vec4f, t2: vec4f, c: vec4f, o: vec4f, p: vec4f };
+struct M { a: vec4f, b: vec4f, t0: vec4f, t1: vec4f, t2: vec4f, c: vec4f, o: vec4f, p: vec4f, g: vec4f, h: vec4f };
 // a: blend, fade, decay, taps · b: hue turn, edge flow, folds, aspect · c: water flow, its scale, sharpen, time
 // o: outer loop decay, zoom, turn, water flow · p: outer folds, outer hue turn, outer fade
+// g: the image layer's strength, use (0 relief, 1 torn strips, 2 flow), light angle or cut seed, hit pulse · h: the held photograph
 @group(0) @binding(0) var<uniform> m: M;
 @group(0) @binding(1) var A: texture_2d<f32>;
 @group(0) @binding(2) var B: texture_2d<f32>;
@@ -658,6 +667,7 @@ struct M { a: vec4f, b: vec4f, t0: vec4f, t1: vec4f, t2: vec4f, c: vec4f, o: vec
 @group(0) @binding(5) var X: texture_2d<f32>;       // the outer loop's input: this frame after the inner loop
 @group(0) @binding(6) var prevO: texture_2d<f32>;   // and the outer loop's own last frame
 @group(0) @binding(7) var CODE: texture_2d<f32>;    // the code layer: glyphs over a dark halo, alpha = coverage; m.p.w its strength
+@group(0) @binding(8) var IMG: texture_2d<f32>;     // the image layer: a photograph, used as material, not shown as a picture
 struct VO { @builtin(position) pos: vec4f, @location(0) uv: vec2f };
 @vertex fn vs(@builtin(vertex_index) i: u32) -> VO {
   var p = array<vec2f, 3>(vec2f(-1.0, -1.0), vec2f(3.0, -1.0), vec2f(-1.0, 3.0));
@@ -672,6 +682,15 @@ fn hueTurn(c: vec3f, a: f32) -> vec3f {           // rotate about the grey axis:
   let ca = cos(a);
   return c * ca + cross(k, c) * sin(a) + k * dot(k, c) * (1.0 - ca);
 }
+// The photograph cut to cover the frame, a little cropped and drifting with the seed, so no edge shows.
+fn imgUV(uv: vec2f) -> vec2f {
+  let d = vec2f(textureDimensions(IMG));
+  var s = (uv - 0.5) * 0.92;
+  if (m.b.w > d.x / d.y) { s.y *= (d.x / d.y) / m.b.w; } else { s.x *= m.b.w / (d.x / d.y); }
+  return s + 0.5 + 0.03 * vec2f(sin(m.g.z * 1.7), cos(m.g.z * 1.3));
+}
+fn img(uv: vec2f) -> vec3f { return textureSampleLevel(IMG, smp, uv, 0.0).rgb; }
+fn dk(c: vec3f) -> vec3f { return c * c * c; }      // the photo as light: mid-tones sink, so a pale wall does not grey the projection
 fn rot(a: f32) -> mat2x2f { return mat2x2f(cos(a), sin(a), -sin(a), cos(a)); }
 fn fold(q: vec2f, n: f32) -> vec2f {
   let sector = 6.2831853 / n;
@@ -717,6 +736,13 @@ fn tapf(q: vec2f, t: vec4f, sharp: bool) -> vec3f {
     let ly = luma(textureSampleLevel(prev, smp, i.uv + vec2f(0.0, px.y), 0.0).rgb) - luma(textureSampleLevel(prev, smp, i.uv - vec2f(0.0, px.y), 0.0).rgb);
     q += vec2f(-ly, lx) * m.b.y;
   }
+  if (m.g.x > 0.0 && m.g.y > 1.5) {                 // flow: the light slides along the photograph's edges, the photo itself unseen
+    let iu = imgUV(i.uv);
+    let px = 2.0 / vec2f(textureDimensions(IMG));
+    let gx = luma(img(iu + vec2f(px.x, 0.0))) - luma(img(iu - vec2f(px.x, 0.0)));
+    let gy = luma(img(iu + vec2f(0.0, px.y))) - luma(img(iu - vec2f(0.0, px.y)));
+    q += vec2f(-gy, gx) * m.g.x * (0.006 + 0.02 * m.g.w);
+  }
   var f = tapf(q, m.t0, m.c.z > 0.0);
   if (m.a.w > 1.5) { f = max(f, tapf(q, m.t1, false)); }
   if (m.a.w > 2.5) { f = max(f, tapf(q, m.t2, false)); }
@@ -729,6 +755,31 @@ fn tapf(q: vec2f, t: vec4f, sharp: bool) -> vec3f {
   let ink = clamp(luma(k.rgb) * k.a * 2.2, 0.0, 1.0) * m.p.w;          // the glyphs (the halo is black)
   var o = bg * (1.0 - k.a * m.p.w * 0.7 * (1.0 - light));               // only ever darker: anything brighter would grow in the loop
   o = mix(o, mix(k.rgb * 1.6, vec3f(0.02), light), ink);
+  // The image layer, written into the generation like the code, so it trails and dissolves with the rest.
+  // Never brighter than the photograph itself, so the loop cannot grow it.
+  if (m.g.x > 0.0) {
+    let iu = imgUV(i.uv);
+    if (m.g.y < 0.5) {                                 // relief: a light rakes across the photo's surface, turning with the music
+      let px = 2.0 / vec2f(textureDimensions(IMG));
+      let hx = luma(img(iu + vec2f(px.x, 0.0))) - luma(img(iu - vec2f(px.x, 0.0)));
+      let hy = luma(img(iu + vec2f(0.0, px.y))) - luma(img(iu - vec2f(0.0, px.y)));
+      let n = normalize(vec3f(-hx * 10.0, -hy * 10.0, 1.0));
+      let sh = clamp(dot(n, normalize(vec3f(cos(m.g.z), sin(m.g.z), 0.55))), 0.0, 1.0);
+      o *= mix(1.0, 0.4 + 0.6 * sh, m.g.x);
+      o = max(o, dk(img(iu)) * sh * m.g.x * 0.85 * m.g.w);   // the photo itself only on a hit
+    } else if (m.g.y < 1.5) {                          // torn strips: rows of the photo slid sideways, more of them on each hit
+      let rows = 8.0 + floor(h21(vec2f(m.g.z, 1.0)) * 28.0);
+      let k = floor(i.uv.y * rows);
+      let shift = (h21(vec2f(k + 17.0, m.g.z)) - 0.5) * 0.4;
+      let vis = step(h21(vec2f(k, m.g.z)), 0.12 + 0.6 * m.g.w);
+      o = max(o, dk(img(imgUV(vec2f(fract(i.uv.x + shift), i.uv.y)))) * vis * m.g.x);
+    } else {
+      let px = 2.0 / vec2f(textureDimensions(IMG));      // only the photo's contours: written every frame, the whole picture would build up in the loop
+      let e = length(vec2f(luma(img(iu + vec2f(px.x, 0.0))) - luma(img(iu - vec2f(px.x, 0.0))), luma(img(iu + vec2f(0.0, px.y))) - luma(img(iu - vec2f(0.0, px.y)))));
+      o = max(o, img(iu) * smoothstep(0.08, 0.3, e) * m.g.x * (0.1 + 0.5 * m.g.w));
+    }
+    o = mix(o, img(iu), m.h.x);                        // the silence before a driving part: the raw photograph, held
+  }
   return vec4f(min(o, vec3f(16.0)), 1.0);
 }
 // The outer loop: a second, slower recursion around the first. It feeds on the inner loop's output, so
@@ -2026,7 +2077,7 @@ async function boot() {
   const pMix = g.fullscreen(MIX, 'mixf');
   const pOuter = g.fullscreen(MIX, 'outerf');
   const postU = device.createBuffer({ size: 64, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
-  const mixU = device.createBuffer({ size: 128, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+  const mixU = device.createBuffer({ size: 160, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
   const postIn = device.createBuffer({ size: Udata.byteLength, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });   // the composite's view of U
   // Every study has its own uniforms and its own target, so two can run at once during a transition.
   const use = s => { g.U = s.U; g.W = s.W; g.H = s.H; g.sceneView = s.view; };
@@ -2079,10 +2130,12 @@ async function boot() {
     this.typed = -1;   // redrawn at the new size on the next frame
   } };
   CODE.c2 = CODE.cv.getContext('2d');
+  // The image layer's texture: black until a piece's photograph has loaded (filled in at "The image layer").
+  const IMAGES = { vid: 'none', view: device.createTexture({ size: [1, 1], format: 'rgba8unorm', usage: GPUTextureUsage.TEXTURE_BINDING }).createView() };
   // The mix pass's bind group depends on which two studies are on and which feedback buffer is read.
   const mixGroup = (a, b, j) => {
-    const key = a.id + b.id + j;
-    return mixBG[key] ??= g.bind(pMix, [mixU, a.view, b.view, g.fbViews[1 - j], smp, CODE.view], [0, 1, 2, 3, 4, 7]);
+    const key = a.id + b.id + j + '|' + IMAGES.vid;
+    return mixBG[key] ??= g.bind(pMix, [mixU, a.view, b.view, g.fbViews[1 - j], smp, CODE.view, IMAGES.view], [0, 1, 2, 3, 4, 7, 8]);
   };
 
   // The clock is the audio: the position of what is coming out of the speakers right now.
@@ -2103,6 +2156,18 @@ async function boot() {
       return { q: r < 0.35 ? 0.15 + 0.3 * h(i + 80) : r < 0.7 ? 0.5 + 0.25 * h(i + 80) : 0.9 + 0.1 * h(i + 80) };
     });
   })();
+  // The image score (Kerem, 2026-11-05: "a score for the whole concert, in some parts the images open, in
+  // some parts closed"). A song's first and last parts stay pure; every driving part has its photographs;
+  // a few of the parts between take them too (about 45 % of the concert with photographs), chosen once,
+  // the same every night.
+  const imgScore = sec.map((s, i) => {
+    const prev = sec[i - 1], nx = sec[i + 1];
+    if (!prev || prev.song !== s.song || !nx || nx.song !== s.song) return false;
+    if (s.energy >= 0.6 && s.energy > prev.energy + 0.1) return true;
+    const x = Math.sin(i * 57.3 + 4.1) * 43758.5453;
+    return x - Math.floor(x) < 0.22;
+  });
+  window.__imgScore = () => { let on = 0; imgScore.forEach((c, i) => { if (c) on += (sec[i + 1]?.t ?? F.duration) - sec[i].t; }); return on / F.duration; };
   window.__codeScore = () => { let on = 0; codeScore.forEach((c, i) => { if (c) on += (sec[i + 1]?.t ?? F.duration) - sec[i].t; }); return on / F.duration; };
   let playing = false, musicT = concert ? 0 : (sec.find(s => ['Summit', 'Apotheosis', 'Possession', 'Ascension', 'Black', 'Computation', 'Submersion', 'Supercodex', 'Possessed', 'Rebirth', 'Gravity'].includes(s.name)) ?? sec[0]).t + 14;
   const clock = now => {
@@ -2171,6 +2236,7 @@ async function boot() {
     d.style.flexGrow = (sec[sec.indexOf(s) + 1]?.t ?? F.duration) - s.t; d.style.height = Math.round(18 + 82 * s.energy) + '%'; d.title = s.name;
     if (concert) d.style.background = songCol(songIndex(s.t), 0.36, 0.06);
     if (codeScore[sec.indexOf(s)]) { d.className = 'code'; d.title += ' · code ' + Math.round(codeScore[sec.indexOf(s)].q * 100) + '%'; }
+    if (imgScore[sec.indexOf(s)]) { d.classList.add('img'); d.title += ' · images'; }
     form.insertBefore(d, $('head'));
   });
   form.onclick = e => { const r = form.getBoundingClientRect(); seek((e.clientX - r.left) / r.width * F.duration); };
@@ -2202,6 +2268,7 @@ async function boot() {
     else if (e.key === 'g' || e.key === 'G') { roll(); }
     else if (e.key === 'c' || e.key === 'C') $('code').click();
     else if (e.key === 'v' || e.key === 'V') $('voice-go').click();
+    else if (e.key === 'i' || e.key === 'I') $('images').click();
     else if (e.key === 'h' || e.key === 'H') { hudHidden = !hudHidden; hud.classList.toggle('gone', hudHidden); }
     else if (e.key === 'f' || e.key === 'F') { document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen?.().catch(() => {}); }
     else return;
@@ -2517,7 +2584,7 @@ async function boot() {
   // zooming tap is a tunnel, a turning one a spiral, three shrunken copies an iterated-function
   // fractal of whatever is on screen. Each pass shifts the hue a little, and can flow along its own
   // edges. The genome picks the network; the bass punches into it.
-  const M = new Float32Array(32);
+  const M = new Float32Array(40);
   const FB_MODES = ['TUNNEL IN', 'TUNNEL OUT', 'SPIRAL', 'FRACTAL 3', 'FRACTAL 2', 'ECHO'];
   function network(dt, visT, aspect) {
     const f = Float32Array.from(D.fbg), e = F.energy, hit = F.hit[1];
@@ -2769,6 +2836,45 @@ async function boot() {
   setCode(CODE.on);
   fetch('media/code.json').then(r => r.ok ? r.json() : null).then(j => { CODE.src = j; }).catch(() => {});
 
+  // The image layer (Kerem, 2026-11-05: "real images, not pasted, cut textures from them, used generatively;
+  // keep the current visuals, just another tool"). A piece's photographs (piece.images, public-domain
+  // archive photos) feed the mix pass as material: each section takes the next photo and the next use
+  // (relief, torn strips, flow), the hits drive it, and in the silence before a driving part the raw
+  // photograph holds still until the downbeat breaks it back into the loop.
+  Object.assign(IMAGES, { mode: 0, k: -1, si: -1, seed: 0, pulse: 0, held: 0, cache: {} });   // mode: 0 off, 1 the score, 2 always
+  try { IMAGES.mode = +(localStorage.getItem('lisztmachine-images') ?? 0) % 3; } catch {}
+  IMAGES.load = url => IMAGES.cache[url] ??= fetch(url).then(r => r.ok ? r.blob() : Promise.reject(url)).then(b => createImageBitmap(b)).then(bm => {
+    const tex = device.createTexture({ size: [bm.width, bm.height], format: 'rgba8unorm', usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT });
+    device.queue.copyExternalImageToTexture({ source: bm }, { texture: tex }, [bm.width, bm.height]);
+    return { view: tex.createView(), vid: url };
+  }).catch(e => { console.warn('image', e); return null; });
+  IMAGES.frame = (dt, visT) => {
+    const list = piece.images;
+    M.fill(0, 32);
+    if (!IMAGES.mode || !list?.length) return;
+    if (F.si !== IMAGES.si) {                                   // a new section: the next photograph, the next use
+      IMAGES.si = F.si; IMAGES.k = (IMAGES.k + 1) % list.length; IMAGES.seed = F.si * 7.31;
+      for (const u of list) IMAGES.load(u);
+      IMAGES.load(list[IMAGES.k]).then(t => { if (t) Object.assign(IMAGES, { view: t.view, vid: t.vid }); });
+    }
+    const hit = Math.max(F.hit[1], pad.kick);
+    if (hit > IMAGES.pulse + 0.35) IMAGES.seed += 1;          // a strong hit tears the strips anew
+    IMAGES.pulse = Math.max(hit, IMAGES.pulse * Math.exp(-dt * 5));
+    const silent = playing && F.lv[6] < 0.002 && musicT > 1;  // the stop's silence (the hush is digital silence)
+    IMAGES.held = silent ? Math.min(1, IMAGES.held + dt * 12) : 0;   // gone on the downbeat, no fade
+    const open = IMAGES.mode === 2 || imgScore[F.si], use = F.si % 3;
+    if (!open && !IMAGES.held) return;                         // closed by the score; the stop's held photo shows even so
+    M.set([open ? 0.75 : 1e-4, use, use === 0 ? visT * 0.35 + IMAGES.seed : IMAGES.seed, IMAGES.pulse, IMAGES.held, 0, 0, 0], 32);
+  };
+  const setImages = mode => {
+    IMAGES.mode = mode; IMAGES.si = -1;
+    $('images').textContent = ['Images off', 'Images: score', 'Images: always'][mode]; $('images').setAttribute('aria-pressed', mode > 0);
+    try { localStorage.setItem('lisztmachine-images', String(mode)); } catch {}
+  };
+  window.__images = () => ({ mode: IMAGES.mode, k: IMAGES.k, si: F.si, open: IMAGES.mode === 2 || imgScore[F.si], held: IMAGES.held, master: F.lv[6], playing, musicT, M: [...M.slice(32, 37)] });
+  $('images').onclick = () => setImages((IMAGES.mode + 1) % 3);
+  setImages(IMAGES.mode);
+
   // ---- The voice (V) -------------------------------------------------------------------------------
   // 2026-11-03 (Kerem: "no countdowns or parts of the songs, I want humor and storytelling"; then "just do it in
   // english, you did not make the music, I composed most of it, you just helped me ... more humoric and cool,
@@ -2923,6 +3029,7 @@ async function boot() {
     if (frameNo % 15 === 0) padStatus();
     const blend = network(dt, visT, canvas.width / canvas.height);
     try { M[31] = CODE.level(); } catch (e) { console.error(e); CODE.block = null; M[31] = 0; }
+    IMAGES.frame(dt, visT);
     const enc = device.createCommandEncoder();
     for (const s of next ? [study, next] : [study]) {
       use(s);
