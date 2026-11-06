@@ -453,6 +453,7 @@ private:
     int duckRamp_ = 0;
     std::vector<float> duckCurve_;
     float hush_ = 1, hushTarget_ = 1;               // the whole mix, tracks and returns: 0 at a stop's silence
+    int hushKeep_ = -1, hushKeepNext_ = -1;         // the one track a lead-in's silence leaves sounding (from its hush on), or -1
     std::vector<float> hushCurve_;
     std::vector<std::pair<int, float>> hushAt_;    // this chunk's hush events: sample, target
     std::vector<std::pair<int, float>> kickHits_; // this chunk's kicks: sample, velocity

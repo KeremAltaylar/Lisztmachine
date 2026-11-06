@@ -47,7 +47,7 @@ struct Event
     Type type;
     uint8_t track;
     uint8_t pitch;
-    float value; // NoteOn: velocity 0..1 · Level: gain 0..1 · Filter: cutoff offset -1..1 · Throw: beats into the echo · Hush: 0 silence, 1 open
+    float value; // NoteOn: velocity 0..1 · Level: gain 0..1 · Filter: cutoff offset -1..1 · Throw: beats into the echo · Hush: 0 silence, 1 open (pitch 1: the track keeps sounding through it)
 
     bool operator<(const Event& o) const
     {

@@ -1244,7 +1244,7 @@ void Engine::renderChunk(float* const* out, int numChannels, int offset, int len
                 case Event::Level:   t.gain.setTargetValue(e.value); break;
                 case Event::Filter:  t.filterTarget = e.value; break;
                 case Event::Throw:   if (t.hasEcho) t.echo.throwFor(at, int(e.value * kPPQ * samplesPerTick_)); break;
-                case Event::Hush:    hushAt_.push_back({ at, e.value }); break;
+                case Event::Hush:    hushAt_.push_back({ at, e.value }); hushKeepNext_ = e.value < 0.5f && e.pitch == 1 ? e.track : -1; break;
             }
         }
         for (int i = 0; i < numTracks_; ++i) changesDue(i, end - 1);
@@ -1300,10 +1300,15 @@ void Engine::renderChunk(float* const* out, int numChannels, int offset, int len
         size_t k = 0;
         for (int n = 0; n < len; ++n)
         {
-            for (; k < hushAt_.size() && hushAt_[k].first <= n; ++k) hushTarget_ = hushAt_[k].second;
+            for (; k < hushAt_.size() && hushAt_[k].first <= n; ++k)
+            {
+                hushTarget_ = hushAt_[k].second;
+                if (hushTarget_ < 0.5f) hushKeep_ = hushKeepNext_;
+            }
             if (hushTarget_ < hush_) hush_ = hush_ * release < 1e-3f ? 0.0f : hush_ * release;
             else hush_ += juce::jmin(step, hushTarget_ - hush_);
             hushCurve_[size_t(n)] = hush_;
+            if (hush_ >= 1 && hushTarget_ >= 1) hushKeep_ = -1; // open again: nothing kept
         }
         hushAt_.clear();
     }
@@ -1361,7 +1366,7 @@ void Engine::renderChunk(float* const* out, int numChannels, int offset, int len
         auto& t = tracks_[i];
         // Glide the filter towards its target over about a quarter second.
         t.filterNow += (t.filterTarget - t.filterNow) * juce::jmin(1.0f, float(len / (0.25 * sampleRate_)));
-        for (int n = 0; n < len; ++n) gains_[size_t(n)] = t.gain.getNextValue() * hushCurve_[size_t(n)];
+        for (int n = 0; n < len; ++n) gains_[size_t(n)] = t.gain.getNextValue() * (i == hushKeep_ ? 0.45f + 0.55f * hushCurve_[size_t(n)] : hushCurve_[size_t(n)]);
         if (!(enabledTracks & (1 << i)))
         {
             for (auto& slot : t.slots)

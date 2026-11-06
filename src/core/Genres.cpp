@@ -1658,9 +1658,11 @@ void GenreComposer::generateBar(int bar, std::vector<Event>& out)
         out.push_back({ int64_t(bar) * kBarTicks + 4 * kSixteenth, Event::Hush, 0, 0, 0 });
         out.push_back({ int64_t(bar + 1) * kBarTicks, Event::Hush, 0, 0, 1 });
     }
-    if (leadIn_[size_t(bar)]) // the lead-in: the last half second or so silent
+    if (leadIn_[size_t(bar)]) // the lead-in: the last half second or so, the main parts silent, one held part sounding on
     {
-        out.push_back({ int64_t(bar) * kBarTicks + leadSix_ * kSixteenth, Event::Hush, 0, 0, 0 });
+        int keep = -1;
+        for (int tr : { Pad, Drone, Texture, Harm, Fx }) if (active(tr, bar)) { keep = tr; break; }
+        out.push_back({ int64_t(bar) * kBarTicks + leadSix_ * kSixteenth, Event::Hush, uint8_t(std::max(keep, 0)), uint8_t(keep >= 0 ? 1 : 0), 0 });
         out.push_back({ int64_t(bar + 1) * kBarTicks, Event::Hush, 0, 0, 1 });
     }
     emitHeld(Fx, bar, out, fxHeld_, active(Fx, bar) ? foldInto(48 + tonicAt(bar), 48, 59) : -1);

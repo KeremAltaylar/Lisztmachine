@@ -449,7 +449,10 @@ void BerlinComposer::generateBar(int bar, std::vector<Event>& out)
     emitSub(bar, out);
     if (const int64_t s = silenceFrom(bar); s >= 0)
     {
-        out.push_back({ s, Event::Hush, 0, 0, 0 });
+        // a lead-in silences the main parts only: the pad, if it plays, holds through it (Kerem, 2026-11-06:
+        // "it doesn't need to be total silence, one component can remain"); a stop is silent, all of it
+        const bool keep = leadIn(bar) && active(Pad, bar);
+        out.push_back({ s, Event::Hush, Pad, uint8_t(keep ? 1 : 0), 0 });
         out.push_back({ int64_t(bar + 1) * kBarTicks, Event::Hush, 0, 0, 1 });
     }
 }
