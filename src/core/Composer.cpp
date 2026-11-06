@@ -461,8 +461,8 @@ const char* BerlinComposer::endFigure(int bar) const
     if (bar + 1 >= totalBars() || sectionOfBar_[size_t(bar + 1)] == sectionOfBar_[size_t(bar)]) return nullptr;
     if (stopBar(bar)) return "X...............";
     if (bigStart(bar + 1)) return "X.......x.x....."; // into a big part from a quiet one: a beat of silence before it
-    static const char* up[] = { "X.......x.x.xXXX", "X..x..x..x..x..x", "X.......x...X..." };
-    static const char* down[] = { "X..x..x.X.......", "X.x...x.x...X.X." };
+    static const char* up[] = { "X.......x.x.xXXX", "X.x.x.x.X.x.x.x.", "X.......x...X..." }; // straight, no threes (Kerem, 2026-11-06)
+    static const char* down[] = { "X.x.X...X.......", "X.x...x.x...X.X." };
     const int si = sectionOfBar_[size_t(bar)];
     return sectionAt(bar + 1).energy > sectionAt(bar).energy ? up[si % 3] : down[si % 2];
 }

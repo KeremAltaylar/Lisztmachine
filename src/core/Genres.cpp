@@ -1569,7 +1569,7 @@ bool GenreComposer::buildsWith(int track, int bar) const
 void GenreComposer::emitAttack(int bar, std::vector<Event>& out)
 {
     if (!attackBar(bar)) return;
-    static const char* kEnds[] = { "X..x..x.X.......", "X.......x.x.xXXX", "X..x..x..x..x..x", "X.x...x.x...X.X.", "X.......x...X...", "........X..x..X.",
+    static const char* kEnds[] = { "X.x.X...X.......", "X.......x.x.xXXX", "X.x.x.x.X.x.x.x.", "X.x...x.x...X.X.", "X.......x...X...", "........X...X...", // straight, no threes
                                    "X.......X.......", "X...X...X...X...", "X.X.X.X.X.X.X.X.", // the build: 2, 4, 8
                                    "X..............." }; // the stop before a driving part
     const int f = endFig_[size_t(bar)];

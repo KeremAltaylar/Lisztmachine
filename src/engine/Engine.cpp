@@ -1293,13 +1293,16 @@ void Engine::renderChunk(float* const* out, int numChannels, int offset, int len
         }
         kickHits_.clear();
     }
-    {   // A stop's silence: everything, the reverb and echo tails too, fades out in 15 ms and back in at the downbeat.
-        const float step = float(1.0 / (0.015 * sampleRate_));
+    {   // A stop's silence: everything, the reverb and echo tails too, dies away like a room (Kerem, 2026-11-06:
+        // "a release, so it feels natural", not a wall): an exponential release, -60 dB in half a second, then
+        // true silence; back in at the downbeat in 15 ms.
+        const float step = float(1.0 / (0.015 * sampleRate_)), release = float(std::exp(-1.0 / (0.072 * sampleRate_)));
         size_t k = 0;
         for (int n = 0; n < len; ++n)
         {
             for (; k < hushAt_.size() && hushAt_[k].first <= n; ++k) hushTarget_ = hushAt_[k].second;
-            hush_ += juce::jlimit(-step, step, hushTarget_ - hush_);
+            if (hushTarget_ < hush_) hush_ = hush_ * release < 1e-3f ? 0.0f : hush_ * release;
+            else hush_ += juce::jmin(step, hushTarget_ - hush_);
             hushCurve_[size_t(n)] = hush_;
         }
         hushAt_.clear();
