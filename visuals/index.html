@@ -1980,15 +1980,21 @@ STUDIES.push({
 });
 
 // 9 · Mill: the steel works of Working Class Curse (Kerem, 2026-11-06: change the song's Ikeda look).
-// Molten metal pours from ladles onto a floor of glowing slag, sparks thrown off every impact and every
-// drum hit, smoke lit from below, the mill's girders black against it. The genome picks the floor's work
-// each section: the pour, the rolling mill (white-hot billets running over the rollers), or the
-// converter's blow (a fountain of sparks); the energy sets how many ladles pour.
+// Molten metal pours from ladles onto a floor of glowing slag, sparks thrown off every impact, smoke lit
+// from below, the mill's girders black against it. The camera tracks along the mill without stopping,
+// faster as the music drives: near iron rushes past, far iron drifts, the pours come and go. The genome
+// picks the floor's work each section: the pour, the rolling mill (white-hot billets running over the
+// rollers), or the converter's blow (a fountain of sparks); the energy sets how many ladles pour.
+// A drum hit is a forge hammer (Kerem, 2026-11-06: no spark burst at the hit): the camera jolts down
+// and settles, the metal flares, and a ring of sparks runs out along the floor from every pour.
 STUDIES.push({
   id: 'mill', name: 'Mill', scale: 0.75, exposure: 1.0, bloom: 0.12, feedback: 0.4,   // hot metal is bright: a light recursion, or it floods white
-  about: 'A steel mill at night: molten metal pouring from ladles onto glowing slag, sparks thrown off every impact and every drum hit, smoke lit from below, girders black against it. The pour, the rolling mill or the converter blow, section by section.',
+  about: 'A steel mill at night, the camera tracking along it: molten metal pouring from ladles onto glowing slag, sparks off every impact, smoke lit from below, girders rushing past. A drum hit is a forge hammer. The pour, the rolling mill or the converter blow, section by section.',
   init(g) {
+    this.x = 0; this.v = 0; this.lastT = null;
+    this.mu = g.device.createBuffer({ size: 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
     this.pipe = g.fullscreen(COMMON + /* wgsl */`
+      @group(0) @binding(1) var<uniform> mill: vec4f;   // x: how far the camera has tracked along the mill
       fn heat(x: f32) -> vec3f { return vec3f(x, 0.75 * x * x, 0.35 * x * x * x); }   // blackbody: dark red, orange, yellow, white
       fn seg(p: vec2f, a: vec2f, b: vec2f) -> f32 {
         let ab = b - a;
@@ -1999,17 +2005,34 @@ STUDIES.push({
       fn spark(p: vec2f, o: vec2f, v: vec2f, a: f32, life: f32, px: f32) -> vec3f {
         if (a < 0.0 || a > life) { return vec3f(0.0); }
         let g = vec2f(0.0, -1.7);
-        let q1 = o + v * a + g * a * a;
-        let q0 = o + v * max(a - 0.035, 0.0) + g * max(a - 0.035, 0.0) * max(a - 0.035, 0.0);
-        let d = seg(p, q0, q1);
+        let a0 = max(a - 0.035, 0.0);
+        let d = seg(p, o + v * a0 + g * a0 * a0, o + v * a + g * a * a);
         let k = 1.0 - a / life;
         return heat(0.6 + 1.6 * k) * smoothstep(1.8 * px, 0.0, d) * k;
+      }
+      // The iron of one layer of the mill at depth z: columns, beams and cross-bracing, 1 where it stands.
+      fn iron(p: vec2f, z: f32, salt: f32) -> f32 {
+        let gp = vec2f(p.x * z + mill.x, p.y * z);
+        let cx = fract(gp.x * 0.5 + salt);
+        let col = step(abs(cx - 0.5), 0.022);
+        let beam = step(abs(gp.y - 0.82), 0.028) + step(abs(gp.y - 0.12), 0.012) * step(0.5, fract(salt * 7.3));
+        let fx = fract(gp.x * 0.5 + salt + 0.5);
+        let brace = step(abs(fx - fract(gp.y * 0.8 + 0.5)), 0.012) + step(abs(fx - fract(-gp.y * 0.8 + 0.5)), 0.012);
+        return clamp(col + beam + brace * step(0.12, gp.y) * step(gp.y, 0.82), 0.0, 1.0);
       }
       @fragment fn fs(i: VO) -> @location(0) vec4f {
         let px = 2.0 / u.res.y;
         let j = traj(8.0);
+        // The hammer: the newest hits, each a jolt down that settles, and a flare.
+        var jolt = 0.0; var flare = 0.0;
+        for (var k = 0; k < 8; k++) {
+          let pd = u.pad[k];
+          if (pd.w <= 0.0 || pd.z > 1.0) { continue; }
+          jolt += pd.w * exp(-pd.z * 9.0) * cos(pd.z * 28.0);
+          flare += pd.w * exp(-pd.z * 5.0);
+        }
         var p = (i.uv * 2.0 - 1.0) * vec2f(u.aspect, -1.0);
-        p = rot2(sin(j.w) * 0.08) * p / (0.9 + 0.2 * j.z * u.cam.z) + vec2f(sin(j.x) * 0.3, sin(j.y) * 0.12) + travel().xy * 0.15 + shake().xy * 0.03;
+        p = rot2(sin(j.w) * 0.06) * p / (0.9 + 0.2 * j.z * u.cam.z) + vec2f(0.0, sin(j.y) * 0.1 + 0.1 * jolt) + shake().xy * 0.03;
         let t = u.time;
         let mode = min(u32(gene(0) * 3.0), 2u);              // 0 the pour · 1 the rolling mill · 2 the converter's blow
         let floorY = -0.55;
@@ -2017,38 +2040,56 @@ STUDIES.push({
         let q = p + vec2f(haze, 0.0);
         var c = vec3f(0.0);
         var light = 0.0;                                     // how much hot metal lights this point's smoke
+        let hot = 1.0 + 1.2 * flare;
 
-        // The ladles' pours.
-        var np = 1 + u32(clamp(u.energy * 3.2 * (0.6 + gene(1)), 0.0, 3.0));
-        if (mode == 1u) { np = 1u; }
-        let flow = 0.6 + 0.6 * u.level.y + 0.8 * u.hit.y;
-        for (var k = 0u; k < np; k++) {
-          let fk = f32(k);
-          let h = hash33(vec3f(fk, gene(2) * 97.0, 3.0));
-          let x0 = (fk - 0.5 * f32(np - 1u)) * 0.85 * (0.7 + 0.6 * gene(3)) + 0.15 * (h.x - 0.5);
+        // The ladles' pours, one per bay of the mill (the bays pass as the camera tracks); the energy
+        // decides how many bays are pouring.
+        let bay = 1.25 * (0.8 + 0.4 * gene(3));
+        let bay0 = floor((mill.x - u.aspect * 1.3) / bay);
+        let flow = (0.6 + 0.6 * u.level.y + 0.8 * u.hit.y) * hot;
+        let busy = select(clamp(0.25 + u.energy * (0.6 + 0.5 * gene(1)), 0.0, 1.0), 0.3, mode == 1u);
+        for (var b = 0; b < 4; b++) {
+          let cell = bay0 + f32(b);
+          let h = hash33(vec3f(cell, gene(2) * 97.0, 3.0));
+          if (h.x > busy) { continue; }
+          let x0 = (cell + 0.3 + 0.4 * h.z) * bay - mill.x;
+          if (abs(x0) > u.aspect * 1.4) { continue; }
           let lip = 0.7 + 0.25 * h.y;
           let bend = 0.25 * (h.z - 0.5);
           let s = clamp((lip - q.y) / (lip - floorY), 0.0, 1.0);          // 0 at the lip, 1 at the floor
-          let xs = x0 + bend * s * s + 0.012 * sin(q.y * 9.0 - t * 5.0 + fk);
+          let xs = x0 + bend * s * s + 0.012 * sin(q.y * 9.0 - t * 5.0 + cell);
           let w = (0.03 + 0.025 * u.level.y) * (1.0 - 0.4 * s);
           let d = abs(q.x - xs);
           let on = step(floorY, q.y) * step(q.y, lip);
-          let bands = 0.75 + 0.25 * sin((q.y + t * 2.2) * 34.0);             // the stream runs down
+          let bands = 0.75 + 0.25 * sin((q.y + t * (2.2 + 2.5 * u.energy)) * 34.0);   // the stream runs down
           c += heat(1.2 * flow * bands) * smoothstep(w, w * 0.3, d) * on;
           c += heat(0.5) * exp(-d / (w * 5.0)) * on * 0.25 * flow;
-          let lipG = exp(-length((q - vec2f(x0, lip)) * vec2f(1.0, 3.0)) * 9.0);  // the ladle's glowing lip
-          c += heat(1.2) * lipG * 0.8;
+          c += heat(1.2 * hot) * exp(-length((q - vec2f(x0, lip)) * vec2f(1.0, 3.0)) * 9.0) * 0.8;   // the ladle's glowing lip
           let impact = vec2f(x0 + bend, floorY);
           let pool = exp(-length((q - impact) * vec2f(1.0, 4.5)) * 4.0);
-          c += heat(1.4 * flow) * pool * step(q.y, floorY + 0.02) * 0.9;
+          let under = step(q.y, floorY + 0.02);
+          c += heat(1.4 * flow) * pool * under * 0.9;
           light += exp(-d * 3.5) * on * 0.6 + pool * 1.5;
           let ns = 8u + u32(14.0 * u.energy + 16.0 * u.hit.y);              // the splash at the floor
           for (var m = 0u; m < ns; m++) {
-            let hs = hash33(vec3f(fk, f32(m), 11.0));
+            let hs = hash33(vec3f(cell, f32(m), 11.0));
             let cyc = t * (0.9 + hs.x) + hs.y;
-            let hv = hash33(vec3f(fk * 7.0 + f32(m), floor(cyc), 5.0));
+            let hv = hash33(vec3f(cell * 7.0 + f32(m), floor(cyc), 5.0));
             let v = vec2f((hv.x - 0.5) * 1.5, 0.35 + hv.y * 1.1) * (0.6 + 0.6 * u.energy);
             c += spark(p, impact, v, fract(cyc) * 0.9, 0.9, px);
+          }
+          // the hammer's ring: sparks skimming out along the floor, and a wave of light through the slag
+          for (var k = 0; k < 2; k++) {
+            let pd = u.pad[k];
+            if (pd.w <= 0.0 || pd.z > 0.8) { continue; }
+            for (var m = 0u; m < 14u; m++) {
+              let hv = hash33(vec3f(cell + f32(k) * 13.0, f32(m), pd.x * 31.0 + pd.y * 17.0));
+              let v = vec2f((hv.x * 2.0 - 1.0) * (1.2 + 0.8 * pd.w), 0.15 + 0.35 * hv.y);
+              c += spark(p, impact, v, pd.z, 0.8, px) * (0.8 + pd.w);
+            }
+            let r = length((q - impact) * vec2f(1.0, 4.5));
+            let wave = exp(-pow((r - pd.z * 2.2) / 0.06, 2.0)) * (1.0 - pd.z / 0.8) * pd.w;
+            c += heat(1.3) * wave * under;
           }
         }
 
@@ -2061,18 +2102,19 @@ STUDIES.push({
             let x = (fract(t * sp * 0.25 + fr * 0.37) * 2.0 - 1.0) * (u.aspect + 0.8);
             let b = vec2f(abs(q.x - x) - 0.35, abs(q.y - y) - 0.025);
             let inside = length(max(b, vec2f(0.0))) + min(max(b.x, b.y), 0.0);
-            c += heat(1.6 + 0.5 * u.hit.y) * smoothstep(px * 2.0, 0.0, inside);
+            c += heat((1.6 + 0.5 * u.hit.y) * hot) * smoothstep(px * 2.0, 0.0, inside);
             c += heat(0.5) * exp(-max(inside, 0.0) * 18.0) * 0.3;
             light += exp(-max(inside, 0.0) * 4.0) * 0.8;
-            let roll = step(abs(q.y - y + 0.045), 0.012) * step(0.5, fract(q.x * 14.0));   // the rollers below
+            let roll = step(abs(q.y - y + 0.045), 0.012) * step(0.5, fract((q.x + mill.x) * 14.0));   // the rollers below
             c += heat(0.35) * roll * exp(-abs(q.x - x) * 2.0) * 0.6;
           }
         }
 
-        // The converter's blow: a fountain of sparks from the mouth.
+        // The converter's blow: a fountain of sparks from the mouth, passing with the bays.
         if (mode == 2u) {
-          let mouth = vec2f(0.15 * sin(gene(4) * 6.0), floorY + 0.25);
-          c += heat(2.2) * exp(-length((q - mouth) * vec2f(1.0, 2.0)) * 12.0) * (0.6 + 0.6 * u.hit.y);
+          let span = u.aspect * 2.0 + 1.6;
+          let mouth = vec2f(fract((0.3 * gene(4) * span - mill.x * 0.5) / span) * span - span * 0.5, floorY + 0.25);
+          c += heat(2.2 * hot) * exp(-length((q - mouth) * vec2f(1.0, 2.0)) * 12.0) * (0.6 + 0.6 * u.hit.y);
           light += exp(-length(q - mouth) * 2.5) * 2.0;
           let nf = 20u + u32(40.0 * u.energy + 30.0 * u.hit.y);
           for (var m = 0u; m < nf; m++) {
@@ -2084,49 +2126,41 @@ STUDIES.push({
           }
         }
 
-        // The floor: slag crusting over the molten metal, glowing in its cracks.
+        // The floor: slag crusting over the molten metal, glowing in its cracks, rushing by underneath.
         if (q.y < floorY) {
           let fz = 0.3 / (floorY + 0.03 - q.y);
-          let n = fbm(vec3f(q.x * fz * 1.6, fz * 2.5 - t * 0.25, t * 0.04));
+          let n = fbm(vec3f((q.x * fz + mill.x) * 1.6, fz * 2.5 - t * 0.25, t * 0.04));
           let molten = smoothstep(0.02, -0.18, n);
-          c += heat(0.9 + 0.4 * u.level.y) * molten * 0.55 * smoothstep(0.0, 0.25, floorY - q.y + 0.05);
+          c += heat((0.6 + 0.3 * u.level.y) * hot) * molten * 0.5 * smoothstep(0.0, 0.25, floorY - q.y + 0.05);
         }
-        light += exp(-max(q.y - floorY, 0.0) * 2.2) * 0.5;
+        light += exp(-max(q.y - floorY, 0.0) * 2.2) * 0.5 * hot;
 
-        // The drums: sparks thrown from where each hit lands, and the furnace flaring.
-        for (var k = 0; k < 8; k++) {
-          let pd = u.pad[k];
-          if (pd.w <= 0.0 || pd.z > 1.4) { continue; }
-          let o = pd.xy * vec2f(u.aspect * 0.8, 0.8);
-          for (var m = 0u; m < 16u; m++) {
-            let hv = hash33(vec3f(f32(k), f32(m), floor(u.time - pd.z) + 1.0));
-            let ang = hv.x * 6.2831853;
-            let v = vec2f(cos(ang), abs(sin(ang)) * 0.7 + 0.3) * (0.4 + 1.2 * hv.y) * (0.5 + pd.w);
-            c += spark(p, o, v, pd.z, 1.4, px) * (0.6 + pd.w);
-          }
-          c += heat(0.7) * pd.w * exp(-pd.z * 7.0) * 0.3;
-        }
-
-        // Smoke, lit from below by the metal.
-        let sm = 0.5 + 0.5 * fbm(vec3f(p * vec2f(1.1, 1.5) + vec2f(0.0, -t * 0.09), t * 0.05));
+        // Smoke, lit from below by the metal, rising and drifting past.
+        let sm = 0.5 + 0.5 * fbm(vec3f((p + vec2f(mill.x * 0.8, -t * (0.09 + 0.15 * u.energy))) * vec2f(1.1, 1.5), t * 0.05));
         let dens = smoothstep(0.38, 0.95, sm) * (0.35 + 0.65 * smoothstep(-0.7, 0.9, p.y));
         c += heat(0.42) * dens * light * 0.45 + vec3f(0.02, 0.016, 0.014) * dens;
 
-        // The girders, black against it, a little nearer than the floor (more parallax).
-        let gp = p * 0.9 + travel().xy * 0.12;
-        let cx = fract(gp.x * 0.55 + gene(5));
-        let col = step(abs(cx - 0.5), 0.022);
-        let beam = step(abs(gp.y - 0.82), 0.028) + step(abs(gp.y - 0.12), 0.012) * step(0.5, gene(6));
-        let fx = fract(gp.x * 0.55 + gene(5) + 0.5);
-        let brace = step(abs(fx - fract(gp.y * 0.8 + 0.5)), 0.012) + step(abs(fx - fract(-gp.y * 0.8 + 0.5)), 0.012);
-        let iron = clamp(col + beam + brace * step(0.12, gp.y) * step(gp.y, 0.82), 0.0, 1.0);
-        c *= 1.0 - 0.94 * iron;
-        c += heat(0.3) * iron * light * 0.04;                 // the iron's lit faces
+        // The iron: a far layer, half lost in the smoke, and a near one, black and rushing past.
+        let ironFar = iron(p, 1.8, gene(5) + 0.37);
+        c *= 1.0 - 0.6 * ironFar * (1.0 - 0.5 * dens);
+        let ironNear = iron(p, 0.6, gene(5));
+        c *= 1.0 - 0.95 * ironNear;
+        c += heat(0.3) * ironNear * light * 0.04;                // the iron's lit faces
 
         return vec4f(c * 0.7, 1.0);
       }`);
   },
-  resize(g) { this.bg = g.bind(this.pipe, [g.U]); },
+  resize(g) { this.bg = g.bind(this.pipe, [g.U, this.mu]); },
+  cpu(g, F, t) {
+    // The camera's track along the mill: a speed that follows the music (and its tempo), eased, so a
+    // new section speeds up or slows down instead of jumping.
+    const dt = this.lastT === null ? 0 : Math.min(0.1, Math.max(0, t - this.lastT));
+    this.lastT = t;
+    const want = (0.12 + 0.55 * F.energy * F.energy) * F.show.bpm / 144;
+    this.v += (want - this.v) * (1 - Math.exp(-dt / 1.5));
+    this.x += this.v * dt;
+    g.device.queue.writeBuffer(this.mu, 0, new Float32Array([this.x, 0, 0, 0]));
+  },
   frame(g, enc) { g.draw(enc, this.pipe, this.bg); },
 });
 
