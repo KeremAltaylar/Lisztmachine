@@ -3054,7 +3054,8 @@ async function boot() {
     if (hit > IMAGES.pulse + 0.35) IMAGES.seed += 1;          // a strong hit tears the strips anew
     IMAGES.pulse = Math.max(hit, IMAGES.pulse * Math.exp(-dt * 5));
     const silent = playing && F.lv[6] < 0.002 && musicT > 1;  // the stop's silence (the hush is digital silence)
-    IMAGES.held = silent ? Math.min(1, IMAGES.held + dt * 12) : 0;   // gone on the downbeat, no fade
+    IMAGES.quiet = silent ? (IMAGES.quiet ?? 0) + dt : 0;      // only a stop's silence, not a part change's short lead-in
+    IMAGES.held = silent && IMAGES.quiet > 0.7 ? Math.min(1, IMAGES.held + dt * 12) : 0;   // gone on the downbeat, no fade
     const open = IMAGES.mode === 2 || imgScore[F.si], use = F.si % 3;
     const hold = Math.max(IMAGES.held, IMAGES.carry);
     if (!open && !hold) return;                                // closed by the score; the held photo shows even so

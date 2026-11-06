@@ -1535,15 +1535,22 @@ void GenreComposer::planEnds()
     // driving parts, after the attack and silence it should start full blast as a whole part, for all
     // songs"): the last bar before a driving part is one hit of the whole band on its downbeat, then
     // silence to the next downbeat (a build's 2, 4, 8 move a bar earlier), as Berlin's big parts do.
+    // 2026-11-06 (Kerem: Berlin's stops at parts 5 and 6 are perfect, the others not; "check the other songs
+    // as well"): every part change stops. Out of a loud part into a driving one, the hit and the silence;
+    // every other change is Berlin's lead-in, the part playing on until its last half second or so (one
+    // beat, two at a fast tempo), that silent, the next part on the downbeat; its figure ends before it.
+    leadIn_.assign(size_t(totalBars()), 0);
+    leadSix_ = 16 - 4 * int(std::ceil(0.5 * bpm_ / 60.0 - 1e-6));
     for (int si = 1; si < int(sections_.size()); ++si)
     {
         const auto& sec = sections_[size_t(si - 1)];
-        if (!drives(si) || sec.bars < 4) continue;
+        if (sec.bars < 4) continue;
         const int end = sec.startBar + sec.bars - 1;
         if (spec_.build && sec.bars >= 8)
             for (int k = 0; k < 3; ++k) endFig_[size_t(end - 3 + k)] = 6 + k;
-        endFig_[size_t(end)] = 9;
-        drop_[size_t(end)] = 0; // the whole band on the stop
+        if (drives(si) && sec.energy >= .45f) { endFig_[size_t(end)] = 9; drop_[size_t(end)] = 0; continue; } // the whole band on the stop
+        if (spec_.build && sec.bars >= 8) endFig_[size_t(end)] = -1;
+        leadIn_[size_t(end)] = 1;
     }
 
     // 2026-11-05 (Kerem: "each song starts with one component, not 3-4 voices; in 10 seconds or so they
@@ -1579,7 +1586,7 @@ void GenreComposer::emitAttack(int bar, std::vector<Event>& out)
     const bool final = bar + 1 == sec.startBar + sec.bars && bar + 1 < totalBars();
     const auto& m = *spec_.mode;
     std::vector<int> at;
-    for (int i = 0; i < 16; ++i) if (fig[i] != '.') at.push_back(i);
+    for (int i = 0; i < (leadIn_[size_t(bar)] ? leadSix_ : 16); ++i) if (fig[i] != '.') at.push_back(i); // none in a lead-in's silence
     auto note = [&](int track, int64_t t, int64_t len, int p, float vel) {
         out.push_back({ t, Event::NoteOn, uint8_t(track), uint8_t(p), std::clamp(vel, .05f, 1.0f) });
         out.push_back({ t + len, Event::NoteOff, uint8_t(track), uint8_t(p), 0 });
@@ -1606,7 +1613,7 @@ void GenreComposer::emitAttack(int bar, std::vector<Event>& out)
         if (on(Pulse) && accent) note(Pulse, t, six / 2, foldInto(24 + tonicAt(bar), 24, 35), vel); // the mix pumps with it
         if (lastHit && (f < 6 || final) && on(Body)) out.push_back({ t, Event::Throw, Body, 0, 1.0f });
     }
-    if (f == 4 && active(Body, bar))
+    if (f == 4 && active(Body, bar) && !leadIn_[size_t(bar)])
         for (int j = 0; j < 12; ++j) // the roll: sixteenths from the half, thirty-seconds in the last beat, swelling
         {
             const int64_t t = t0 + 8 * six + (j < 4 ? j * six : 4 * six + (j - 4) * six / 2);
@@ -1649,6 +1656,11 @@ void GenreComposer::generateBar(int bar, std::vector<Event>& out)
     if (attackBar(bar) && endFig_[size_t(bar)] == 9) // the stop: silence, the tails too, from beat two to the downbeat
     {
         out.push_back({ int64_t(bar) * kBarTicks + 4 * kSixteenth, Event::Hush, 0, 0, 0 });
+        out.push_back({ int64_t(bar + 1) * kBarTicks, Event::Hush, 0, 0, 1 });
+    }
+    if (leadIn_[size_t(bar)]) // the lead-in: the last half second or so silent
+    {
+        out.push_back({ int64_t(bar) * kBarTicks + leadSix_ * kSixteenth, Event::Hush, 0, 0, 0 });
         out.push_back({ int64_t(bar + 1) * kBarTicks, Event::Hush, 0, 0, 1 });
     }
     emitHeld(Fx, bar, out, fxHeld_, active(Fx, bar) ? foldInto(48 + tonicAt(bar), 48, 59) : -1);

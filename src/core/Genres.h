@@ -169,6 +169,8 @@ private:
     int lastTop_ = -1;                              // the line's last pitch: the next one stays near it
     std::vector<int> melA_, melB_;                  // the tremolo's top line: degrees above the chord's root, two a bar; the summit its own
     std::vector<int> endFig_;                       // per bar: the end figure it plays, or -1
+    std::vector<char> leadIn_;                      // per bar: its end silent from sixteenth leadSix_ (a part change without the stop)
+    int leadSix_ = 12;
     std::vector<uint32_t> drop_;                    // per bar: the tracks taken out before a big arrival
     std::vector<int> chordsHeldRiff_;
     int fxHeld_ = -1;

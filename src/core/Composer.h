@@ -151,6 +151,7 @@ private:
     void emitGuitar(int bar, std::vector<Event>& out);
     bool soloFloor(int bar) const;
     bool bigStart(int bar) const;
+    bool leadIn(int bar) const;                     // the last bar of a part not ending on a stop: its last beat silent
     bool clip(int64_t on, int64_t& off) const;
     void emitSub(int bar, std::vector<Event>& out);
     void emitSolo(int bar, std::vector<Event>& out);

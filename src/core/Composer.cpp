@@ -460,7 +460,7 @@ const char* BerlinComposer::endFigure(int bar) const
     // that stops. All start on the downbeat (the bass keeps its spine), all on the chord they are in.
     if (bar + 1 >= totalBars() || sectionOfBar_[size_t(bar + 1)] == sectionOfBar_[size_t(bar)]) return nullptr;
     if (stopBar(bar)) return "X...............";
-    if (bigStart(bar + 1)) return "X.......x.x....."; // into a big part from a quiet one: a beat of silence before it
+    if (leadIn(bar)) return "X.......x.x....."; // rising from a quiet part: a beat of silence before the next
     static const char* up[] = { "X.......x.x.xXXX", "X.x.x.x.X.x.x.x.", "X.......x...X..." }; // straight, no threes (Kerem, 2026-11-06)
     static const char* down[] = { "X.x.X...X.......", "X.x...x.x...X.X." };
     const int si = sectionOfBar_[size_t(bar)];
@@ -514,8 +514,17 @@ bool BerlinComposer::stopBar(int bar) const
     // Kerem, 2026-11-02: "attacks that establish silence at the end of the parts which are just big, and
     // those main parts start on a big sound". A big part (Song, Theme, Shift, Summit) ends on one attack of
     // the whole band on the downbeat of its last bar, then nothing until the next part's downbeat.
-    return bar >= 0 && bar + 1 < totalBars() && sectionOfBar_[size_t(bar + 1)] != sectionOfBar_[size_t(bar)]
-        && sectionAt(bar).energy >= .6f;
+    // 2026-11-06 (Kerem: the stops at parts 5 and 6 are perfect, the ones before them not): a part already
+    // loud going into a big one stops the same way, instead of a beat cut out of it at full level.
+    if (bar < 0 || bar + 1 >= totalBars() || sectionOfBar_[size_t(bar + 1)] == sectionOfBar_[size_t(bar)]) return false;
+    return sectionAt(bar).energy >= .6f || (sectionAt(bar).energy >= .45f && bigStart(bar + 1));
+}
+
+bool BerlinComposer::leadIn(int bar) const
+{
+    // The last bar of a part that does not end on a stop: its last beat silent, the next part on the downbeat
+    // (into a big part since 2026-11-02; every part change since 2026-11-06, Kerem: like parts 5 and 6).
+    return bar >= 0 && bar + 1 < totalBars() && !stopBar(bar) && sectionOfBar_[size_t(bar + 1)] != sectionOfBar_[size_t(bar)];
 }
 
 bool BerlinComposer::bigStart(int bar) const
@@ -527,10 +536,10 @@ bool BerlinComposer::bigStart(int bar) const
 
 int64_t BerlinComposer::silenceFrom(int bar) const
 {
-    // After a big part's stop, and on the last beat before a big part that follows a quiet one.
+    // After a big part's stop, and on the last beat of a quiet part rising into the next.
     if (bar < 0 || bar + 1 >= totalBars()) return -1;
     if (stopBar(bar)) return int64_t(bar) * kBarTicks + kHit;
-    if (bigStart(bar + 1)) return int64_t(bar) * kBarTicks + 12 * kSixteenth;
+    if (leadIn(bar)) return int64_t(bar) * kBarTicks + 12 * kSixteenth;
     return -1;
 }
 
