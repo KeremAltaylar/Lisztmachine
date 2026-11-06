@@ -2852,7 +2852,15 @@ async function boot() {
     const list = piece.images;
     M.fill(0, 32);
     if (!IMAGES.mode || !list?.length) return;
-    if (F.si !== IMAGES.si) {                                   // a new section: the next photograph, the next use
+    // A song's end holds its photograph in the silence; the next song starts on that photograph and the new
+    // visuals grow out of it (Kerem, 2026-11-06): a second still, then it lets go over a few seconds.
+    if (piece !== IMAGES.piece) { IMAGES.carry = IMAGES.piece && IMAGES.held > 0.5 ? 1 : 0; IMAGES.carryT = 0; IMAGES.piece = piece; }
+    if (IMAGES.carry) {
+      IMAGES.carryT += dt;
+      IMAGES.carry = IMAGES.carryT < 1 ? 1 : Math.exp(-(IMAGES.carryT - 1) / 1.6);
+      if (IMAGES.carry < 0.01) IMAGES.carry = 0;
+    }
+    if (F.si !== IMAGES.si && !IMAGES.carry) {                 // (the old song's photo stays until it has let go)                                   // a new section: the next photograph, the next use
       IMAGES.si = F.si; IMAGES.k = (IMAGES.k + 1) % list.length; IMAGES.seed = F.si * 7.31;
       for (const u of list) IMAGES.load(u);
       IMAGES.load(list[IMAGES.k]).then(t => { if (t) Object.assign(IMAGES, { view: t.view, vid: t.vid }); });
@@ -2863,15 +2871,16 @@ async function boot() {
     const silent = playing && F.lv[6] < 0.002 && musicT > 1;  // the stop's silence (the hush is digital silence)
     IMAGES.held = silent ? Math.min(1, IMAGES.held + dt * 12) : 0;   // gone on the downbeat, no fade
     const open = IMAGES.mode === 2 || imgScore[F.si], use = F.si % 3;
-    if (!open && !IMAGES.held) return;                         // closed by the score; the stop's held photo shows even so
-    M.set([open ? 0.75 : 1e-4, use, use === 0 ? visT * 0.35 + IMAGES.seed : IMAGES.seed, IMAGES.pulse, IMAGES.held, 0, 0, 0], 32);
+    const hold = Math.max(IMAGES.held, IMAGES.carry);
+    if (!open && !hold) return;                                // closed by the score; the held photo shows even so
+    M.set([open && !IMAGES.carry ? 0.75 : 1e-4, use, use === 0 ? visT * 0.35 + IMAGES.seed : IMAGES.seed, IMAGES.pulse, hold, 0, 0, 0], 32);
   };
   const setImages = mode => {
     IMAGES.mode = mode; IMAGES.si = -1;
     $('images').textContent = ['Images off', 'Images: score', 'Images: always'][mode]; $('images').setAttribute('aria-pressed', mode > 0);
     try { localStorage.setItem('lisztmachine-images', String(mode)); } catch {}
   };
-  window.__images = () => ({ mode: IMAGES.mode, k: IMAGES.k, si: F.si, open: IMAGES.mode === 2 || imgScore[F.si], held: IMAGES.held, master: F.lv[6], playing, musicT, M: [...M.slice(32, 37)] });
+  window.__images = () => ({ mode: IMAGES.mode, k: IMAGES.k, si: F.si, open: IMAGES.mode === 2 || imgScore[F.si], held: IMAGES.held, carry: IMAGES.carry, master: F.lv[6], playing, musicT, M: [...M.slice(32, 37)] });
   $('images').onclick = () => setImages((IMAGES.mode + 1) % 3);
   setImages(IMAGES.mode);
 
