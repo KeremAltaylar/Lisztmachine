@@ -825,7 +825,7 @@ juce::String Engine::load(double sampleRate, int maxBlock, const Palette& palett
                             : first.endsWith("clap") ? InternalSynth::Clap : first.endsWith("snare") ? InternalSynth::Snare
                             : first.endsWith("metal") ? InternalSynth::Metal
                             : first.endsWith("zap") ? InternalSynth::Zap : first.endsWith("none") ? InternalSynth::None
-                            : first.endsWith("guitar") ? InternalSynth::Guitar : first.endsWith("deep") ? InternalSynth::Deep : first.endsWith("808") ? InternalSynth::Bass808 : InternalSynth::Click;
+                            : first.endsWith("guitar") ? InternalSynth::Guitar : first.endsWith("deep") ? InternalSynth::Deep : first.endsWith("808") ? InternalSynth::Bass808 : first.endsWith("boom") ? InternalSynth::Boom : InternalSynth::Click;
             t.synth.prepare(sampleRate, kind, first.fromFirstOccurrenceOf("/modal-", false, false));
             for (auto& s : t.slots) { s.plugin.reset(); s.midi.ensureSize(8192); s.state = Idle; s.entry = 0; s.gain = juce::Decibels::decibelsToGain(palette.parts[i].front().gainDb); }
             t.buffer.setSize(2, maxBlock);
@@ -865,8 +865,9 @@ juce::String Engine::load(double sampleRate, int maxBlock, const Palette& palett
     duckCurve_.assign(size_t(maxBlock), 0);
     kickHits_.reserve(64);
     hushCurve_.assign(size_t(maxBlock), 1);
+    ringCurve_.assign(size_t(maxBlock), 1);
     hushAt_.reserve(16);
-    hush_ = hushTarget_ = 1;
+    hush_ = hushTarget_ = ring_ = 1;
     return {};
 }
 
@@ -1244,7 +1245,10 @@ void Engine::renderChunk(float* const* out, int numChannels, int offset, int len
                 case Event::Level:   t.gain.setTargetValue(e.value); break;
                 case Event::Filter:  t.filterTarget = e.value; break;
                 case Event::Throw:   if (t.hasEcho) t.echo.throwFor(at, int(e.value * kPPQ * samplesPerTick_)); break;
-                case Event::Hush:    hushAt_.push_back({ at, e.value }); hushKeepNext_ = e.value < 0.5f && e.pitch == 1 ? e.track : -1; break;
+                case Event::Hush:
+                    hushAt_.push_back({ at, e.value });
+                    if (e.value < 0.5f) { if (e.pitch & 1) hushKeepNext_ |= 1u << e.track; if (e.pitch & 2) hushTailsNext_ = true; if (e.pitch & 4) hushSoftNext_ = true; }
+                    break;
             }
         }
         for (int i = 0; i < numTracks_; ++i) changesDue(i, end - 1);
@@ -1297,18 +1301,34 @@ void Engine::renderChunk(float* const* out, int numChannels, int offset, int len
         // "a release, so it feels natural", not a wall): an exponential release, -60 dB in half a second, then
         // true silence; back in at the downbeat in 15 ms.
         const float step = float(1.0 / (0.015 * sampleRate_)), release = float(std::exp(-1.0 / (0.072 * sampleRate_)));
+        // where the tails ring (a fall, the hole) they still die away, only slower: -43 dB a second, so the room
+        // rings out over the bar line instead of holding the music's level through the silence
+        const float ringOut = float(std::exp(-1.0 / (0.2 * sampleRate_)));
+        // and after them they come back slowly, so the old part's room does not spring back over the new
+        // part's downbeat (Kerem, 2026-11-07: the start after the echoes was not sharp enough)
+        const float reopen = float(1.0 / (0.35 * sampleRate_));
         size_t k = 0;
         for (int n = 0; n < len; ++n)
         {
             for (; k < hushAt_.size() && hushAt_[k].first <= n; ++k)
             {
+                const float was = hushTarget_;
                 hushTarget_ = hushAt_[k].second;
-                if (hushTarget_ < 0.5f) hushKeep_ = hushKeepNext_;
+                if (hushTarget_ < 0.5f && was >= 0.5f) // a silence begins: what it keeps (open, keeping it changes nothing)
+                {
+                    hushKeep_ = hushKeepNext_;
+                    hushTails_ = hushTailsNext_;
+                    hushSoft_ = hushSoftNext_;
+                    hushKeepNext_ = 0;
+                    hushTailsNext_ = hushSoftNext_ = false;
+                }
             }
             if (hushTarget_ < hush_) hush_ = hush_ * release < 1e-3f ? 0.0f : hush_ * release;
             else hush_ += juce::jmin(step, hushTarget_ - hush_);
             hushCurve_[size_t(n)] = hush_;
-            if (hush_ >= 1 && hushTarget_ >= 1) hushKeep_ = -1; // open again: nothing kept
+            if (hushTarget_ < ring_) ring_ = ring_ * ringOut < 1e-3f ? 0.0f : ring_ * ringOut;
+            else ring_ += juce::jmin(reopen, hushTarget_ - ring_);
+            ringCurve_[size_t(n)] = ring_;
         }
         hushAt_.clear();
     }
@@ -1366,7 +1386,15 @@ void Engine::renderChunk(float* const* out, int numChannels, int offset, int len
         auto& t = tracks_[i];
         // Glide the filter towards its target over about a quarter second.
         t.filterNow += (t.filterTarget - t.filterNow) * juce::jmin(1.0f, float(len / (0.25 * sampleRate_)));
-        for (int n = 0; n < len; ++n) gains_[size_t(n)] = t.gain.getNextValue() * (i == hushKeep_ ? 0.45f + 0.55f * hushCurve_[size_t(n)] : hushCurve_[size_t(n)]);
+        // A kept track sounds on through a silence, 7 dB down (14 in a soft one, the hole); where the tails ring,
+        // a track's own echo is silenced at its input instead of its output, so what it already holds rings on.
+        const bool kept = (hushKeep_ >> i) & 1, preEcho = hushTails_ && t.hasEcho && !kept;
+        const float floor = hushSoft_ ? 0.2f : 0.45f;
+        for (int n = 0; n < len; ++n) gains_[size_t(n)] = t.gain.getNextValue() * (kept ? floor + (1 - floor) * hushCurve_[size_t(n)] : preEcho ? ringCurve_[size_t(n)] : hushCurve_[size_t(n)]);
+        auto echo = [&](float* l, float* r) {
+            if (preEcho) { juce::FloatVectorOperations::multiply(l, hushCurve_.data(), len); juce::FloatVectorOperations::multiply(r, hushCurve_.data(), len); }
+            t.echo.process(l, r, len);
+        };
         if (!(enabledTracks & (1 << i)))
         {
             for (auto& slot : t.slots)
@@ -1383,7 +1411,7 @@ void Engine::renderChunk(float* const* out, int numChannels, int offset, int len
             t.buffer.clear();
             t.synth.render(slot.midi, t.buffer.getWritePointer(0), t.buffer.getWritePointer(1), len);
             slot.midi.clear();
-            if (t.hasEcho) t.echo.process(t.buffer.getWritePointer(0), t.buffer.getWritePointer(1), len);
+            if (t.hasEcho) echo(t.buffer.getWritePointer(0), t.buffer.getWritePointer(1));
             for (int c = 0; c < 2; ++c) juce::FloatVectorOperations::multiply(t.buffer.getWritePointer(c), slot.gain, len);
             mixTrack(i, t.buffer.getReadPointer(0), t.buffer.getReadPointer(1));
             continue;
@@ -1434,7 +1462,7 @@ void Engine::renderChunk(float* const* out, int numChannels, int offset, int len
         }
         // The echo runs once on the track's sum: run per slot, a crossfade ran it twice a block (the old
         // sound's slot then carried the echo, never fell quiet, and the track sat 11 dB hot for 20 s).
-        if (t.hasEcho) t.echo.process(t.mix.getWritePointer(0), t.mix.getWritePointer(1), len);
+        if (t.hasEcho) echo(t.mix.getWritePointer(0), t.mix.getWritePointer(1));
         mixTrack(i, t.mix.getReadPointer(0), t.mix.getReadPointer(1));
     }
 
@@ -1458,7 +1486,7 @@ void Engine::renderChunk(float* const* out, int numChannels, int offset, int len
                 for (int n = 0; n < len; ++n) b.getWritePointer(c)[n] *= 1 - depth * duckCurve_[size_t(n)];
         };
         duckReturn(delayIn, 0.35f);
-        for (int c = 0; c < 2; ++c) juce::FloatVectorOperations::multiply(delayIn.getWritePointer(c), hushCurve_.data(), len);
+        for (int c = 0; c < 2; ++c) juce::FloatVectorOperations::multiply(delayIn.getWritePointer(c), (hushTails_ ? ringCurve_ : hushCurve_).data(), len);
         for (int c = 0; c < 2; ++c)
         {
             juce::FloatVectorOperations::addWithMultiply(pa[c], delayIn.getReadPointer(c), returnGain[0], len);
@@ -1472,7 +1500,7 @@ void Engine::renderChunk(float* const* out, int numChannels, int offset, int len
                 for (int n = 0; n < len; ++n) reverbIn.getWritePointer(c)[n] += palette_.shimmer * octaveUp_[c].process(reverbIn.getReadPointer(c)[n]);
         runFx(*reverb_, reverbIn);
         duckReturn(reverbIn, 0.5f);
-        for (int c = 0; c < 2; ++c) juce::FloatVectorOperations::multiply(reverbIn.getWritePointer(c), hushCurve_.data(), len);
+        for (int c = 0; c < 2; ++c) juce::FloatVectorOperations::multiply(reverbIn.getWritePointer(c), (hushTails_ ? ringCurve_ : hushCurve_).data(), len);
         if (mixStage)
             for (int c = 0; c < 2; ++c)
                 for (int n = 0; n < len; ++n) reverbIn.getWritePointer(c)[n] = reverbLowCut_[c].process(reverbIn.getReadPointer(c)[n]);
@@ -1484,8 +1512,10 @@ void Engine::renderChunk(float* const* out, int numChannels, int offset, int len
 
     if (effects) // the feedback bus (silent unless something feeds it)
     {
+        // the slider glides: the whole range in about half a second
+        if (const float a = feedbackBus.load(); a >= 0 && !(playing && pos_ > endSample_)) fbBus_.glideTo(a, float(len / (0.5 * sampleRate_)));
         fbBus_.process(fbIn[0], fbIn[1], len);
-        for (int c = 0; c < 2; ++c) juce::FloatVectorOperations::multiply(fbIn[c], hushCurve_.data(), len);
+        for (int c = 0; c < 2; ++c) juce::FloatVectorOperations::multiply(fbIn[c], (hushTails_ ? ringCurve_ : hushCurve_).data(), len);
         const float g = juce::Decibels::decibelsToGain(palette_.returnDb[2]);
         for (int c = 0; c < 2; ++c)
         {
@@ -1796,6 +1826,7 @@ void InternalSynth::start(int note, float velocity)
     if (kind_ == Metal) tau = 0.05 + 0.25 * velocity;   // struck metal, tuned to the note
     if (kind_ == Zap) tau = 0.04 + 0.08 * velocity;     // a laser: a sine diving onto the note
     if (kind_ == Deep) tau = 0.45 + 0.9 * velocity;     // a struck plate the size of a door
+    if (kind_ == Boom) tau = 0.7 + 0.8 * velocity;      // the drum rings long; harder, longer
     if (kind_ == Bass808) tau = 2.5;                    // while held the 808 fades slowly, as the real one does
     v->decay = std::exp(-1.0 / (tau * sr_));
     v->phase2 = v->phase3 = 0;
@@ -1891,6 +1922,21 @@ void InternalSynth::run(float* l, float* r, int from, int to)
                     v.phase3 += v.inc * 2.4495;
                     const double index = 2.6 * std::exp(-age / 0.25) + 0.35;
                     y = std::sin(v.phase + index * std::sin(v.phase2) + 0.5 * index * std::sin(v.phase3)) * v.env;
+                }
+                else if (kind_ == Boom)
+                {
+                    // the skin's modes: the fundamental, falling from a fourth above, and two higher ones dying first
+                    const double drop = 1 + 0.335 * std::exp(-age / 0.04);
+                    v.phase += v.inc * drop;
+                    v.phase2 += v.inc * 1.593 * drop;
+                    v.phase3 += v.inc * 2.136 * drop;
+                    // the mallet: low-passed noise for the first few milliseconds
+                    seed_ = seed_ * 1664525u + 1013904223u;
+                    v.lastNoise += (float(int32_t(seed_)) * (1.0f / 2147483648.0f) - v.lastNoise) * 0.06f;
+                    const double env = v.env / std::max(v.gain, 1e-9);
+                    const double x = std::sin(v.phase) + 0.35 * std::sin(v.phase2) * std::exp(-age / 0.18) + 0.18 * std::sin(v.phase3) * std::exp(-age / 0.09)
+                                   + 6.0 * v.lastNoise * std::exp(-age / 0.006);
+                    y = std::tanh(1.4 * x * env) / std::tanh(1.4) * v.gain * 0.9;
                 }
                 else
                 {

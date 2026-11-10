@@ -60,3 +60,7 @@ return reverb 12
 # sine (a little second harmonic, held without fading), driven for the harmonics that make it heard.
 sub     -13.0      40  internal/sub   # at 0 it sat 11 dB over the bass; now 2 dB under it
 drive sub  0.55 2500
+
+# 2026-11-09 (Kerem: "low kick percussion hits like a deep gong drum, organic sub hits, long sentences, not too
+# crowded"): the low hits, an eight-bar sentence (Sentence, Composer.h) on the engine's frame drum
+boom    -4.0    1000  internal/boom  # about 4 dB under the sub (measured in the Haze-Theme bars)

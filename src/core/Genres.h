@@ -34,7 +34,7 @@ public:
     // impact (one big hit where a section rises). Each one's rhythm develops phrase by phrase.
     // The riff (2026-10-30, Kerem: "gnarly guitar like stoner doom, think of it as rhythm guitar, that's my
     // style, or industrial low hits"): a rhythm guitar (or struck iron) playing the song's riff.
-    enum GTrack : uint8_t { Pad, Pulse, Metal, Tick, Perc, Bass, Sub, Arp, Chord, Fx, Harm, Ground, Body, Mallet, Texture, Impact, Riff, Drone, kGenreTracks };
+    enum GTrack : uint8_t { Pad, Pulse, Metal, Tick, Perc, Bass, Sub, Arp, Chord, Fx, Harm, Ground, Body, Mallet, Texture, Impact, Riff, Drone, Lead, Boom, kGenreTracks };
     // How the riff is played: doom (power chords, long, the flat second and the tritone around them),
     // chug (palm-muted sixteenths, chords on the syncopations), tremolo (blackgaze: every sixteenth
     // picked, root, fifth and ninth), sludge (one huge chord a bar, let ring), drone (re-picked whole notes), stoner (fast: muted eighths, chords
@@ -89,8 +89,10 @@ public:
         bool gaze = false;                         // the choir holds open intervals (root, fifth, ninth) instead of the chord
     bool build = false;                        // every part ends in a three-bar unison build (2, 4, 8 hits a bar), the next one enters whole
     bool walk = false;                         // the bass walks: a contrabass on every beat (in two in the calm), its pattern unused
-    bool solo = false;                         // the arp track is a soloist: the hook as the head of each part, then phrases of its own
-    bool voice = false;                        // the drone track is a wordless soprano: long phrases above the lead, sung across the part changes
+    int lead = Lead;                           // the track the soloist plays (Soloist, Composer.h): its own, or the arp or the drone
+    int leadLo = 60, leadHi = 84;              // where its own track's line is written
+    bool sing = false;                         // the soloist is a voice: long notes only
+    bool pedal = false;                        // a change between parts of like energy leans on the next root (Turn::Pedal), not thinning
     };
 
     static const Spec* find(const std::string& scene);
@@ -138,6 +140,9 @@ private:
     bool drives(int si) const { return si > 0 && sections_[size_t(si)].energy >= .6f && sections_[size_t(si)].energy > sections_[size_t(si - 1)].energy + .1f; }
     bool buildsWith(int track, int bar) const; // a build bar: the track plays it because the next part has it
     void emitAttack(int bar, std::vector<Event>& out);
+    void emitTurn(int bar, size_t from, std::vector<Event>& out); // a part's last bar: the silences, what sounds through them
+    bool cuts(int bar) const { return turn_[size_t(bar)] == Turn::Pickup || turn_[size_t(bar)] == Turn::Echo; } // silent from leadSix_
+    int heldTrack(int bar) const;                   // the held part that sounds through a silence, or -1
     bool summitHalftime(int bar) const;
     bool summitUnison(int bar) const;
     int lowRootAt(int bar) const;                   // the bass's root: the chord's, or the tonic under a pedal
@@ -149,8 +154,8 @@ private:
     void emitPart(int track, const Part& part, int bar, std::vector<Event>& out);
     void emitArp(int bar, std::vector<Event>& out);
     void emitWalk(int bar, std::vector<Event>& out);
-    void emitSolo(int bar, std::vector<Event>& out);
-    void emitVoice(int bar, std::vector<Event>& out);
+    void emitLead(int bar, std::vector<Event>& out);
+    void emitBoom(int bar, std::vector<Event>& out);
     void emitHeld(int track, int bar, std::vector<Event>& out, int& held, int pitch);
     int tier(int bar) const;
 
@@ -169,8 +174,9 @@ private:
     int lastTop_ = -1;                              // the line's last pitch: the next one stays near it
     std::vector<int> melA_, melB_;                  // the tremolo's top line: degrees above the chord's root, two a bar; the summit its own
     std::vector<int> endFig_;                       // per bar: the end figure it plays, or -1
-    std::vector<char> leadIn_;                      // per bar: its end silent from sixteenth leadSix_ (a part change without the stop)
-    int leadSix_ = 12;
+    std::vector<Turn> turn_;                        // per bar: how a part's last bar hands over (Composer.h), else None
+    std::vector<int> pedal_;                        // per bar: the low end's root degree under a pedal into the next part, or -1
+    int leadSix_ = 12;                              // where a rise or a fall falls silent: the last half second or so
     std::vector<uint32_t> drop_;                    // per bar: the tracks taken out before a big arrival
     std::vector<int> chordsHeldRiff_;
     int fxHeld_ = -1;
@@ -182,8 +188,9 @@ private:
     std::array<float, 16> accent_ {};               // the song's groove: how hard each sixteenth of the bar leans
     int gapBeat_ = -1, stutterBeat_ = -1;
     int walkLast_ = -1;                             // the walk's last note: the next bar's root is found near it
-    int voiceLeft_ = 0, voiceRest_ = 0, voicePitch_ = -1, voiceDir_ = 1; // the singer's phrase, as the soloist's
-    int soloLeft_ = 0, soloRest_ = 0, soloPitch_ = -1, soloDir_ = 1; // the phrase: bars left in it, bars of breath, where the line is
+    Soloist solo_ { 0, 0, 0, false };               // the lead soloist, through every part
+    Rng leadRng_ { 0 };                             // its own dice, so the rest of the song stays as it was
+    Sentence booms_ { 0 };                          // the low hits' eight-bar sentence
 };
 
 const SceneInfo* genreSceneInfo(const std::string& scene);

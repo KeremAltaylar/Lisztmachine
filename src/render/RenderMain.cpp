@@ -1,6 +1,7 @@
 // liszt_render: the concert, offline and faster than real time.
 //   liszt_render [--seed N] [--seconds S] [--out file.wav] [--solo <track of the scene>]
 //                [--feedback 0..0.95]              every track's echo feeds back this much
+//                [--feedback-bus 0..0.8]           the feedback bus's amount (the app's slider)
 //                [--patch bass="Basses/Bass 1"]  (repeatable; any Surge factory patch)
 //                [--from Summit|<bar>] [--bars N]  start at a section or bar; render N bars + tail
 //                [--dry]                           no delay or reverb
@@ -311,6 +312,7 @@ static void writeShow(uint64_t seed, double blockRate, const std::vector<std::ar
 
 static juce::String paletteName = "berlin"; // --palette <name>: sounds/<name>.txt
 static float feedbackOverride = -1;            // --feedback 0..0.95: every track's echo
+static float feedbackBus = -1;                 // --feedback-bus 0..0.8: the feedback bus's amount (the app's slider)
 static bool gRaw = false;                      // --raw: without the mix stage (ducking, low cuts, width, glue)
 static bool gStems = false;                    // --stems: also <out>.<track>.wav per track and <out>.delay/.reverb.wav, before the glue
 
@@ -330,6 +332,7 @@ static int renderConcert(uint64_t seed, double seconds, const juce::File& out, i
     if (auto e = engine.load(sr, block, palette); e.isNotEmpty()) { std::cerr << e << "\n"; return 1; }
     if (solo >= 0) engine.enabledTracks = uint32_t(1u << solo);
     engine.feedbackOverride = feedbackOverride;
+    engine.feedbackBus = feedbackBus;
     engine.effects = !dry;
     engine.mixStage = !gRaw;
     int startBar = 0;
@@ -499,6 +502,7 @@ int main(int argc, char** argv)
     juce::File out = juce::File::getCurrentWorkingDirectory().getChildFile("lisztmachine.wav");
     if (int i = args.indexOf("--scene"); i >= 0) paletteName = sceneName = args[i + 1].toStdString();   // a scene brings its own palette
     if (int i = args.indexOf("--feedback"); i >= 0) feedbackOverride = args[i + 1].getFloatValue();
+    if (int i = args.indexOf("--feedback-bus"); i >= 0) feedbackBus = args[i + 1].getFloatValue();
     for (int i = 0; i + 1 < args.size(); ++i)
     {
         if (args[i] == "--seed") seed = uint64_t(args[i + 1].getLargeIntValue());

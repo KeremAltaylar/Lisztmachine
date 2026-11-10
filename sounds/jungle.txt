@@ -91,3 +91,10 @@ send chord reverb 0.35
 send pad reverb 0.40
 send harm reverb 0.50
 send arp reverb 0.35
+
+# 2026-11-09: the soloist plays on the drone track here; its own track stays empty
+lead     0.0       0  internal/none
+
+# 2026-11-09 (Kerem: "low kick percussion hits like a deep gong drum, organic sub hits, long sentences, not too
+# crowded"): the low hits, an eight-bar sentence (Sentence, Composer.h) on the engine's frame drum
+boom    -4.0    1000  internal/boom  # about 4 dB under the 808 (measured in Doom and Liquid)

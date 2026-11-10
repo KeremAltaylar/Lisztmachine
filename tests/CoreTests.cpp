@@ -66,7 +66,7 @@ int main()
                     CHECK(b < c.totalBars() && inMode(c.modeAt(b), c.tonicPc(), x.pitch),
                           "%s pitch %d not in %s at bar %d", kTrackNames[x.track], x.pitch, c.modeAt(b).name, b);
                     CHECK(x.value > 0 && x.value <= 1, "velocity %f", x.value);
-                    CHECK(!(c.silenceFrom(b) >= 0 && x.tick >= c.silenceFrom(b)),
+                    CHECK(!(c.silenceFrom(b) >= 0 && x.tick >= c.silenceFrom(b) && !c.keeps(b, x.track)),
                           "%s note %d in a silence at bar %d", kTrackNames[x.track], x.pitch, b);
                     if (x.track == Bass || x.track == Seq)
                         CHECK(x.tick % kSixteenth == 0, "sequencer note off the grid at tick %lld", (long long) x.tick);
@@ -119,7 +119,7 @@ int main()
             CHECK(minutes > 3.5 && minutes < 6, "%s length %.1f min (the concert is about 43)", spec->scene, minutes);
             std::map<std::pair<int, int>, int> held;
             int notes[G::kGenreTracks] = {}, slides = 0, subHeld = 0;
-            // a walk's approach and a solo's passing note may leave the key: by a half step into the track's next note
+            // a walk's approach may leave the key: by a half step into the track's next note
             std::vector<int> nextOn(ev.size(), -1);
             { int last[G::kGenreTracks]; std::fill(std::begin(last), std::end(last), -1);
               for (size_t i = ev.size(); i-- > 0;) if (ev[i].type == Event::NoteOn) { nextOn[i] = last[ev[i].track]; last[ev[i].track] = ev[i].pitch; } }
@@ -135,15 +135,34 @@ int main()
                     CHECK(x.value > 0 && x.value <= 1, "%s velocity %f", spec->scene, x.value);
                     const auto r = c.range(x.track);
                     CHECK(x.pitch >= r[0] && x.pitch <= r[1], "%s track %d pitch %d out of range", spec->scene, x.track, x.pitch);
-                    const bool chromatic = ((x.track == G::Bass && spec->walk) || (x.track == G::Arp && spec->solo)) && nextOn[i] >= 0 && std::abs(nextOn[i] - x.pitch) == 1;
+                    const bool chromatic = (x.track == G::Bass && spec->walk) && nextOn[i] >= 0 && std::abs(nextOn[i] - x.pitch) == 1;
                     if (!(x.track == G::Tick && x.pitch >= 96) && !chromatic) // noise ticks have no pitch
-                        CHECK(inMode(*spec->mode, c.tonicAt(int(x.tick / kBarTicks)), x.pitch), "%s track %d pitch %d outside the key", spec->scene, x.track, x.pitch);
+                        CHECK(inMode(*spec->mode, c.tonicAt(int(x.tick / kBarTicks)), x.pitch), "%s track %d pitch %d outside the key at bar %d tick %d next %d", spec->scene, x.track, x.pitch, int(x.tick / kBarTicks), int(x.tick % kBarTicks), nextOn[i]);
                     ++held[key];
                     ++notes[x.track];
                 }
                 else if (x.type == Event::NoteOff) { CHECK(held[key] == 1, "%s note-off without note-on track %d pitch %d", spec->scene, x.track, x.pitch); --held[key]; }
             }
             for (auto& [k, n] : held) CHECK(n == 0, "%s stuck note track %d pitch %d", spec->scene, k.first, k.second);
+            // the soloist plays every bar from the fourth but a hole's, and walks through some part changes (the rises, the level ones)
+            {
+                std::vector<int> lead(size_t(c.totalBars()), 0), run(size_t(c.totalBars()), 0);
+                for (auto& x : ev)
+                    if (x.type == Event::NoteOn && x.track == spec->lead)
+                    {
+                        ++lead[size_t(x.tick / kBarTicks)];
+                        if (x.tick % kBarTicks >= 3 * kPPQ) ++run[size_t(x.tick / kBarTicks)];
+                    }
+                int silent = 0, walks = 0;
+                for (int b = 4; b < c.totalBars(); ++b) silent += lead[size_t(b)] == 0;
+                for (auto& s : c.sections()) if (s.startBar > 4) walks += run[size_t(s.startBar - 1)] > 0;
+                CHECK(silent <= 1, "%s: the soloist is silent in %d bars", spec->scene, silent);
+                CHECK(walks >= 1, "%s: the soloist never walks into a part", spec->scene);
+                // the low hits: about one a bar where they play, never crowded
+                int booms = 0;
+                for (auto& x : ev) booms += x.type == Event::NoteOn && x.track == G::Boom;
+                CHECK(booms > c.totalBars() / 4 && booms < c.totalBars() * 2, "%s: %d low hits in %d bars", spec->scene, booms, c.totalBars());
+            }
             CHECK(slides > 10, "%s: the 808 never slides (%d)", spec->scene, slides);
             CHECK(notes[G::Harm] > 20, "%s: the choir never sings", spec->scene);
             // the fills throw their last hit into the echo

@@ -43,6 +43,8 @@ void rankByPriority(std::vector<Step>& p, Rng& rng, T priority)
 BerlinComposer::BerlinComposer(uint64_t seed) : Composer(seed)
 {
     static constexpr int tonics[] = { 4, 9, 2, 7, 0, 5 }; // E A D G C F
+    leadRng_ = Rng(seed * 0x9E3779B97F4A7C15ull + 7);
+    booms_ = Sentence(seed);
     tonicPc_ = tonics[rng_.range(0, 5)];
     // a minor home, melancholic; the shift is the one lighter moment (aeolian to dorian, phrygian to aeolian)
     homeMode_ = rng_.chance(.6) ? &kAeolian : &kPhrygian;
@@ -50,6 +52,9 @@ BerlinComposer::BerlinComposer(uint64_t seed) : Composer(seed)
     bpm_ = 2.0 * rng_.range(51, 56); // 102..112: slower, so the sequences breathe
 
     planForm();
+    std::vector<bool> stops(sections_.size(), false); // a loud part into a big one
+    for (size_t si = 1; si < sections_.size(); ++si) stops[si] = sections_[si - 1].energy >= .45f && sections_[si].energy >= .6f;
+    turns_ = planTurns(stops, false);
     planHarmony();
     makeBassPattern();
     makeSeqPattern();
@@ -65,16 +70,16 @@ void BerlinComposer::planForm()
         // 2026-11-02 (Kerem: "shorten Berlin"): 288 bars to 176, about six and a half minutes; the Return
         // is gone and the quiet parts are half as long. The soloist answers the lead and has the Shift to itself.
         // 2026-11-04 (Kerem: "shorten the songs"): 176 to 144: the Song, the Theme and the Summit 24 bars, the Shift 8.
-        { "Drift",      8, .15f, bit(Pad), false },
-        { "Pulse",      8, .30f, uint8_t(bit(Pad) | bit(Bass)), false },
-        { "Motion",    16, .50f, uint8_t(bit(Pad) | bit(Bass) | bit(Seq)), false },
+        { "Drift",      8, .15f, uint8_t(bit(Pad) | bit(Solo)), false },
+        { "Pulse",      8, .30f, uint8_t(bit(Pad) | bit(Bass) | bit(Solo)), false },
+        { "Motion",    16, .50f, uint8_t(bit(Pad) | bit(Bass) | bit(Seq) | bit(Solo)), false },
         { "Song",      24, .62f, kAll, false },
-        { "Haze",       8, .35f, uint8_t(bit(Pad) | bit(Seq)), false },
+        { "Haze",       8, .35f, uint8_t(bit(Pad) | bit(Seq) | bit(Solo)), false },
         { "Theme",     24, .82f, kAll, true },
         { "Shift",      8, .70f, uint8_t(kAll & ~bit(Lead)), false },
         { "Summit",    24, 1.0f, kAll, true },
         { "Dissolve",  16, .30f, uint8_t(bit(Pad) | bit(Seq) | bit(Solo)), false },
-        { "Afterglow",  8, .05f, bit(Pad), false },
+        { "Afterglow",  8, .05f, uint8_t(bit(Pad) | bit(Solo)), false },
     };
 
     int bar = 0;
@@ -209,6 +214,21 @@ void BerlinComposer::mutate(std::vector<Step>& p, double chance, bool isBass)
         s.deg = kLadder[size_t(rng_.range(0, 6))];
 }
 
+std::vector<Turn> Composer::planTurns(const std::vector<bool>& stopInto, bool pedal) const
+{
+    std::vector<Turn> t(sections_.size(), Turn::None);
+    int hole = -1;
+    float most = 0;
+    for (size_t si = 1; si < sections_.size(); ++si)
+    {
+        const float d = sections_[si].energy - sections_[si - 1].energy; // a fifth of the range either way is level
+        t[si] = stopInto[si] ? Turn::Stop : d > .21f ? Turn::Pickup : d < -.21f ? Turn::Echo : pedal ? Turn::Pedal : Turn::Thin;
+        if (t[si] == Turn::Pickup && d > most) most = d, hole = int(si);
+    }
+    if (hole > 0) t[size_t(hole)] = Turn::Hole;
+    return t;
+}
+
 bool BerlinComposer::active(int track, int bar) const
 {
     return bar >= 0 && bar < totalBars() && (sectionAt(bar).layers & bit(track));
@@ -216,6 +236,7 @@ bool BerlinComposer::active(int track, int bar) const
 
 float BerlinComposer::levelAt(int track, int bar) const
 {
+    if (track == Boom) return 1; // its hits follow the parts themselves
     if (!active(track, bar)) return 0;
     auto& sec = sectionAt(bar);
     if (sec.energy >= .6f) return 1; // a big part starts on its whole sound and ends on the stop
@@ -266,8 +287,9 @@ void BerlinComposer::emitPad(int bar, std::vector<Event>& out)
 {
     const int64_t t = int64_t(bar) * kBarTicks;
     auto release = [&](int64_t at) {
-        for (int v : padVoices_) out.push_back({ at, Event::NoteOff, Pad, uint8_t(v), 0 });
+        for (size_t v = 0; v < 4; ++v) if (!padGone_[v]) out.push_back({ at, Event::NoteOff, Pad, uint8_t(padVoices_[v]), 0 });
         padChord_ = -1;
+        padGone_ = {};
     };
 
     if (!active(Pad, bar)) { if (padChord_ >= 0) release(t); return; }
@@ -298,9 +320,10 @@ void BerlinComposer::emitPad(int bar, std::vector<Event>& out)
         }
 
         const float vel = loud ? .9f : .45f + .2f * energyAt(bar);
-        for (int p : padVoices_)
-            if (wasSounding && std::find(next.begin(), next.end(), p) == next.end())
-                out.push_back({ t, Event::NoteOff, Pad, uint8_t(p), 0 });
+        for (size_t v = 0; v < 4; ++v)
+            if (wasSounding && !padGone_[v] && std::find(next.begin(), next.end(), padVoices_[v]) == next.end())
+                out.push_back({ t, Event::NoteOff, Pad, uint8_t(padVoices_[v]), 0 });
+        padGone_ = {};
         for (int p : next)
             if (!wasSounding || std::find(padVoices_.begin(), padVoices_.end(), p) == padVoices_.end())
                 out.push_back({ t, Event::NoteOn, Pad, uint8_t(p), vel });
@@ -320,6 +343,15 @@ void BerlinComposer::emitPad(int bar, std::vector<Event>& out)
 
     if (stopBar(bar)) release(t + kHit - 20);
     else if (bar == totalBars() - 1) release(t + kBarTicks);
+    else if (turnAt(bar) == Turn::Echo && chordAt(bar + 1) != c)
+    {   // the pivot: through the silence only the notes the next chord shares ring on (if it shares any)
+        auto& nm = modeAt(bar + 1);
+        const int nc = chordAt(bar + 1);
+        auto shared = [&](int p) { for (int d : { 0, 2, 4, 6 }) if ((tonicPc_ + degreeSemis(nm, nc + d)) % 12 == p % 12) return true; return false; };
+        if (std::any_of(padVoices_.begin(), padVoices_.end(), shared))
+            for (size_t v = 0; v < 4; ++v)
+                if (!shared(padVoices_[v])) { out.push_back({ t + 12 * kSixteenth, Event::NoteOff, Pad, uint8_t(padVoices_[v]), 0 }); padGone_[v] = true; }
+    }
 }
 
 void BerlinComposer::emitSequence(int track, int bar, std::vector<Event>& out)
@@ -330,6 +362,16 @@ void BerlinComposer::emitSequence(int track, int bar, std::vector<Event>& out)
     const int limit = std::max(1, int(std::lround((track == Bass ? .5 + .5 * e : .45 + .55 * e) * len)));
     const bool summit = std::strcmp(sectionAt(bar).name, "Summit") == 0;
     const char* fig = endFigure(bar);
+    if (turnAt(bar) == Turn::Thin) // thinning into the next part: the upper sequence gone, the bass one long root
+    {
+        if (track == Bass)
+        {
+            const int p = stepPitch(Bass, bar, 0);
+            out.push_back({ int64_t(bar) * kBarTicks, Event::NoteOn, Bass, uint8_t(p), .7f });
+            out.push_back({ int64_t(bar + 1) * kBarTicks - 20, Event::NoteOff, Bass, uint8_t(p), 0 });
+        }
+        return;
+    }
     if (fig && track == Bass)
     {
         const int p = stepPitch(Bass, bar, 0);
@@ -352,7 +394,7 @@ void BerlinComposer::emitSequence(int track, int bar, std::vector<Event>& out)
         out.push_back({ t + kHit - 20, Event::NoteOff, Seq, uint8_t(p), 0 });
         return;
     }
-    const int stop = fig ? 4 : 16; // the upper sequence stops after the figure's first beat
+    const int stop = turnAt(bar) == Turn::Hole ? 0 : fig ? 4 : 16; // the upper sequence stops after the figure's first beat
 
     for (int i = 0; i < stop; ++i)
     {
@@ -445,29 +487,38 @@ void BerlinComposer::generateBar(int bar, std::vector<Event>& out)
     if (active(Seq, bar)) emitSequence(Seq, bar, out);
     if (active(Lead, bar) && (bar - sec.startBar) % 4 == 0) emitLeadPhrase(bar, out);
     emitSolo(bar, out);
+    emitBoom(bar, out);
     emitGuitar(bar, out);
     emitSub(bar, out);
+    const int64_t t0 = int64_t(bar) * kBarTicks;
+    if (turnAt(bar) == Turn::Hole) emitHint(bar, out);
+    if (turnAt(bar) == Turn::Echo) // the beat before the silence goes into the echoes
+        for (int tr : { Seq, Lead, Guitar, Solo }) out.push_back({ t0 + 8 * kSixteenth, Event::Throw, uint8_t(tr), 0, 1.0f });
     if (const int64_t s = silenceFrom(bar); s >= 0)
     {
-        // a lead-in silences the main parts only: the pad, if it plays, holds through it (Kerem, 2026-11-06:
-        // "it doesn't need to be total silence, one component can remain"); a stop is silent, all of it
-        const bool keep = leadIn(bar) && active(Pad, bar);
-        out.push_back({ s, Event::Hush, Pad, uint8_t(keep ? 1 : 0), 0 });
-        out.push_back({ int64_t(bar + 1) * kBarTicks, Event::Hush, 0, 0, 1 });
+        // a stop is silent, all of it; the other changes keep a part sounding (Kerem, 2026-11-06: "one
+        // component can remain"), and the falls and the hole let the tails ring
+        const uint8_t tails = turnAt(bar) == Turn::Hole ? 2 | 4 : turnAt(bar) == Turn::Echo ? 2 : 0; // the hole: what holds on, softly
+        bool any = false;
+        for (int tr = 0; tr < kNumTracks; ++tr)
+            if (keeps(bar, tr)) { out.push_back({ s, Event::Hush, uint8_t(tr), uint8_t(1 | tails), 0 }); any = true; }
+        if (!any) out.push_back({ s, Event::Hush, 0, tails, 0 });
+        out.push_back({ t0 + kBarTicks, Event::Hush, 0, 0, 1 });
     }
 }
 
 const char* BerlinComposer::endFigure(int bar) const
 {
-    // The last bar of every part but the final one; into a rise a figure that pushes, into a fall one
-    // that stops. All start on the downbeat (the bass keeps its spine), all on the chord they are in.
-    if (bar + 1 >= totalBars() || sectionOfBar_[size_t(bar + 1)] == sectionOfBar_[size_t(bar)]) return nullptr;
-    if (stopBar(bar)) return "X...............";
-    if (leadIn(bar)) return "X.......x.x....."; // rising from a quiet part: a beat of silence before the next
-    static const char* up[] = { "X.......x.x.xXXX", "X.x.x.x.X.x.x.x.", "X.......x...X..." }; // straight, no threes (Kerem, 2026-11-06)
-    static const char* down[] = { "X.x.X...X.......", "X.x...x.x...X.X." };
-    const int si = sectionOfBar_[size_t(bar)];
-    return sectionAt(bar + 1).energy > sectionAt(bar).energy ? up[si % 3] : down[si % 2];
+    // The last bar of every part but the final one: what the bass and the guitar play together. All start
+    // on the downbeat (the bass keeps its spine), all on the chord they are in, straight (no threes).
+    switch (turnAt(bar))
+    {
+        case Turn::Stop: return "X...............";
+        case Turn::Pickup: return "X.......x.x.....";
+        case Turn::Echo: return sectionOfBar_[size_t(bar)] % 2 ? "X...x.x.X......." : "X.x.X...X......."; // the last into the echoes
+        case Turn::Hole: return "................";
+        default: return nullptr;
+    }
 }
 
 void BerlinComposer::emitGuitar(int bar, std::vector<Event>& out)
@@ -475,7 +526,7 @@ void BerlinComposer::emitGuitar(int bar, std::vector<Event>& out)
     // Power chords on the chord's root (the mode's own fifth over it), let ring: one every other bar
     // while the music is calm, on one and three as it drives, and at the summit a muted pair leading
     // into each bar. A part's last bar plays its figure. Under .5 the engine's guitar mutes the string.
-    if (!active(Guitar, bar)) return;
+    if (!active(Guitar, bar) || turnAt(bar) == Turn::Thin) return;
     const int64_t t0 = int64_t(bar) * kBarTicks, six = kSixteenth;
     auto& m = modeAt(bar);
     const int c = chordAt(bar);
@@ -515,19 +566,25 @@ void BerlinComposer::emitGuitar(int bar, std::vector<Event>& out)
 bool BerlinComposer::stopBar(int bar) const
 {
     // Kerem, 2026-11-02: "attacks that establish silence at the end of the parts which are just big, and
-    // those main parts start on a big sound". A big part (Song, Theme, Shift, Summit) ends on one attack of
-    // the whole band on the downbeat of its last bar, then nothing until the next part's downbeat.
-    // 2026-11-06 (Kerem: the stops at parts 5 and 6 are perfect, the ones before them not): a part already
-    // loud going into a big one stops the same way, instead of a beat cut out of it at full level.
-    if (bar < 0 || bar + 1 >= totalBars() || sectionOfBar_[size_t(bar + 1)] == sectionOfBar_[size_t(bar)]) return false;
-    return sectionAt(bar).energy >= .6f || (sectionAt(bar).energy >= .45f && bigStart(bar + 1));
+    // those main parts start on a big sound": one attack of the whole band on the downbeat of the last bar,
+    // then nothing until the next part's downbeat; since 2026-11-07 only a loud part going into a big one.
+    return turnAt(bar) == Turn::Stop;
 }
 
-bool BerlinComposer::leadIn(int bar) const
+Turn BerlinComposer::turnAt(int bar) const
 {
-    // The last bar of a part that does not end on a stop: its last beat silent, the next part on the downbeat
-    // (into a big part since 2026-11-02; every part change since 2026-11-06, Kerem: like parts 5 and 6).
-    return bar >= 0 && bar + 1 < totalBars() && !stopBar(bar) && sectionOfBar_[size_t(bar + 1)] != sectionOfBar_[size_t(bar)];
+    if (bar < 0 || bar + 1 >= totalBars() || sectionOfBar_[size_t(bar + 1)] == sectionOfBar_[size_t(bar)]) return Turn::None;
+    return turns_[size_t(sectionOfBar_[size_t(bar + 1)])];
+}
+
+bool BerlinComposer::keeps(int bar, int track) const
+{
+    // through a part change's silence the pad holds on, and in the hole the lead hints at the theme; a fall
+    // leaves only the echoes (Kerem, 2026-11-07: the held pad blurred the start of the quiet part); the
+    // soloist walks through a rise into the next part (2026-11-09)
+    const Turn t = turnAt(bar);
+    return (track == Pad && (t == Turn::Pickup || t == Turn::Hole)) || (track == Lead && t == Turn::Hole)
+        || (track == Solo && t == Turn::Pickup);
 }
 
 bool BerlinComposer::bigStart(int bar) const
@@ -539,11 +596,15 @@ bool BerlinComposer::bigStart(int bar) const
 
 int64_t BerlinComposer::silenceFrom(int bar) const
 {
-    // After a big part's stop, and on the last beat of a quiet part rising into the next.
-    if (bar < 0 || bar + 1 >= totalBars()) return -1;
-    if (stopBar(bar)) return int64_t(bar) * kBarTicks + kHit;
-    if (leadIn(bar)) return int64_t(bar) * kBarTicks + 12 * kSixteenth;
-    return -1;
+    // after the stop's hit; the last beat of a rise or a fall; the whole bar of the hole
+    const int64_t t0 = int64_t(bar) * kBarTicks;
+    switch (turnAt(bar))
+    {
+        case Turn::Stop: return t0 + kHit;
+        case Turn::Pickup: case Turn::Echo: return t0 + 12 * kSixteenth;
+        case Turn::Hole: return t0;
+        default: return -1;
+    }
 }
 
 bool BerlinComposer::clip(int64_t on, int64_t& off) const
@@ -556,6 +617,29 @@ bool BerlinComposer::clip(int64_t on, int64_t& off) const
     return off > on;
 }
 
+void BerlinComposer::emitHint(int bar, std::vector<Event>& out)
+{
+    // the hole before the theme comes back: its first notes (as many as the bar holds, three at most), the
+    // lead alone over the pad while Kerem fills; on the beats chord tones, as the lead plays them
+    const int64_t t0 = int64_t(bar) * kBarTicks;
+    const int c = chordAt(bar);
+    for (size_t k = 0; k < motif_.size() && k < 3 && motif_[k].start < kBarTicks; ++k)
+    {
+        int deg = c + motif_[k].deg;
+        if (motif_[k].start % (2 * kPPQ) == 0)
+        {
+            int best = deg, bestDist = 99;
+            for (int d = deg - 3; d <= deg + 3; ++d)
+                if (const int r = ((d - c) % 7 + 7) % 7; (r == 0 || r == 2 || r == 4) && std::abs(d - deg) < bestDist) best = d, bestDist = std::abs(d - deg);
+            deg = best;
+        }
+        const int p = foldInto(60 + tonicPc_ + degreeSemis(modeAt(bar), deg), kRange[Lead][0], kRange[Lead][1]);
+        const int64_t t = t0 + motif_[k].start;
+        out.push_back({ t, Event::NoteOn, Lead, uint8_t(p), k == 0 ? .6f : .52f });
+        out.push_back({ std::min<int64_t>(t + int64_t(motif_[k].dur * 0.92), t0 + kBarTicks - 20), Event::NoteOff, Lead, uint8_t(p), 0 });
+    }
+}
+
 void BerlinComposer::emitSub(int bar, std::vector<Event>& out)
 {
     // The sub (Kerem, 2026-11-02: "sub bass root notes on the long parts, good fat sub bass"): through the
@@ -563,17 +647,20 @@ void BerlinComposer::emitSub(int bar, std::vector<Event>& out)
     // next, struck where a part begins and cut with the band at the stop.
     const int64_t t = int64_t(bar) * kBarTicks;
     auto release = [&](int64_t at) { if (subNote_ >= 0) out.push_back({ at, Event::NoteOff, Sub, uint8_t(subNote_), 0 }); subNote_ = -1; };
-    if (!active(Sub, bar)) { release(t); return; }
+    // after a fall the quiet part lands on one sub note, its root struck on the downbeat and held the bar
+    // (Kerem, 2026-11-07: the start of the part after the echoes was not sharp enough)
+    const bool land = turnAt(bar - 1) == Turn::Echo;
+    if (!active(Sub, bar) && !land) { release(t); return; }
     const int p = foldInto(24 + tonicPc_ + degreeSemis(modeAt(bar), chordAt(bar)), kRange[Sub][0], kRange[Sub][1]);
     const bool begin = bar == sectionAt(bar).startBar;
-    if (p != subNote_ || begin)
+    if (p != subNote_ || begin || land)
     {
         release(t);
         out.push_back({ t, Event::NoteOn, Sub, uint8_t(p), begin ? 1.0f : .85f });
         subNote_ = p;
     }
     if (stopBar(bar)) release(t + kHit - 20);
-    else if (bar == totalBars() - 1) release(t + kBarTicks);
+    else if (bar == totalBars() - 1 || !active(Sub, bar)) release(t + kBarTicks);
 }
 
 bool BerlinComposer::soloFloor(int bar) const
@@ -587,74 +674,42 @@ bool BerlinComposer::soloFloor(int bar) const
     return std::strcmp(sec.name, "Summit") == 0 ? phrase % 2 == 1 : phrase % 3 == 2;
 }
 
+void BerlinComposer::emitBoom(int bar, std::vector<Event>& out)
+{
+    // the low hits from the Motion on (the quiet ends of the song are without them), none in a silence
+    auto& sec = sectionAt(bar);
+    if (sec.energy < .3f || bar < 4) return;
+    const int64_t t0 = int64_t(bar) * kBarTicks, quiet = silenceFrom(bar);
+    auto& m = modeAt(bar);
+    const bool last = bar + 1 == sec.startBar + sec.bars && bar + 1 < totalBars(); // a part's last bar closes the sentence: its pickup leads in
+    for (auto& h : booms_.bar(last ? 7 : bar - sec.startBar, energyAt(bar)))
+    {
+        if (quiet >= 0 && t0 + h.at >= quiet - 20) continue;
+        const int p = foldInto(24 + tonicPc_ + degreeSemis(m, chordAt(bar) + (h.fifth ? 4 : 0)), kRange[Boom][0], kRange[Boom][1]);
+        out.push_back({ t0 + h.at, Event::NoteOn, Boom, uint8_t(p), h.vel });
+        out.push_back({ t0 + h.at + kPPQ / 4, Event::NoteOff, Boom, uint8_t(p), 0 });
+    }
+}
+
 void BerlinComposer::emitSolo(int bar, std::vector<Event>& out)
 {
-    // The soloist (Kerem, 2026-11-02: "add a lead soloist"): phrases of its own, two to four bars with a
-    // bar to breathe, answering the lead's motif and alone through the Shift and the Dissolve. Mostly steps
-    // of the mode, now and then a leap to a chord tone and back the other way, chord tones on the beats;
-    // long notes in the calm, eighths as it moves, runs of sixteenths at the top; every phrase ends long
-    // on a chord tone. Straight time, one voice. A part's last bar belongs to the band's figure.
-    if (!active(Solo, bar)) { soloLeft_ = soloRest_ = 0; soloPitch_ = -1; return; }
-    auto playable = [&](int b) { return b >= 0 && b < totalBars() && soloFloor(b) && !endFigure(b); };
-    if (!playable(bar)) { soloLeft_ = soloRest_ = 0; return; }
-    if (!playable(bar - 1)) soloRest_ = 0; // a turn begins at once
-    const float e = energyAt(bar);
-    bool start = false;
-    if (soloLeft_ == 0)
-    {
-        if (soloRest_ > 0) { --soloRest_; return; }
-        soloLeft_ = rng_.range(2, e > .7f ? 4 : 3);
-        start = true;
-    }
-    const bool last = --soloLeft_ == 0 || !playable(bar + 1);
-    if (last) { soloLeft_ = 0; soloRest_ = e > .8f ? 0 : 1; }
-
-    const int64_t t0 = int64_t(bar) * kBarTicks, q = kPPQ, h = kPPQ / 2;
-    std::vector<int64_t> on;
-    for (int b = 0; b < (last ? 3 : 4); ++b)
-    {
-        const int64_t s = b * q;
-        const double u = rng_.uniform();
-        if (e < .45f) { if (u < .5) on.push_back(s); else if (u < .75 && b < 2) { on.push_back(s); ++b; } else if (u < .85) on.push_back(s + h); }
-        else if (e < .8f) { if (u < .5) { on.push_back(s); on.push_back(s + h); } else if (u < .8) on.push_back(s); else if (u < .9) on.push_back(s + h); }
-        else
-        {
-            if (u < .4) { on.push_back(s); on.push_back(s + h); }
-            else if (u < .7) for (int k = 0; k < 4; ++k) on.push_back(s + k * q / 4);
-            else on.push_back(s);
-        }
-    }
-    if (on.empty()) on.push_back(0);
-
+    // The soloist (Kerem, 2026-11-02: "add a lead soloist"; 2026-11-09: continuous, connecting the parts):
+    // the Soloist's line through every part from the fourth bar, in long notes under the lead's motif
+    // phrases and on its own where the motif rests (the Shift, the Dissolve, the quiet parts).
+    if (bar < 4) return;
+    auto& sec = sectionAt(bar);
     auto& m = modeAt(bar);
-    const int c = chordAt(bar);
-    auto isCT = [&](int p) {
-        for (int d : { 0, 2, 4 }) if ((tonicPc_ + degreeSemis(m, c + d)) % 12 == p % 12) return true;
-        return false;
+    auto tones = [&](int b) {
+        const int c = chordAt(b);
+        std::vector<int> ct;
+        for (int d : { 0, 2, 4 }) ct.push_back((tonicPc_ + degreeSemis(modeAt(b), c + d)) % 12);
+        return ct;
     };
-    auto toCT = [&](int p, int d) { for (int k = 0; k < 7; ++k) { if (isCT(p + d * k)) return p + d * k; if (isCT(p - d * k)) return p - d * k; } return p; };
-    auto stepIn = [&](int p, int d) { int x = p + d; while (!inMode(m, tonicPc_, x)) x += d; return x; };
-    const int lo = kRange[Solo][0], hi = kRange[Solo][1];
-    int p = soloPitch_ < 0 ? toCT(lo + (hi - lo) * 2 / 5, 1) : soloPitch_;
-    const int64_t cap = e < .45f ? 2 * q : q; // how long a note may ring before a rest
-    for (size_t i = 0; i < on.size(); ++i)
-    {
-        const bool onBeat = on[i] % q == 0, fin = last && i + 1 == on.size();
-        if (p > hi - 4) soloDir_ = -1;
-        else if (p < lo + 4) soloDir_ = 1;
-        else if (rng_.chance(.15)) soloDir_ = -soloDir_;
-        if (start && i == 0) p = toCT(p, soloDir_);                                                  // a phrase begins on a chord tone
-        else if (rng_.chance(.12)) { p = toCT(p + soloDir_ * rng_.range(5, 7), soloDir_); soloDir_ = -soloDir_; } // a leap, then back
-        else { const int n = stepIn(p, soloDir_); p = onBeat || fin ? toCT(n, soloDir_) : n; }
-        while (p > hi) p -= 12;
-        while (p < lo) p += 12;
-        const int64_t next = i + 1 < on.size() ? on[i + 1] : kBarTicks;
-        const int64_t len = fin ? kBarTicks - on[i] - 40 : std::min(next - on[i], cap) - 20;
-        const float vel = std::clamp(.55f + .3f * e + (onBeat ? .06f : 0.0f), .05f, 1.0f);
-        out.push_back({ t0 + on[i], Event::NoteOn, Solo, uint8_t(p), vel });
-        out.push_back({ t0 + on[i] + len, Event::NoteOff, Solo, uint8_t(p), 0 });
-    }
-    soloPitch_ = p;
+    const int64_t t0 = int64_t(bar) * kBarTicks;
+    solo_.play({ t0, energyAt(bar), sectionOfBar_[size_t(bar)], bar - sec.startBar, sec.bars, std::strcmp(sec.name, "Summit") == 0, false,
+                 active(Lead, bar) && !soloFloor(bar), bar + 1 == totalBars(), tones(bar), tones(std::min(bar + 1, totalBars() - 1)),
+                 [&](int p) { return inMode(m, tonicPc_, p); }, turnAt(bar) == Turn::Pickup ? -1 : silenceFrom(bar) },
+               leadRng_, out);
 }
 
 std::string BerlinComposer::describe() const
@@ -667,11 +722,146 @@ std::string BerlinComposer::describe() const
     return buf;
 }
 
+Sentence::Sentence(uint64_t seed)
+{
+    Rng rng(seed * 0xD1B54A32D192ED03ull + 11);
+    const int64_t e8 = kPPQ / 2;                                    // an eighth
+    static const int offs[] = { 3, 5, 6, 10, 11, 12, 14 };          // where the motif answers its downbeat, in eighths over two bars
+    std::vector<int> motif = { 0 };
+    for (int n = rng.range(1, 2); int(motif.size()) <= n;)
+        if (const int o = offs[rng.range(0, 6)]; std::find(motif.begin(), motif.end(), o) == motif.end()) motif.push_back(o);
+    std::sort(motif.begin(), motif.end());
+    auto put = [&](int pair, int at, float vel, bool fifth) { bars_[size_t(pair * 2 + at / 8)].push_back({ (at % 8) * e8, vel, fifth }); };
+    for (int pair = 0; pair < 3; ++pair)
+    {
+        auto m = motif;
+        if (pair == 1) m.back() = m.back() + (m.back() < 15 && rng.chance(.5) ? 1 : -1);                  // the motif, a note moved
+        if (pair == 2) for (int o = rng.range(4, 7); ; o = (o + 3) % 16) if (std::find(m.begin(), m.end(), o) == m.end()) { m.push_back(o); break; } // grown
+        for (size_t k = 0; k < m.size(); ++k) put(pair, m[k], k == 0 ? (pair == 0 ? 1.0f : .85f) : .62f, pair == 2 && k + 1 == m.size());
+    }
+    put(3, 0, .9f, false);                                           // the close: one hit, then the pickup into the next
+    put(3, 12, .6f, true);
+    put(3, 14, .75f, false);
+    for (auto& b : bars_)
+    {   // sorted, and one hit to a place (the moved note may land on another)
+        std::sort(b.begin(), b.end(), [](auto& x, auto& y) { return x.at < y.at || (x.at == y.at && x.vel > y.vel); });
+        b.erase(std::unique(b.begin(), b.end(), [](auto& x, auto& y) { return x.at == y.at; }), b.end());
+    }
+}
+
+std::vector<Sentence::Hit> Sentence::bar(int in, float energy) const
+{
+    const int k = in % 8;
+    std::vector<Hit> hits;
+    for (auto& h : bars_[size_t(k)])
+    {
+        const bool head = h.at == 0 && k % 2 == 0, pickup = k == 7 && h.at > 0;
+        if (energy < .35f && !head && !pickup) continue;              // the calm: the pairs' downbeats and the pickup
+        if (energy < .6f && k >= 4 && k < 6 && !head) continue;       // the grown pair only where the music moves
+        hits.push_back({ h.at, h.vel * (.55f + .45f * energy), h.fifth });
+    }
+    return hits;
+}
+
+void Soloist::play(const Bar& b, Rng& rng, std::vector<Event>& out)
+{
+    const int64_t q = kPPQ;
+    const float e = b.energy;
+    const bool lyric = sing_ || b.theme;
+    if (b.part != part_)
+    {   // a new part: a rhythm and a register of its own
+        part_ = b.part;
+        centre_ = lo_ + int(float(hi_ - lo_) * (b.summit ? .75f : b.away ? .25f : .3f + .4f * e));
+        cell_.clear();
+        if (lyric)
+        {
+            static const int64_t kLong[][3] = { { 0, -1, -1 }, { 0, 2 * kPPQ, -1 }, { 0, 3 * kPPQ, -1 }, { 0, 2 * kPPQ, 3 * kPPQ }, { 0, 3 * kPPQ / 2, 3 * kPPQ } };
+            for (int64_t x : kLong[e < .35f ? rng.range(0, 2) : e < .7f ? rng.range(1, 3) : rng.range(2, 4)]) if (x >= 0) cell_.push_back(x);
+        }
+        else
+        {   // a quarter, eighth or sixteenth grid, some of its steps, always the downbeat
+            const int grid = e < .35f ? 4 : e < .7f ? 8 : 16, n = e < .35f ? rng.range(2, 3) : e < .7f ? rng.range(4, 6) : rng.range(8, 11);
+            std::vector<int> steps;
+            for (int i = 1; i < grid; ++i) steps.push_back(i);
+            for (int i = int(steps.size()) - 1; i > 0; --i) std::swap(steps[size_t(i)], steps[size_t(rng.range(0, i))]);
+            cell_.push_back(0);
+            for (int i = 0; i < n - 1; ++i) cell_.push_back(steps[size_t(i)] * (kBarTicks / grid));
+            std::sort(cell_.begin(), cell_.end());
+        }
+    }
+
+    if (b.stopAt >= 0 && b.stopAt - b.t0 < kPPQ) { left_ = 0; return; } // the whole bar is a silence
+    // this bar's rhythm: the part's, now and then a note left out
+    std::vector<int64_t> on = cell_;
+    if (on.size() > 2 && rng.chance(.25)) on.erase(on.begin() + rng.range(1, int(on.size()) - 1));
+    const bool walk = b.in + 1 == b.bars && !b.final && b.stopAt < 0;
+    const bool start = left_ == 0;
+    if (start) left_ = rng.range(2, lyric ? 3 : 4);
+    const bool breath = --left_ == 0 && !walk && !b.final;
+    int64_t end = kBarTicks;
+    if (b.stopAt >= 0)
+    {   // up to the silence as the part plays it, the last note held into it
+        end = b.stopAt - b.t0;
+        std::erase_if(on, [&](int64_t t) { return t > 0 && t > end - kPPQ / 2; });
+        left_ = 0;
+    }
+    else if (b.final) on = { 0 };
+    else if (breath) { std::erase_if(on, [&](int64_t t) { return t > 0 && t >= 3 * q; }); end = 3 * q; }
+    else if (walk)
+    {   // through the change: the first half as the part plays it, then a run into the next part's chord
+        std::erase_if(on, [&](int64_t t) { return t >= 3 * q; });
+        const int64_t d = lyric ? q : e < .7f ? q / 2 : q / 4;
+        for (int64_t t = 3 * q; t < kBarTicks; t += d) on.push_back(t);
+    }
+
+    auto has = [](const std::vector<int>& ct, int p) { return std::find(ct.begin(), ct.end(), (p % 12 + 12) % 12) != ct.end(); };
+    auto toCT = [&](const std::vector<int>& ct, int p, int d) {
+        for (int k = 0; k < 7; ++k) { if (has(ct, p + d * k)) return p + d * k; if (has(ct, p - d * k)) return p - d * k; }
+        return p;
+    };
+    auto step = [&](int p, int d) { int x = p + d; for (int k = 0; k < 12 && !b.inMode(x); ++k) x += d; return x; };
+    auto fold = [&](int p) { while (p > hi_) p -= 12; while (p < lo_) p += 12; return p; };
+
+    int p = pitch_ < 0 ? toCT(b.chord, centre_, 1) : pitch_;
+    // the run's goal: a chord tone of what comes next, on the side of the line's centre; the run steps up (or down) to it
+    const int goal = walk ? fold(toCT(b.next, p + (p < centre_ ? 2 : -2), p < centre_ ? 1 : -1)) : -1;
+    const int runs = walk ? int(std::count_if(on.begin(), on.end(), [&](int64_t t) { return t >= 3 * q; })) : 0;
+    int run = 0;
+    for (size_t i = 0; i < on.size(); ++i)
+    {
+        const int64_t t = on[i];
+        const bool beat = t % (lyric ? 2 * q : q) == 0;
+        if (walk && t >= 3 * q)
+        {
+            const int s = goal >= p ? 1 : -1;
+            p = goal;
+            for (int k = runs - run++; k > 0; --k) p = step(p, -s);
+        }
+        else if (i == 0 && (start || b.in == 0)) p = toCT(b.chord, p, dir_);       // a phrase, and a part, begin on a chord tone
+        else
+        {
+            if (p > centre_ + 6 || p > hi_ - 3) dir_ = -1;
+            else if (p < centre_ - 6 || p < lo_ + 3) dir_ = 1;
+            else if (rng.chance(.15)) dir_ = -dir_;
+            if (rng.chance(lyric ? .15 : .1)) { p = toCT(b.chord, p + dir_ * rng.range(4, 7), dir_); dir_ = -dir_; } // a leap, then back
+            else { const int n = step(p, dir_); p = beat ? toCT(b.chord, n, dir_) : n; }
+        }
+        p = fold(p);
+        const int64_t next = i + 1 < on.size() ? on[i + 1] : end;
+        int64_t len = next - t - 20;
+        if (!lyric && e > .5f && !beat && i + 1 < on.size() && rng.chance(.2)) len = std::min<int64_t>(len, q / 3);
+        const float vel = std::clamp(.5f + .35f * e + (beat ? .06f : 0.0f) + (b.summit ? .05f : 0.0f) + float(rng.uniform() * .06 - .03), .2f, 1.0f);
+        out.push_back({ b.t0 + t, Event::NoteOn, uint8_t(track_), uint8_t(p), vel });
+        out.push_back({ b.t0 + t + std::max<int64_t>(30, len), Event::NoteOff, uint8_t(track_), uint8_t(p), 0 });
+    }
+    pitch_ = p;
+}
+
 const SceneInfo& sceneInfo(const std::string& scene)
 {
     static const SceneInfo berlin {
-        "berlin", 7, { "pad", "bass", "seq", "lead", "guitar", "solo", "sub" }, { 0, 1, 2, 3, 1, 3, 1 },
-        { { .15f, .35f }, { .05f, .15f }, { .35f, .25f }, { .30f, .35f }, { .05f, .15f }, { .30f, .40f }, { 0, .03f } }, { -1, -1, -1, -1, -1, -1, -1 }, {}, false,
+        "berlin", 8, { "pad", "bass", "seq", "lead", "guitar", "solo", "sub", "boom" }, { 0, 1, 2, 3, 1, 3, 1, 1 },
+        { { .15f, .35f }, { .05f, .15f }, { .35f, .25f }, { .30f, .35f }, { .05f, .15f }, { .30f, .40f }, { 0, .03f }, { 0, .12f } }, { -1, -1, -1, -1, -1, -1, -1, -1 }, {}, false,
     };
     if (auto* g = genreSceneInfo(scene)) return *g;
     return berlin;

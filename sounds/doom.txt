@@ -119,3 +119,12 @@ feed riff   0.69
 feed bass   0.49
 feed drone  0.65
 return feedback 6.3
+
+# 2026-11-09 (Kerem: "a leading soloist instrument that connects parts as lead, continuous to play but changes
+# accordingly to the parts"): the soloist's own track. an octave down, beating 5 %.
+lead      2.0    2252  3rd/Rozzer/Leads/Dark Heart
+delay lead 0.75 0.35 0.22
+
+# 2026-11-09 (Kerem: "low kick percussion hits like a deep gong drum, organic sub hits, long sentences, not too
+# crowded"): the low hits, an eight-bar sentence (Sentence, Composer.h) on the engine's frame drum
+boom    -1.0    1000  internal/boom  # about 4 dB under the 808, +3 under the guitars

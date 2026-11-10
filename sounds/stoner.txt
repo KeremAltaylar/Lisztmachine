@@ -121,9 +121,18 @@ return feedback 6.3
 arp     13.2    2170  sfz/Weresax/Programs/wcc-bass-sax.sfz
 drone   13.2    2170  sfz/Weresax/Programs/Sax.sfz
 drive arp  0.35 3200
-delay arp   0.75 0.80 0.40
-delay drone 1.5  0.85 0.45
-send arp reverb 0.30
-send drone reverb 0.45
+delay arp   0.75 0.80 0.55  # 2026-11-09 Kerem: the saxes wetter (mix was 0.40, 0.45; sends 0.30, 0.45)
+delay drone 1.5  0.85 0.60
+send arp reverb 0.50
+send arp delay 0.30
+send drone reverb 0.70
+send drone delay 0.30
 feed arp    0.70
 feed drone  0.55
+
+# 2026-11-09: the soloist plays on the drone track here; its own track stays empty
+lead     0.0       0  internal/none
+
+# 2026-11-09 (Kerem: "low kick percussion hits like a deep gong drum, organic sub hits, long sentences, not too
+# crowded"): the low hits, an eight-bar sentence (Sentence, Composer.h) on the engine's frame drum
+boom    -4.0    1000  internal/boom  # about 4 dB under the 808 (measured in Doom and Liquid)

@@ -104,7 +104,7 @@ pre { margin: 0; background: var(--well); border-radius: 8px; padding: 12px 14px
   <section class="fbk" id="fbk" hidden aria-label="Feedback bus">
     <div class="label" style="flex-basis:100%">Feedback bus · the guitars and the bass into a ping-pong echo, live</div>
     <label>Time <select id="fbBeats"><option value="0.25">1/16</option><option value="0.5">1/8</option><option value="0.75">1/8 dotted</option><option value="1">1/4</option><option value="1.5">1/4 dotted</option><option value="2">1/2</option></select></label>
-    <label>Feedback <output id="fbAmtV"></output><input id="fbAmt" type="range" min="0" max="1.5" step="0.01" aria-label="Feedback amount"></label>
+    <label>Feedback <output id="fbAmtV"></output><input id="fbAmt" type="range" min="0" max="0.8" step="0.01" aria-label="Feedback amount, 0 to 80 percent"></label>
     <div id="fbFeeds" style="display:contents"></div>
   </section>
 
@@ -262,7 +262,7 @@ function apply() {
   }
   if (FB) {
     const f = engineMix ? FB : mix.fb;
-    $("fbBeats").value = String(mix.fb.beats); $("fbAmt").value = mix.fb.amount; $("fbAmtV").textContent = mix.fb.amount.toFixed(2);
+    $("fbBeats").value = String(mix.fb.beats); $("fbAmt").value = mix.fb.amount; $("fbAmtV").textContent = Math.round(mix.fb.amount * 100) + " %";
     for (const s in FB.feeds) { $("fd-" + s).value = mix.fb.feeds[s]; $("fdV-" + s).textContent = mix.fb.feeds[s].toFixed(2); }
     if (fbNodes) {
       const t = ctx.currentTime;

@@ -68,6 +68,25 @@ public:
             if (engine && engine->isPlaying()) engine->start(uint64_t(seed));
         };
         audio.onClick = [this] { showAudioSettings(); };
+        // the feedback bus (Kerem, 2026-11-09: "the feedback amount from 0 to 80 percent as a slider"), per song, remembered
+        feedback.setSliderStyle(juce::Slider::LinearHorizontal);
+        feedback.setRange(0, 80, 1);
+        feedback.setTextValueSuffix(" %");
+        feedback.setTextBoxStyle(juce::Slider::TextBoxRight, false, 56, 24);
+        feedback.onValueChange = [this] {
+            props.getUserSettings()->setValue("feedback." + juce::String(scene), feedback.getValue());
+            if (engine) engine->feedbackBus = float(feedback.getValue() / 100.0);
+        };
+        feedback.setColour(juce::Slider::trackColourId, tok::accent);
+        feedback.setColour(juce::Slider::backgroundColourId, tok::sunk);
+        feedback.setColour(juce::Slider::thumbColourId, tok::lamp);
+        feedback.setColour(juce::Slider::textBoxTextColourId, tok::ink);
+        feedback.setColour(juce::Slider::textBoxOutlineColourId, tok::hairline);
+        feedback.setColour(juce::Slider::textBoxBackgroundColourId, tok::sunk);
+        feedbackLabel.setColour(juce::Label::textColourId, tok::dim);
+        feedbackLabel.setFont(juce::FontOptions(13.0f));
+        addAndMakeVisible(feedback);
+        addAndMakeVisible(feedbackLabel);
         click.setToggleState(true, juce::dontSendNotification);
         click.onClick = [this] { if (engine) engine->clickLevel = click.getToggleState() ? 0.5f : 0.0f; };
 
@@ -99,7 +118,7 @@ public:
 
         preview();
         setWantsKeyboardFocus(true);
-        setSize(1000, 450);
+        setSize(1000, 500);
         startTimerHz(20);
     }
 
@@ -207,7 +226,11 @@ public:
 
     void resized() override
     {
-        auto row = getLocalBounds().reduced(tok::s5).removeFromBottom(36);
+        auto area = getLocalBounds().reduced(tok::s5);
+        auto row = area.removeFromBottom(36);
+        auto fbRow = area.removeFromBottom(tok::s3 + 28).removeFromTop(28);
+        feedbackLabel.setBounds(fbRow.removeFromLeft(190));
+        feedback.setBounds(fbRow.removeFromLeft(360));
         juce::FlexBox fb;
         // JUCE's FlexBox has no gap property, so each item carries the gap as a right margin.
         auto item = [](juce::Component& c, float w) { return juce::FlexItem(c).withWidth(w).withMargin({ 0, float(tok::s3), 0, 0 }); };
@@ -256,6 +279,14 @@ private:
         if (error.isEmpty())
             error = dev ? engine->load(loadedRate, juce::jmax(512, loadedBlock), palette) : juce::String("no audio output device");
         if (error.isNotEmpty()) engine.reset();
+        // the song's own amount until Kerem moves it (at most 80 %); a song without the bus greys the slider out
+        const bool bus = engine && engine->hasFeedbackBus();
+        const double own = engine ? juce::jmin(80.0, std::round(engine->palette().fbAmount * 100.0)) : 0.0;
+        feedback.setValue(bus ? double(props.getUserSettings()->getDoubleValue("feedback." + juce::String(scene), own)) : 0.0, juce::dontSendNotification);
+        feedback.setEnabled(bus);
+        feedback.setAlpha(bus ? 1.0f : 0.35f);
+        feedbackLabel.setText(bus ? "Feedback" : "Feedback (none in this song)", juce::dontSendNotification);
+        if (engine && bus) engine->feedbackBus = float(feedback.getValue() / 100.0);
         deviceManager.addAudioCallback(this);
         repaint();
     }
@@ -317,6 +348,8 @@ private:
     juce::TextEditor seedBox;
     juce::ComboBox sceneBox;
     juce::ToggleButton click { "Click on out 3/4" };
+    juce::Slider feedback;
+    juce::Label feedbackLabel { {}, "Feedback" };
 };
 
 struct App : juce::JUCEApplication
@@ -330,7 +363,7 @@ struct App : juce::JUCEApplication
         window->setUsingNativeTitleBar(true);
         window->setContentOwned(new MainComponent(), true);
         window->setResizable(true, false);
-        window->setResizeLimits(960, 450, 4000, 2000);
+        window->setResizeLimits(960, 500, 4000, 2000);
         window->centreWithSize(window->getWidth(), window->getHeight());
         window->setVisible(true);
     }

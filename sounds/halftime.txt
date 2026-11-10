@@ -105,3 +105,12 @@ drone   10.0    1000  sfz/Karoryfer_Bigcat_cello.v1.001/Karoryfer_Bigcat_cello/P
 gain drone  -4.0
 release drone 3.0
 send drone reverb 0.35
+
+# 2026-11-09 (Kerem: "a leading soloist instrument that connects parts as lead, continuous to play but changes
+# accordingly to the parts"): the soloist's own track. the erhu, long bows (Berlin's lead). In the mix +3 dB (2026-11-09: under the pad)
+lead     25.9    2983  sfz/aliexpress-erhu_v1000/Programs/02-erhu_long.sfz
+delay lead 0.75 0.35 0.22
+
+# 2026-11-09 (Kerem: "low kick percussion hits like a deep gong drum, organic sub hits, long sentences, not too
+# crowded"): the low hits, an eight-bar sentence (Sentence, Composer.h) on the engine's frame drum
+boom    -4.0    1000  internal/boom  # about 4 dB under the 808 (measured in Doom and Liquid)

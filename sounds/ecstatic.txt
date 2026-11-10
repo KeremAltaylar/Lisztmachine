@@ -79,3 +79,12 @@ bass     -5.6     400  vst/TAL-NoiseMaker/|Filter Cutoff=0.3|Filter Resonance=0.
 send arp reverb 0.30
 send harm reverb 0.45
 chord     0.0       0  internal/none  # no chords: the sequence, the pad and the choir carry the harmony
+
+# 2026-11-09 (Kerem: "a leading soloist instrument that connects parts as lead, continuous to play but changes
+# accordingly to the parts"): the soloist's own track. Six Sines with operator feedback, saturated (Berlin's lead): pitch-true, beating 1 %.
+lead    -18.2    1770  vst/Six Sines/|Op 1 Feedback Active=1|Op 1 Feedback Level=0.8|Main Saturation Type=0.5|Main Saturation Drive=0.6
+delay lead 0.75 0.35 0.22
+
+# 2026-11-09 (Kerem: "low kick percussion hits like a deep gong drum, organic sub hits, long sentences, not too
+# crowded"): the low hits, an eight-bar sentence (Sentence, Composer.h) on the engine's frame drum
+boom    -4.0    1000  internal/boom  # about 4 dB under the 808 (measured in Doom and Liquid)

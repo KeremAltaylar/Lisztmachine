@@ -78,6 +78,8 @@ std::vector<SoundChange> planSounds(const Composer& composer, const Palette& pal
 //   sub:   a held sine (and a little of its octave, for small speakers), 40 ms in, 400 ms out
 //   snare: a falling tone body and a burst of noise; from note 60 up a short rimshot
 //   deep:  struck metal low and long: FM on inharmonic ratios, its brightness fading over a second
+//   boom:  a big frame drum and a sub at once: a skin's first three modes (1, 1.59, 2.14), the pitch dropping
+//          from a fourth above in 40 ms, a felt mallet's thump, rounded by a soft saturation; long
 //   808:   a held, saturated sine with a short pitch punch; a note started while one is held slides there
 //   modal-<material>: struck, scraped or shaken objects (wood, log drum, skin, glass, bowl, kalimba,
 //          plate, scrape, rattle, chain, crackle): a bank of resonant modes excited by a short noise
@@ -85,7 +87,7 @@ std::vector<SoundChange> planSounds(const Composer& composer, const Palette& pal
 class InternalSynth
 {
 public:
-    enum Kind { Click, Blip, Sub, Kick, Hat, Clap, Snare, Metal, Zap, None, Deep, Bass808, Modal, Guitar };
+    enum Kind { Click, Blip, Sub, Kick, Hat, Clap, Snare, Metal, Zap, None, Deep, Bass808, Modal, Guitar, Boom };
     enum Excite { Strike, Scrape, Rattle, Crackle };
     struct Material { const char* name; std::array<float, 8> ratios; int modes; float tau, damp, exciteMs, slap; Excite excite; };
     void prepare(double sampleRate, Kind kind, const juce::String& material = {});
@@ -148,6 +150,7 @@ public:
     void set(double seconds, float feedback) { d_ = juce::jlimit(1, int(l_.size()) - 1, int(std::lround(seconds * sr_))); fb_ = juce::jlimit(0.0f, 1.5f, feedback); }
     void process(float* left, float* right, int numSamples);
     void letGo(float to, float step) { fb_ = juce::jmax(juce::jmin(fb_, to), fb_ - step); }
+    void glideTo(float to, float step) { fb_ += juce::jlimit(-step, step, juce::jlimit(0.0f, 1.5f, to) - fb_); } // the app's slider, no jumps
 
 private:
     std::vector<float> l_, r_;
@@ -327,6 +330,8 @@ public:
     void start(uint64_t seed, int startBar = 0);
     std::string scene = "berlin"; // which composer start() uses: the palette's scene
     float feedbackOverride = -1;  // >= 0: every track's echo feeds back this much (the app's control, the renderer's --feedback)
+    std::atomic<float> feedbackBus { -1 }; // >= 0: the feedback bus's amount, live (the app's slider, 0 to 0.8); -1: the palette's
+    bool hasFeedbackBus() const { for (float f : palette_.feeds) if (f > 0) return true; return false; }
     void stop();
     // Message thread, often (a timer): loads each part's next sound into its idle instance
     // ahead of the change. The audio thread never waits for this; a sound not ready in
@@ -453,8 +458,11 @@ private:
     int duckRamp_ = 0;
     std::vector<float> duckCurve_;
     float hush_ = 1, hushTarget_ = 1;               // the whole mix, tracks and returns: 0 at a stop's silence
-    int hushKeep_ = -1, hushKeepNext_ = -1;         // the one track a lead-in's silence leaves sounding (from its hush on), or -1
-    std::vector<float> hushCurve_;
+    bool hushSoft_ = false, hushSoftNext_ = false;   // a soft silence (pitch bit 4): the kept tracks further down
+    uint32_t hushKeep_ = 0, hushKeepNext_ = 0;      // the tracks a part change's silence leaves sounding (a bit each)
+    bool hushTails_ = false, hushTailsNext_ = false; // the silence lets the echoes and the reverb ring on (only the playing stops)
+    std::vector<float> hushCurve_, ringCurve_;      // the silence; its slower twin for the tails that ring through it
+    float ring_ = 1;
     std::vector<std::pair<int, float>> hushAt_;    // this chunk's hush events: sample, target
     std::vector<std::pair<int, float>> kickHits_; // this chunk's kicks: sample, velocity
 
