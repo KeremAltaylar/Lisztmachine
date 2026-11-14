@@ -221,6 +221,23 @@ int main()
                     ++at;
                 }
                 CHECK(pal.find("# drone from") != std::string::npos, "improv %d: palette not read", k);
+                // on a machine without the sampled instruments (Kerem's Mac before installing them): every track still has a sound
+                const auto bare = improvPalette(s, [&](const std::string& sc) {
+                    std::string t;
+                    if (FILE* f = std::fopen((root + "/sounds/" + sc + ".txt").c_str(), "rb")) { char b[4096]; size_t n; while ((n = std::fread(b, 1, sizeof b, f)) > 0) t.append(b, n); std::fclose(f); }
+                    return t;
+                }, [](const std::string& p) { return p.rfind("sfz/", 0) != 0; });
+                for (auto* name : { "pad", "bass", "sub", "arp", "chord", "harm", "riff", "drone", "lead" })
+                {
+                    bool found = false;
+                    for (size_t at = 0; (at = bare.find(std::string("\n") + name + " ", at)) != std::string::npos; ++at)
+                    {
+                        const size_t end = bare.find('\n', at + 1);
+                        const std::string line = bare.substr(at + 1, end - at - 1);
+                        if (line.find("sfz/") == std::string::npos && line.find(" gain") == std::string::npos) found = true;
+                    }
+                    CHECK(found, "improv %d: no installed sound for %s", k, name);
+                }
             }
             if (seed == 1) std::printf("      improv %2d  %-22s %s  %.0f%% different  %s\n", k, s.name.c_str(), c->describe().c_str(), 100 * s.distance, s.move.c_str());
         }

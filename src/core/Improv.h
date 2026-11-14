@@ -40,7 +40,10 @@ bool improvScene(const std::string& scene, int& k);
 // The chain's song k (planned from song 0 on, cached; the reference stays valid)
 const ImprovSong& improvSong(uint64_t seed, int k);
 // The song's palette: each track's lines from its donor's palette (read by name), levels moved to one master
-std::string improvPalette(const ImprovSong& s, const std::function<std::string(const std::string&)>& readPalette);
+// installed (optional): whether a patch can sound on this machine. A track whose borrowed instrument is not installed
+// here takes the same part from another song that has one (Kerem's Mac, 2026-11-14: "no patches for bass").
+std::string improvPalette(const ImprovSong& s, const std::function<std::string(const std::string&)>& readPalette,
+                          const std::function<bool(const std::string&)>& installed = nullptr);
 // The plan as JSON, for the page and for checking the chain
 std::string improvJson(const ImprovSong& s);
 

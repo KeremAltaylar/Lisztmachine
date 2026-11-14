@@ -300,7 +300,8 @@ const ImprovSong& improvSong(uint64_t seed, int k)
     return chain[size_t(k)];
 }
 
-std::string improvPalette(const ImprovSong& s, const std::function<std::string(const std::string&)>& read)
+std::string improvPalette(const ImprovSong& s, const std::function<std::string(const std::string&)>& read,
+                          const std::function<bool(const std::string&)>& installed)
 {
     // A track's lines are the ones that name it: its patches ("pad 0 400 Cat/Patch") and its settings ("gain pad 3").
     // Each donor's levels were set under its own master: a track keeps its loudness here by carrying the
@@ -337,13 +338,49 @@ std::string improvPalette(const ImprovSong& s, const std::function<std::string(c
         if (w == "shimmer" || w == "return" || w == "feedback" || w == "master" || (w == "send" && tok(l, 1) == "all")) out << l << "\n";
     }
     static const char* perTrack[] = { "gain", "delay", "drive", "crush", "comp", "duck", "lowcut", "amp", "release", "feed", "send" };
+    // a donor that has, for this track, a patch that sounds here: its patch lines are "<track> gain bright <patch...>"
+    auto sounds = [&](int d, const std::string& name) {
+        for (auto& l : lines(d))
+        {
+            if (tok(l, 0) != name) continue;
+            std::istringstream in(l);
+            std::string a, b, c, patch;
+            in >> a >> b >> c;
+            std::getline(in, patch);
+            patch.erase(0, patch.find_first_not_of(" \t"));
+            if (!installed || installed(patch)) return true;
+        }
+        return false;
+    };
     for (int t = 0; t < G::kGenreTracks; ++t)
     {
         const std::string name = info.trackNames[t];
-        const int d = s.sound[size_t(t)];
+        int d = s.sound[size_t(t)];
+        std::string note;
+        if (!sounds(d, name))
+        {   // the planned instrument is not installed here: the same part from another song (one that plays it, then any)
+            int alt = -1;
+            for (int pass = 0; pass < 2 && alt < 0; ++pass)
+                for (int k = 1; k < int(all.size()) && alt < 0; ++k)
+                {
+                    const int c = (d + k) % int(all.size());
+                    if ((pass == 1 || canLend(*all[size_t(c)], t)) && sounds(c, name)) alt = c;
+                }
+            if (alt < 0)
+            {   // nothing of it installed anywhere: one of the engine's own sounds, so the song still plays
+                const char* own = t == G::Bass || t == G::Sub ? "internal/808"
+                                : t == G::Metal || t == G::Perc || t == G::Tick || t == G::Ground || t == G::Body || t == G::Impact || t == G::Mallet ? "internal/metal"
+                                : t == G::Pulse ? "internal/none" : "internal/blip";
+                out << "# " << name << ": " << all[size_t(d)]->scene << "'s is not installed here, nor any song's: the engine's own\n"
+                    << name << " 0.0 1000 " << own << "\n";
+                continue;
+            }
+            note = std::string(" (") + all[size_t(d)]->scene + "'s is not installed here)";
+            d = alt;
+        }
         const double shift = masterOf(d) - master;
         bool gain = false;
-        out << "# " << name << " from " << all[size_t(d)]->scene << "\n";
+        out << "# " << name << " from " << all[size_t(d)]->scene << note << "\n";
         for (auto& l : lines(d))
         {
             const auto w = tok(l, 0);

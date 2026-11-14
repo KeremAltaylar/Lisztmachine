@@ -779,12 +779,23 @@ juce::String showHead(const std::string& sceneName, uint64_t seed, double blockR
     return j.toString();
 }
 
+// Whether a patch can sound on this machine: the palette loader's own checks
+static bool patchInstalled(const juce::String& patch)
+{
+    if (isEngineSound(patch)) return true;
+    if (isSfzSound(patch)) return findSfz(patch).existsAsFile();
+    if (isVstSound(patch)) return findVst(patch).exists();
+    if (isDexedSound(patch)) return findDexed().exists();
+    return findSurgePatch(patch).existsAsFile();
+}
+
 juce::File writeImprovPalette(uint64_t seed, int k)
 {
     auto file = juce::File::getSpecialLocation(juce::File::tempDirectory).getChildFile("lisztmachine-improv")
                     .getChildFile(juce::String(int64_t(seed)) + "-" + juce::String(k) + ".txt");
     file.getParentDirectory().createDirectory();
-    file.replaceWithText(improvPalette(improvSong(seed, k), [](const std::string& s) { return findPalette(s).loadFileAsString().toStdString(); }));
+    file.replaceWithText(improvPalette(improvSong(seed, k), [](const std::string& s) { return findPalette(s).loadFileAsString().toStdString(); },
+                                       [](const std::string& p) { return patchInstalled(juce::String(p)); }));
     return file;
 }
 
