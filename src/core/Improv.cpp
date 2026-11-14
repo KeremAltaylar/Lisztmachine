@@ -62,6 +62,30 @@ const char* moveName(int d)
     }
 }
 
+// Each part's level in each genre song's mix at its summit (dB against the whole mix; N: silent there), measured by
+// tools/track_levels.py (2026-11-14), in GenreComposer::all() order, tracks in GTrack order. A borrowed part is moved
+// from its donor's balance to the target: the songs' median (Kerem, 2026-11-14: "this high pitched sound rhythm is too
+// loud compared to the other synths" - the ticks came from Deconstructed Club, a click-heavy song); the ticks lower still.
+constexpr double N = 99;
+constexpr double kPartLevel[8][20] = {
+    { -4.1, N, -19.7, N, N, -2.7, -6.6, -8.8, N, -17.4, -14.0, -15.4, -17.4, N, -25.2, -14.7, 0.3, -2.8, N, -8.7 }, // stoner
+    { -14.4, N, -20.7, -40.3, -19.5, -14.5, -7.3, -10.4, -12.8, -28.9, -9.8, -19.1, -19.1, -20.4, -28.6, -20.3, -20.0, -13.4, N, -9.9 }, // jungle
+    { -17.8, N, -19.2, -26.9, -20.2, -17.9, -16.0, -15.0, N, -29.7, -16.7, -19.8, -20.6, -21.9, -29.0, -17.6, -20.9, N, -12.5, -9.2 }, // ecstatic
+    { -14.6, N, -17.7, -24.7, -18.4, -15.0, -14.5, -8.9, -10.8, -28.6, -18.3, -18.8, -19.0, -19.3, -27.6, -16.2, N, -15.9, N, -10.2 }, // noir
+    { -20.2, N, -22.3, -25.1, -20.9, -18.7, -19.0, -13.2, -20.0, -27.8, -18.2, -21.8, -22.8, -21.5, -31.4, -15.8, -23.9, N, -11.6, -10.4 }, // deconstructed
+    { -8.2, N, -18.9, -38.0, -43.9, -15.4, -16.3, N, N, N, -16.0, -18.9, -12.3, -23.6, -28.9, -11.5, -17.4, -16.0, N, -10.3 }, // halftime
+    { -2.7, N, -16.0, N, -18.8, -0.6, -5.1, -21.5, -24.4, -19.3, -12.9, -17.7, -18.1, -26.8, -25.5, -14.6, 2.3, -7.4, -1.7, -8.5 }, // doom
+    { -13.4, N, -18.3, N, N, -8.4, -6.0, -38.8, -7.1, -21.4, -13.8, -41.8, -45.3, N, -36.8, -13.4, -7.9, N, -10.8, -7.0 }, // blackgaze
+};
+constexpr double kPartTarget[20] = { -13.9, N, -19.0, -30.0, -19.9, -14.8, -10.9, -13.2, -12.8, -27.8, -15.0, -19.0, -19.1, -21.7, -28.8, -15.2, -17.4, -13.4, -11.2, -9.6 };
+// how far a part borrowed from song d is moved, at most 12 dB either way
+double partMove(int d, int t)
+{
+    const double have = kPartLevel[size_t(d)][size_t(t)], want = kPartTarget[size_t(t)];
+    if (have == N || want == N) return 0;
+    return std::max(-12.0, std::min(12.0, want - have));
+}
+
 // the sound donors each track may borrow from: a song's instrument for that track only where it plays that role, and
 // only for a part its own form plays (a song keeps a silent placeholder, internal/none, on the parts it never uses:
 // Blackgaze's drone, Ecstatic's chords; borrowed, the Seed's drone was silence, 2026-11-14)
@@ -378,7 +402,7 @@ std::string improvPalette(const ImprovSong& s, const std::function<std::string(c
             note = std::string(" (") + all[size_t(d)]->scene + "'s is not installed here)";
             d = alt;
         }
-        const double shift = masterOf(d) - master;
+        const double shift = masterOf(d) - master + partMove(d, t);
         bool gain = false;
         out << "# " << name << " from " << all[size_t(d)]->scene << note << "\n";
         for (auto& l : lines(d))
