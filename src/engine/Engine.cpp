@@ -1658,7 +1658,10 @@ void Engine::renderClick(float* const* out, int numChannels, int offset, int len
     for (int n = 0; n < len; ++n)
     {
         const int64_t s = pos_ + n;
-        const int64_t beat = int64_t(std::ceil(double(s) / samplesPerTick_ / beatTicks));
+        // the nearest beat, then whether this is its sample: ceil() overshot to the next beat whenever the beat's sample was
+        // rounded up, and at most tempos about half the clicks never sounded (Kerem, 2026-11-14: "some of the metronome
+        // hits disappear"; at 106 bpm 981 of 2000 missed, measured)
+        const int64_t beat = int64_t(std::llround(double(s) / samplesPerTick_ / beatTicks));
         if (sampleOf(beat * beatTicks) == s && s < endSample_)
         {
             clickFreq_ = beat % 4 == 0 ? 1760.0 : 1320.0;
