@@ -62,10 +62,13 @@ public:
         // 2026-11-14 (Kerem): Improvisation, endless generated songs (src/core/Improv.cpp), after the songs
         sceneBox.addSeparator();
         sceneBox.addItem("Improvisation", kImprovId);
+        sceneBox.addItem("The whole concert", kConcertId); // 2026-11-14 (Kerem): the nine songs back to back, live
         if (scene == "improv") sceneBox.setSelectedId(kImprovId, juce::dontSendNotification);
+        if (scene == "concert") sceneBox.setSelectedId(kConcertId, juce::dontSendNotification);
         if (sceneBox.getSelectedId() == 0) { scene = "berlin"; sceneBox.setSelectedId(1, juce::dontSendNotification); }
         sceneBox.onChange = [this] {
-            scene = sceneBox.getSelectedId() == kImprovId ? std::string("improv") : std::string(kScenes[sceneBox.getSelectedId() - 1]);
+            scene = sceneBox.getSelectedId() == kImprovId ? std::string("improv") : sceneBox.getSelectedId() == kConcertId ? std::string("concert")
+                  : std::string(kScenes[sceneBox.getSelectedId() - 1]);
             props.getUserSettings()->setValue("scene", juce::String(scene));
             reload();
             preview();
@@ -89,7 +92,7 @@ public:
             seed = juce::Random::getSystemRandom().nextInt({ 1, 1000000 });
             seedBox.setText(juce::String(seed), false);
             preview();
-            if (improv()) { if (engine && engine->isPlaying()) { stopAll(); reload(); togglePlay(); } } // a new endless chain
+            if (chained()) { if (engine && engine->isPlaying()) { stopAll(); reload(); togglePlay(); } } // a new chain
             else if (engine && engine->isPlaying()) { engine->start(uint64_t(seed)); announce(*engine, 0); }
         };
         audio.onClick = [this] { showAudioSettings(); };
@@ -250,7 +253,8 @@ public:
 
         g.setColour(tok::faint);
         g.setFont(juce::FontOptions(11.0f).withStyle("Bold"));
-        const juce::String head = improv() ? "Improvisation" + dot + "song " + juce::String(improvK + 1)
+        const juce::String head = chained() ? juce::String(improv() ? "Improvisation" : "The whole concert") + dot + "song " + juce::String(improvK + 1)
+                                                  + (concert() ? juce::String("/") + juce::String(int(std::size(kScenes))) : juce::String())
                                               + (oldEngine ? dot + "changing over" : nextEngine ? dot + "next song ready" : loader ? dot + "writing the next song" : juce::String())
                                            : juce::String(kSceneTitles[sceneBox.getSelectedId() - 1]);
         g.drawText("LISZTMACHINE" + dot + head.toUpperCase(), r.removeFromTop(16), juce::Justification::left);
@@ -334,7 +338,11 @@ public:
             g.setColour(tok::dim);
             g.setFont(juce::FontOptions(13.0f));
             auto peak = juce::Decibels::gainToDecibels(meterPeak, -90.0f);
-            g.drawText("master " + juce::String(peak, 1) + " dBFS " + dot + " limiter " + juce::String(engine->limiter.maxReductionDb, 1)
+            auto* dev = deviceManager.getCurrentAudioDevice();
+            const int xruns = dev ? dev->getXRunCount() : -1;   // the audio not computed in time: crackles, a stumbling click
+            g.setColour(xruns > 0 ? juce::Colour(0xffe8a598) : tok::dim);
+            g.drawText(juce::String(xruns >= 0 ? "dropouts " + juce::String(xruns) + " " + dot + " " : juce::String())
+                       + "master " + juce::String(peak, 1) + " dBFS " + dot + " limiter " + juce::String(engine->limiter.maxReductionDb, 1)
                            + " dB" + (deviceManager.getCurrentAudioDevice() ? " " + dot + " " + deviceManager.getCurrentAudioDevice()->getName() : ""),
                        r.removeFromTop(18), juce::Justification::left);
         }
@@ -397,15 +405,15 @@ private:
     void togglePlay()
     {
         if (!engine || error.isNotEmpty()) return;
-        if (engine->isPlaying()) { if (improv()) stopAll(); else engine->stop(); live.stop(); }
+        if (engine->isPlaying()) { if (chained()) stopAll(); else engine->stop(); live.stop(); }
         else
         {
             seed = juce::jmax<int64_t>(1, seedBox.getText().getLargeIntValue());
             // Improvisation always begins at its first song (the chain is the seed)
-            if (improv() && (improvK != 0 || chainSeed != seed || engine->isFinished())) { reload(); if (!engine) return; }
+            if (chained() && (improvK != 0 || chainSeed != seed || engine->isFinished())) { reload(); if (!engine) return; }
             engine->limiter.maxReductionDb = 0;
             engine->start(uint64_t(seed));
-            if (improv()) changeAt = changeTime(*engine->composer());
+            if (chained()) changeAt = changeTime(*engine->composer());
             announce(*engine, improvK);
         }
     }
@@ -474,7 +482,7 @@ private:
         {
             meterPeak = engine->peakPost.exchange(0);
             engine->service(); // load each part's next sound ahead of its change
-            if (improv()) improvise();
+            if (chained()) improvise();
             sendState();
             if (engine->isPlaying() || engine->isFinished()) composer = engine->composer();
         }
@@ -514,11 +522,19 @@ private:
     // A quarter of the way into song k's Release, song k+1 starts (its Seed: the drone alone, inside k's last chord,
     // src/core/Improv.cpp) and song k rings out under it in `oldEngine` until it has finished. Endless; the seed is the chain.
     static constexpr int kImprovId = 1000;
+    static constexpr int kConcertId = 1001;
     bool improv() const { return scene == "improv"; }
-    std::string songScene(int k) const { return improv() ? "improv/" + std::to_string(k) : scene; }
-    // seconds into a song where the next one begins: a quarter into its Release
-    static double changeTime(const Composer& c)
+    bool concert() const { return scene == "concert"; }   // the nine songs in order, each loaded while the one before plays
+    bool chained() const { return improv() || concert(); }
+    std::string songScene(int k) const
     {
+        return improv() ? "improv/" + std::to_string(k) : concert() ? std::string(kScenes[size_t(k) % std::size(kScenes)]) : scene;
+    }
+    // seconds into a song where the next one begins: Improvisation a quarter into its Release; the concert when the
+    // song's last bar has ended and two seconds of its tail have rung
+    double changeTime(const Composer& c) const
+    {
+        if (concert()) return c.totalBars() * 240.0 / c.bpm() + 2.0;
         const auto& r = c.sections().back();
         return (r.startBar + 0.25 * r.bars) * 240.0 / c.bpm();
     }
@@ -526,7 +542,7 @@ private:
     {
         Palette palette;
         const auto sc = songScene(k);
-        err = palette.load(improv() ? writeImprovPalette(uint64_t(chainSeed), k) : findPalette(scene), sc);
+        err = palette.load(improv() ? writeImprovPalette(uint64_t(chainSeed), k) : findPalette(sc), sc);
         if (err.isNotEmpty()) return nullptr;
         auto e = std::make_unique<Engine>();
         if (offThread)
@@ -558,7 +574,7 @@ private:
     void prepareNext()
     {
         const int k = improvK + 1, gen = ++loadGen;
-        improvSong(uint64_t(chainSeed), k); // planned here: the chain's cache is filled on this thread only
+        if (improv()) improvSong(uint64_t(chainSeed), k); // planned here: the chain's cache is filled on this thread only
         loader = std::make_unique<Loader>([this, k, gen] {
             juce::String err;
             auto e = build(k, err, true);
@@ -582,7 +598,8 @@ private:
         if (loader && !loader->isThreadRunning()) loader.reset();
         graveyard.erase(std::remove_if(graveyard.begin(), graveyard.end(), [](auto& t) { return !t->isThreadRunning(); }), graveyard.end());
         const bool going = engine->isPlaying() || engine->isFinished();
-        if (going && !loader && !nextEngine && engine->seconds.load() > 2.0) prepareNext();
+        const bool more = !concert() || improvK + 1 < int(std::size(kScenes)); // the concert ends after its ninth song
+        if (going && more && !loader && !nextEngine && engine->seconds.load() > 2.0) prepareNext();
         if (nextEngine && (engine->isFinished() || (engine->isPlaying() && engine->seconds.load() >= changeAt))) changeover();
         if (oldEngine)
         {
@@ -642,7 +659,7 @@ private:
         else if (c.startsWith("scene/"))
         {
             const auto id = c.fromFirstOccurrenceOf("scene/", false, false);
-            int sel = id == "improv" ? kImprovId : 0;
+            int sel = id == "improv" ? kImprovId : id == "concert" ? kConcertId : 0;
             for (int i = 0; i < int(std::size(kScenes)); ++i) if (id == kScenes[i]) sel = i + 1;
             if (sel && sel != sceneBox.getSelectedId()) sceneBox.setSelectedId(sel, juce::sendNotificationSync);
         }
@@ -662,7 +679,7 @@ private:
                        + "\",\"click\":" + (click.getToggleState() ? "true" : "false") + ",\"clickMain\":" + (clickMain.getToggleState() ? "true" : "false")
                        + ",\"error\":" + juce::JSON::toString(error) + ",\"scenes\":[";
         for (int i = 0; i < int(std::size(kScenes)); ++i) j << "[\"" << kScenes[i] << "\"," << juce::JSON::toString(juce::String::fromUTF8(kSceneTitles[i])) << "],";
-        j << "[\"improv\",\"Improvisation\"]]}";
+        j << "[\"improv\",\"Improvisation\"],[\"concert\",\"The whole concert\"]]}";
         live.state(j);
     }
 
@@ -680,7 +697,7 @@ private:
         const double at = LiveLink::now() + double(e.preRollSamples()) / loadedRate + outLatency();
         juce::MemoryOutputStream j;
         j << showHead(e.scene, uint64_t(improv() ? chainSeed : seed), 20.0) << ",\"at\":" << juce::String(at, 4) << ",\"now\":" << juce::String(LiveLink::now(), 4) << ",\"k\":" << k
-          << ",\"piece\":\"" << (improv() ? juce::String("improv") : juce::String(scene)) << "\"";
+          << ",\"piece\":\"" << (improv() ? juce::String("improv") : juce::String(e.scene)) << "\"";
         if (improv()) j << ",\"plan\":" << juce::String(improvJson(improvSong(uint64_t(chainSeed), k)));
         j << "}";
         songAt = at;
