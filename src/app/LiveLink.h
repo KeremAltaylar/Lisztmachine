@@ -61,6 +61,23 @@ public:
     }
     int clients() const { const std::lock_guard<std::mutex> l(m); return int(socks.size()); }
 
+    // Sends all of it: macOS send() takes part of a large message at a time (a song's show is about 1 MB). One write
+    // cut the song off on Kerem's Mac, the page could not read it and the visuals never started (2026-11-14).
+    static bool sendAll(juce::StreamingSocket& sock, const juce::String& text)
+    {
+        const char* p = text.toRawUTF8();
+        int left = int(text.getNumBytesAsUTF8());
+        while (left > 0)
+        {
+            if (sock.waitUntilReady(false, 2000) != 1) return false; // the page stopped reading
+            const int n = sock.write(p, left);
+            if (n < 0) return false;
+            p += n;
+            left -= n;
+        }
+        return true;
+    }
+
 private:
     struct Acceptor : juce::Thread
     {
@@ -82,27 +99,27 @@ private:
                 {
                     if (o.onCommand) o.onCommand(line.fromFirstOccurrenceOf("/cmd/", false, false).upToFirstOccurrenceOf(" ", false, false));
                     const juce::String r = "HTTP/1.1 204 No Content\r\nAccess-Control-Allow-Origin: *\r\nAccess-Control-Allow-Private-Network: true\r\nContent-Length: 0\r\n\r\n";
-                    c->write(r.toRawUTF8(), int(r.getNumBytesAsUTF8()));
+                    sendAll(*c, r);
                     continue;
                 }
                 if (!juce::String(req).startsWith("GET /live")) // a CORS preflight or anything else: answer and close
                 {
                     const juce::String r = "HTTP/1.1 204 No Content\r\nAccess-Control-Allow-Origin: *\r\nAccess-Control-Allow-Private-Network: true\r\n"
                                            "Access-Control-Allow-Methods: GET\r\nAccess-Control-Allow-Headers: *\r\nContent-Length: 0\r\n\r\n";
-                    c->write(r.toRawUTF8(), int(r.getNumBytesAsUTF8()));
+                    sendAll(*c, r);
                     continue;
                 }
-                c->write(head.toRawUTF8(), int(head.getNumBytesAsUTF8()));
+                sendAll(*c, head);
                 const std::lock_guard<std::mutex> l(o.m);
                 if (o.lastState.isNotEmpty())
                 {
                     const juce::String ev = "event: state\ndata: " + o.lastState + "\n\n";
-                    c->write(ev.toRawUTF8(), int(ev.getNumBytesAsUTF8()));
+                    sendAll(*c, ev);
                 }
                 for (auto& s : o.songs) // what is sounding now, so a page that joins mid-song can follow
                 {
                     const juce::String ev = "event: song\ndata: " + s + "\n\n";
-                    c->write(ev.toRawUTF8(), int(ev.getNumBytesAsUTF8()));
+                    sendAll(*c, ev);
                 }
                 o.socks.push_back(std::move(c));
             }
@@ -128,7 +145,7 @@ private:
                 std::vector<juce::StreamingSocket*> dead;
                 for (auto* s : to)
                     for (auto& msg : q)
-                        if (s->write(msg.toRawUTF8(), int(msg.getNumBytesAsUTF8())) < 0) { dead.push_back(s); break; }
+                        if (!sendAll(*s, msg)) { dead.push_back(s); break; }
                 if (!dead.empty())
                 {
                     const std::lock_guard<std::mutex> l(o.m);
