@@ -26,7 +26,7 @@ delay arp 1.5 0.55 0.45  # 2026-11-09 Kerem: the sax wetter (was 0.45 0.25)
 # Balance (to be measured in the mix)
 gain pulse   0.0
 gain metal   8.7
-gain tick    12.2
+gain tick    8.2
 gain perc    -5.8
 gain pad     -3.2
 gain bass    -0.7

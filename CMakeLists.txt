@@ -47,7 +47,8 @@ endif()
 # The composer: plain C++, no JUCE, so it is testable and deterministic on its own.
 add_library(liszt_core STATIC
     src/core/Composer.cpp
-    src/core/Genres.cpp)
+    src/core/Genres.cpp
+    src/core/Improv.cpp)
 target_include_directories(liszt_core PUBLIC src/core)
 
 # The engine: plugin hosting, event player, mixer. Shared by the app and the renderer.

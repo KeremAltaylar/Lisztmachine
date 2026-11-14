@@ -1,6 +1,7 @@
 // Checks on the composer alone, over many seeds. Run: liszt_tests
 #include "Composer.h"
 #include "Genres.h"
+#include "Improv.h"
 #include <cmath>
 #include <cstdlib>
 #include <algorithm>
@@ -8,6 +9,7 @@
 #include <cstring>
 #include <map>
 #include <set>
+#include <string>
 
 using namespace liszt;
 
@@ -183,6 +185,45 @@ int main()
         }
         std::printf("      %s\n", G(*spec, 1).describe().c_str());
     }
+    // Improvisation: a chain of songs, each at most five minutes, each different from the one before in every
+    // dimension that is measured, and the next drone inside the last song's final chord
+    for (seed = 1; seed <= 6; ++seed)
+        for (int k = 0; k < 12; ++k)
+        {
+            const auto& s = improvSong(seed, k);
+            auto c = makeComposer("improv/" + std::to_string(k), seed);
+            auto ev = generateAll(*c);
+            const double secs = c->totalBars() * 240.0 / c->bpm();
+            CHECK(secs <= 295 && secs >= 150, "improv %d: %.0f s", k, secs);
+            CHECK(!ev.empty(), "improv %d: silent", k);
+            CHECK(c->sections().front().name == std::string("Seed") && c->sections().back().name == std::string("Release"), "improv %d: no Seed/Release", k);
+            if (k > 0)
+            {
+                for (auto& d : s.dims)
+                    if (d.first != "length" && d.first != "space") CHECK(d.second > 0, "improv %d: %s same as the song before", k, d.first.c_str());
+                CHECK(s.distance >= 0.75, "improv %d: distance %.2f", k, s.distance);
+            }
+            {   // every borrowed instrument is a real one: no silent placeholder (internal/none) but the ghost pulse
+                std::string root = __FILE__;
+                root = root.substr(0, root.find_last_of("/\\"));
+                root = root.substr(0, root.find_last_of("/\\"));
+                const auto pal = improvPalette(s, [&](const std::string& sc) {
+                    std::string t;
+                    if (FILE* f = std::fopen((root + "/sounds/" + sc + ".txt").c_str(), "rb")) { char b[4096]; size_t n; while ((n = std::fread(b, 1, sizeof b, f)) > 0) t.append(b, n); std::fclose(f); }
+                    return t;
+                });
+                size_t at = 0;
+                while ((at = pal.find("internal/none", at)) != std::string::npos)
+                {
+                    const size_t line = pal.rfind('\n', at) + 1;
+                    const std::string track = pal.substr(line, pal.find(' ', line) - line);
+                    CHECK(track == "pulse", "improv %d: %s borrows a silent placeholder", k, track.c_str());
+                    ++at;
+                }
+                CHECK(pal.find("# drone from") != std::string::npos, "improv %d: palette not read", k);
+            }
+            if (seed == 1) std::printf("      improv %2d  %-22s %s  %.0f%% different  %s\n", k, s.name.c_str(), c->describe().c_str(), 100 * s.distance, s.move.c_str());
+        }
     seed = 0;
 
     std::printf("%s (%d failures)\n", failures ? "FAILED" : "all checks passed", failures);

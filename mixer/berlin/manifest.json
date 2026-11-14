@@ -1,0 +1,156 @@
+{
+ "song": "berlin",
+ "title": "Berlin",
+ "bpm": 106.0,
+ "labels": {
+  "pad": "Pads",
+  "seq": "Sequence",
+  "lead": "Lead",
+  "solo": "Soloist",
+  "guitar": "Power Synth",
+  "sub": "Sub"
+ },
+ "sections": [
+  {
+   "name": "Drift",
+   "start": 0.0,
+   "end": 18.1132,
+   "stems": [
+    "pad",
+    "delay",
+    "reverb"
+   ]
+  },
+  {
+   "name": "Pulse",
+   "start": 18.1132,
+   "end": 36.2264,
+   "stems": [
+    "pad",
+    "bass",
+    "delay",
+    "reverb"
+   ]
+  },
+  {
+   "name": "Motion",
+   "start": 36.2264,
+   "end": 72.4528,
+   "stems": [
+    "pad",
+    "bass",
+    "seq",
+    "delay",
+    "reverb"
+   ]
+  },
+  {
+   "name": "Song",
+   "start": 72.4528,
+   "end": 144.906,
+   "stems": [
+    "pad",
+    "bass",
+    "sub",
+    "seq",
+    "lead",
+    "solo",
+    "guitar",
+    "delay",
+    "reverb"
+   ]
+  },
+  {
+   "name": "Haze",
+   "start": 144.906,
+   "end": 163.019,
+   "stems": [
+    "pad",
+    "seq",
+    "delay",
+    "reverb"
+   ]
+  },
+  {
+   "name": "Theme",
+   "start": 163.019,
+   "end": 235.472,
+   "stems": [
+    "pad",
+    "bass",
+    "sub",
+    "seq",
+    "lead",
+    "solo",
+    "guitar",
+    "delay",
+    "reverb"
+   ]
+  },
+  {
+   "name": "Shift",
+   "start": 235.472,
+   "end": 271.698,
+   "stems": [
+    "pad",
+    "bass",
+    "sub",
+    "seq",
+    "solo",
+    "guitar",
+    "delay",
+    "reverb"
+   ]
+  },
+  {
+   "name": "Summit",
+   "start": 271.698,
+   "end": 344.151,
+   "stems": [
+    "pad",
+    "bass",
+    "sub",
+    "seq",
+    "lead",
+    "solo",
+    "guitar",
+    "delay",
+    "reverb"
+   ]
+  },
+  {
+   "name": "Dissolve",
+   "start": 344.151,
+   "end": 380.377,
+   "stems": [
+    "pad",
+    "seq",
+    "solo",
+    "delay",
+    "reverb"
+   ]
+  },
+  {
+   "name": "Afterglow",
+   "start": 380.377,
+   "end": 398.491,
+   "stems": [
+    "pad",
+    "delay",
+    "reverb"
+   ]
+  }
+ ],
+ "master": 5.6,
+ "base": {
+  "guitar": -13.0,
+  "bass": 7.5,
+  "pad": 0.4,
+  "seq": 4.3,
+  "lead": -0.6
+ },
+ "returns": {
+  "delay": 12.0,
+  "reverb": 12.0
+ }
+}

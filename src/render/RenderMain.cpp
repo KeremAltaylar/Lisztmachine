@@ -2,6 +2,7 @@
 //   liszt_render [--seed N] [--seconds S] [--out file.wav] [--solo <track of the scene>]
 //                [--feedback 0..0.95]              every track's echo feeds back this much
 //                [--feedback-bus 0..0.8]           the feedback bus's amount (the app's slider)
+//                [--master-fx DriveOn=1,Drive=0.6,Low=0.7]  the app's master FX panel (MasterFx::paramNames)
 //                [--patch bass="Basses/Bass 1"]  (repeatable; any Surge factory patch)
 //                [--from Summit|<bar>] [--bars N]  start at a section or bar; render N bars + tail
 //                [--dry]                           no delay or reverb
@@ -11,6 +12,7 @@
 //   liszt_render --audition "Category/Patch" [note] [--pure] hold one note on a Surge patch, measure it
 //   liszt_render --probe <plugin.vst3>                        list what a plugin exposes
 #include "Engine.h"
+#include "Improv.h"
 #include <juce_audio_formats/juce_audio_formats.h>
 #include <juce_dsp/juce_dsp.h>
 #include <array>
@@ -263,43 +265,10 @@ static void writeMidi(uint64_t seed, const juce::File& file)
 // audio block. The live app will send the same over a socket.
 static void writeShow(uint64_t seed, double blockRate, const std::vector<std::array<float, 7>>& levels, const juce::File& file)
 {
-    auto cp = makeComposer(sceneName, seed);
-    auto& c = *cp;
-    std::vector<Event> ev;
-    for (int b = 0; b < c.totalBars(); ++b) c.generateBar(b, ev);
-    std::stable_sort(ev.begin(), ev.end());
-    const double secPerTick = 60.0 / (c.bpm() * kPPQ);
+    juce::MemoryOutputStream j;
+    j << showHead(sceneName, seed, blockRate);
     auto num = [](double v) { return juce::String(v, 4).trimCharactersAtEnd("0").trimCharactersAtEnd("."); };
-
-    juce::MemoryOutputStream j; // a juce::String grown by << took 6 minutes for 57k level rows
-    j << "{\"seed\":" << juce::String(int64_t(seed)) << ",\"bpm\":" << num(c.bpm()) << ",\"key\":\"" << juce::String(c.describe()) << "\""
-      << ",\"tracks\":[\"pad\",\"bass\",\"seq\",\"lead\"],\"levelNames\":[\"pad\",\"bass\",\"seq\",\"lead\",\"delay\",\"reverb\",\"master\"]"
-      << ",\"levelRate\":" << num(blockRate) << ",\"sections\":[";
-    for (size_t i = 0; i < c.sections().size(); ++i)
-    {
-        auto& sc = c.sections()[i];
-        j << (i ? "," : "") << "{\"t\":" << num(sc.startBar * 4 * 60.0 / c.bpm()) << ",\"bars\":" << sc.bars
-          << ",\"energy\":" << num(sc.energy) << ",\"name\":\"" << sc.name << "\"}";
-    }
-    j << "],\"notes\":["; // [time s, duration s, role, pitch, velocity]: the visuals read roles, not tracks
-    const auto& info = sceneInfo(sceneName);
-    int64_t onAt[kMaxTracks][128];
-    float velAt[kMaxTracks][128] = {};
-    std::fill(&onAt[0][0], &onAt[0][0] + kMaxTracks * 128, int64_t(-1));
-    bool first = true;
-    for (auto& e : ev)
-    {
-        if (e.type == Event::NoteOn) { onAt[e.track][e.pitch] = e.tick; velAt[e.track][e.pitch] = e.value; }
-        else if (e.type == Event::NoteOff && onAt[e.track][e.pitch] >= 0)
-        {
-            const int64_t on = onAt[e.track][e.pitch];
-            j << (first ? "" : ",") << "[" << num(on * secPerTick) << "," << num((e.tick - on) * secPerTick) << ","
-              << info.role[e.track] << "," << int(e.pitch) << "," << num(velAt[e.track][e.pitch]) << "]";
-            first = false;
-            onAt[e.track][e.pitch] = -1;
-        }
-    }
-    j << "],\"levels\":["; // RMS per audio block, linear
+    j << ",\"levels\":["; // RMS per audio block, linear
     for (size_t i = 0; i < levels.size(); ++i)
     {
         j << (i ? ",[" : "[");
@@ -311,10 +280,82 @@ static void writeShow(uint64_t seed, double blockRate, const std::vector<std::ar
 }
 
 static juce::String paletteName = "berlin"; // --palette <name>: sounds/<name>.txt
+static juce::File paletteFile;                 // Improvisation: its generated palette
 static float feedbackOverride = -1;            // --feedback 0..0.95: every track's echo
+static juce::String masterFx;                  // --master-fx Name=value,...: the app's master FX panel
 static float feedbackBus = -1;                 // --feedback-bus 0..0.8: the feedback bus's amount (the app's slider)
 static bool gRaw = false;                      // --raw: without the mix stage (ducking, low cuts, width, glue)
 static bool gStems = false;                    // --stems: also <out>.<track>.wav per track and <out>.delay/.reverb.wav, before the glue
+
+// Improvisation as the app plays it (src/app/Main.cpp): song k in one engine, song k+1 made ready silent beside it and
+// started a quarter of the way into k's Release, k ringing out under it in a second engine until it finishes. Writes
+// the whole chain to one WAV and <out>.chain.json (each song's start in the file, its plan), for checking the changeovers.
+static int renderChain(uint64_t seed, int songs, const juce::File& out)
+{
+    const double sr = 48000;
+    const int block = 512;
+    auto build = [&](int k) -> std::unique_ptr<Engine> {
+        Palette palette;
+        const auto sc = "improv/" + std::to_string(k);
+        if (auto e = palette.load(writeImprovPalette(seed, k), sc); e.isNotEmpty()) { std::cerr << e << "\n"; return nullptr; }
+        auto e = std::make_unique<Engine>();
+        e->scene = sc;
+        if (auto err = e->load(sr, block, palette); err.isNotEmpty()) { std::cerr << err << "\n"; return nullptr; }
+        e->start(seed, 0, false);
+        return e;
+    };
+    auto changeTime = [](const Composer& c) { const auto& r = c.sections().back(); return (r.startBar + 0.25 * r.bars) * 240.0 / c.bpm(); };
+
+    out.deleteFile();
+    std::unique_ptr<juce::OutputStream> stream = std::make_unique<juce::FileOutputStream>(out);
+    auto writer = juce::WavAudioFormat().createWriterFor(
+        stream, juce::AudioFormatWriterOptions {}.withSampleRate(sr).withNumChannels(2).withBitsPerSample(24));
+    if (!writer) { std::cerr << "cannot write " << out.getFullPathName() << "\n"; return 1; }
+
+    std::unique_ptr<Engine> cur = build(0), next, old;
+    if (!cur) return 1;
+    cur->go();
+    juce::String json = "{\"seed\":" + juce::String(int64_t(seed)) + ",\"songs\":[";
+    auto note = [&](int k, int64_t at) {
+        json << (k ? "," : "") << "{\"t\":" << juce::String(double(at) / sr, 3) << ",\"plan\":" << juce::String(improvJson(improvSong(seed, k))) << "}";
+        std::cout << juce::String(double(at) / sr, 1) << " s  song " << k << ": " << cur->composer()->describe() << "\n";
+    };
+    note(0, 0);
+    juce::AudioBuffer<float> buf(2, block), tmp(2, block);
+    int k = 0;
+    int64_t done = 0;
+    float peak = 0;
+    for (;;)
+    {
+        if (!next && k + 1 < songs && cur->seconds.load() > 2.0) next = build(k + 1);   // the app does this on a thread
+        const bool change = next && (cur->isFinished() || cur->seconds.load() >= changeTime(*cur->composer()));
+        if (change)
+        {
+            cur->clickLevel = 0;
+            old = cur->isFinished() ? nullptr : std::move(cur);
+            cur = std::move(next);
+            cur->go();
+            note(++k, done);
+        }
+        if (old && old->isFinished()) old.reset();
+        if (cur->isFinished() && !next && !old) break;
+        cur->service();
+        if (old) old->service();
+        cur->render(buf.getArrayOfWritePointers(), 2, block);
+        if (old)
+        {
+            old->render(tmp.getArrayOfWritePointers(), 2, block);
+            for (int c = 0; c < 2; ++c) buf.addFrom(c, 0, tmp, c, 0, block);
+            for (int c = 0; c < 2; ++c) for (int i = 0; i < block; ++i) buf.setSample(c, i, ceilingClip(buf.getSample(c, i)));
+        }
+        peak = juce::jmax(peak, buf.getMagnitude(0, block));
+        writer->writeFromAudioSampleBuffer(buf, 0, block);
+        done += block;
+    }
+    out.withFileExtension("chain.json").replaceWithText(json + "]}");
+    std::cout << "chain of " << songs << " songs: " << juce::String(double(done) / sr, 1) << " s, peak " << dbfs(peak) << " dBFS -> " << out.getFullPathName() << "\n";
+    return 0;
+}
 
 static int renderConcert(uint64_t seed, double seconds, const juce::File& out, int solo, const juce::StringArray& patches, bool dry,
                          const juce::String& from, int bars)
@@ -322,7 +363,7 @@ static int renderConcert(uint64_t seed, double seconds, const juce::File& out, i
     const double sr = 48000;
     const int block = 512;
     Palette palette;
-    if (auto e = palette.load(findPalette(paletteName), sceneName); e.isNotEmpty()) { std::cerr << e << "\n"; return 1; }
+    if (auto e = palette.load(paletteFile.existsAsFile() ? paletteFile : findPalette(paletteName), sceneName); e.isNotEmpty()) { std::cerr << e << "\n"; return 1; }
     const auto& info = *palette.info;
     for (auto& p : patches) // "bass=Templates/Init Square": that part plays only this patch
         if (int t = info.trackOf(p.upToFirstOccurrenceOf("=", false, false).toStdString()); t >= 0)
@@ -333,6 +374,9 @@ static int renderConcert(uint64_t seed, double seconds, const juce::File& out, i
     if (solo >= 0) engine.enabledTracks = uint32_t(1u << solo);
     engine.feedbackOverride = feedbackOverride;
     engine.feedbackBus = feedbackBus;
+    for (auto& kv : juce::StringArray::fromTokens(masterFx, ",", ""))
+        for (int k = 0; k < MasterFx::NumParams; ++k)
+            if (kv.upToFirstOccurrenceOf("=", false, false).trim() == MasterFx::paramNames[k]) engine.masterFx.p[k] = kv.fromFirstOccurrenceOf("=", false, false).getFloatValue();
     engine.effects = !dry;
     engine.mixStage = !gRaw;
     int startBar = 0;
@@ -503,6 +547,7 @@ int main(int argc, char** argv)
     if (int i = args.indexOf("--scene"); i >= 0) paletteName = sceneName = args[i + 1].toStdString();   // a scene brings its own palette
     if (int i = args.indexOf("--feedback"); i >= 0) feedbackOverride = args[i + 1].getFloatValue();
     if (int i = args.indexOf("--feedback-bus"); i >= 0) feedbackBus = args[i + 1].getFloatValue();
+    if (int i = args.indexOf("--master-fx"); i >= 0) masterFx = args[i + 1];
     for (int i = 0; i + 1 < args.size(); ++i)
     {
         if (args[i] == "--seed") seed = uint64_t(args[i + 1].getLargeIntValue());
@@ -517,5 +562,13 @@ int main(int argc, char** argv)
         if (args[i] == "--bars") bars = args[i + 1].getIntValue();
     }
     if (int i = args.indexOf("--palette"); i >= 0) paletteName = args[i + 1];
+    if (int k; improvScene(sceneName, k))
+    {   // Improvisation: the song's palette borrowed track by track from the other songs', and its plan beside the render
+        const auto& song = improvSong(seed, k);
+        paletteFile = writeImprovPalette(seed, k);
+        out.withFileExtension("plan.json").replaceWithText(improvJson(song));
+        std::cout << improvJson(song) << "\n";
+    }
+    if (int i = args.indexOf("--chain"); i >= 0) return renderChain(seed, args[i + 1].getIntValue(), out); // with --scene improv
     return renderConcert(seed, seconds, out, solo, patches, args.contains("--dry"), from, bars);
 }

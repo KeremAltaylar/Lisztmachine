@@ -93,6 +93,7 @@ public:
     int leadLo = 60, leadHi = 84;              // where its own track's line is written
     bool sing = false;                         // the soloist is a voice: long notes only
     bool pedal = false;                        // a change between parts of like energy leans on the next root (Turn::Pedal), not thinning
+    bool quietEdges = false;                   // Improvisation: the first and last parts are the changeover between songs, the soloist rests in them
     };
 
     static const Spec* find(const std::string& scene);

@@ -16,7 +16,7 @@ delay arp 0.75 0.40 0.22
 # Balance (to be measured in the mix)
 gain pulse   0.0
 gain metal   -2.3
-gain tick    16.7
+gain tick    12.7
 gain perc    -8.0
 gain pad     -3.7
 gain bass    -2.1

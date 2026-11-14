@@ -1,4 +1,5 @@
 #include "Engine.h"
+#include "Improv.h"
 #include <sfizz.hpp>
 
 namespace liszt {
@@ -531,6 +532,19 @@ void Biquad::highpass(double sr, double hz, double q)
     z1 = z2 = 0;
 }
 
+void Biquad::shelf(double sr, double hz, double dB, bool high)
+{
+    const double A = std::pow(10.0, dB / 40), w = juce::MathConstants<double>::twoPi * hz / sr, c = std::cos(w);
+    const double alpha = std::sin(w) / 2 * std::sqrt(2.0), k = 2 * std::sqrt(A) * alpha, s = high ? 1 : -1;
+    const double a0 = (A + 1) - s * (A - 1) * c + k;
+    b0 = float(A * ((A + 1) + s * (A - 1) * c + k) / a0);
+    b1 = float(-2 * s * A * ((A - 1) + s * (A + 1) * c) / a0);
+    b2 = float(A * ((A + 1) + s * (A - 1) * c - k) / a0);
+    a1 = float(2 * s * ((A - 1) - s * (A + 1) * c) / a0);
+    a2 = float(((A + 1) - s * (A - 1) * c - k) / a0);
+    z1 = z2 = 0;
+}
+
 void Drive::prepare(double sr, const DriveSpec& spec)
 {
     k_ = 1 + 14 * spec.amount * spec.amount;
@@ -719,6 +733,61 @@ juce::String Palette::load(const juce::File& file, const std::string& sceneName)
     return {};
 }
 
+// What the visuals follow, for a song (the renderer's show.json without its levels; the app sends it live): its tempo,
+// key, sections, voices and every note with its role.
+juce::String showHead(const std::string& sceneName, uint64_t seed, double blockRate)
+{
+    auto cp = makeComposer(sceneName, seed);
+    auto& c = *cp;
+    std::vector<Event> ev;
+    for (int b = 0; b < c.totalBars(); ++b) c.generateBar(b, ev);
+    std::stable_sort(ev.begin(), ev.end());
+    const double secPerTick = 60.0 / (c.bpm() * kPPQ);
+    auto num = [](double v) { return juce::String(v, 4).trimCharactersAtEnd("0").trimCharactersAtEnd("."); };
+
+    juce::MemoryOutputStream j; // a juce::String grown by << took 6 minutes for 57k level rows
+    j << "{\"seed\":" << juce::String(int64_t(seed)) << ",\"bpm\":" << num(c.bpm()) << ",\"key\":\"" << juce::String(c.describe()) << "\""
+      << ",\"tracks\":[\"pad\",\"bass\",\"seq\",\"lead\"],\"levelNames\":[\"pad\",\"bass\",\"seq\",\"lead\",\"delay\",\"reverb\",\"master\"]"
+      << ",\"levelRate\":" << num(blockRate) << ",\"sections\":[";
+    for (size_t i = 0; i < c.sections().size(); ++i)
+    {
+        auto& sc = c.sections()[i];
+        j << (i ? "," : "") << "{\"t\":" << num(sc.startBar * 4 * 60.0 / c.bpm()) << ",\"bars\":" << sc.bars
+          << ",\"energy\":" << num(sc.energy) << ",\"name\":\"" << sc.name << "\"}";
+    }
+    const auto& info = sceneInfo(sceneName);
+    j << "],\"voices\":[";
+    for (int k = 0; k < info.numTracks; ++k) j << (k ? ",\"" : "\"") << info.trackNames[k] << "\"";
+    j << "],\"notes\":["; // [time s, duration s, role, pitch, velocity, voice]: roles for every study, voices for a piece's own mapping
+    int64_t onAt[kMaxTracks][128];
+    float velAt[kMaxTracks][128] = {};
+    std::fill(&onAt[0][0], &onAt[0][0] + kMaxTracks * 128, int64_t(-1));
+    bool first = true;
+    for (auto& e : ev)
+    {
+        if (e.type == Event::NoteOn) { onAt[e.track][e.pitch] = e.tick; velAt[e.track][e.pitch] = e.value; }
+        else if (e.type == Event::NoteOff && onAt[e.track][e.pitch] >= 0)
+        {
+            const int64_t on = onAt[e.track][e.pitch];
+            j << (first ? "" : ",") << "[" << num(on * secPerTick) << "," << num((e.tick - on) * secPerTick) << ","
+              << info.role[e.track] << "," << int(e.pitch) << "," << num(velAt[e.track][e.pitch]) << "," << e.track << "]";
+            first = false;
+            onAt[e.track][e.pitch] = -1;
+        }
+    }
+    j << "]";
+    return j.toString();
+}
+
+juce::File writeImprovPalette(uint64_t seed, int k)
+{
+    auto file = juce::File::getSpecialLocation(juce::File::tempDirectory).getChildFile("lisztmachine-improv")
+                    .getChildFile(juce::String(int64_t(seed)) + "-" + juce::String(k) + ".txt");
+    file.getParentDirectory().createDirectory();
+    file.replaceWithText(improvPalette(improvSong(seed, k), [](const std::string& s) { return findPalette(s).loadFileAsString().toStdString(); }));
+    return file;
+}
+
 juce::File findPalette(const juce::String& name)
 {
     // Next to the executable, or in a sounds/ folder of any parent (the repo, in development).
@@ -834,9 +903,8 @@ juce::String Engine::load(double sampleRate, int maxBlock, const Palette& palett
         for (auto& s : t.slots)
         {
             juce::String err;
-            s.plugin = createSurge(sampleRate, maxBlock, err);
+            guarded([&] { s.plugin = createSurge(sampleRate, maxBlock, err); if (s.plugin) s.plugin->prepareToPlay(sampleRate, maxBlock); });
             if (!s.plugin) return err;
-            s.plugin->prepareToPlay(sampleRate, maxBlock);
             s.midi.ensureSize(8192);
             s.state = Idle;
             s.entry = -1;
@@ -846,9 +914,9 @@ juce::String Engine::load(double sampleRate, int maxBlock, const Palette& palett
     }
 
     juce::String err;
-    delay_ = createSurgeEffect(kDelayBus, sampleRate, maxBlock, err);
+    guarded([&] { delay_ = createSurgeEffect(kDelayBus, sampleRate, maxBlock, err); });
     if (!delay_) return "delay bus: " + err;
-    reverb_ = createSurgeEffect(kReverbBus, sampleRate, maxBlock, err);
+    guarded([&] { reverb_ = createSurgeEffect(kReverbBus, sampleRate, maxBlock, err); });
     if (!reverb_) return "reverb bus: " + err;
     auto busChannels = [](juce::AudioPluginInstance& p) { return juce::jmax(2, p.getTotalNumInputChannels(), p.getTotalNumOutputChannels()); };
     delayBus_.setSize(busChannels(*delay_), maxBlock);
@@ -858,6 +926,7 @@ juce::String Engine::load(double sampleRate, int maxBlock, const Palette& palett
 
     limiter.prepare(sampleRate, -1.0f, 150.0f);
     glue.prepare(sampleRate);
+    masterFx.prepare(sampleRate, maxBlock);
     glue.makeupDb = palette.masterDb;
     for (auto& f : reverbLowCut_) f.highpass(sampleRate, 180);
     for (auto& o : octaveUp_) o.prepare(sampleRate);
@@ -993,7 +1062,7 @@ juce::String Engine::currentPatch(int track) const
     return e < 0 ? juce::String() : palette_.parts[track][size_t(e)].patch;
 }
 
-void Engine::start(uint64_t seed, int startBar)
+void Engine::start(uint64_t seed, int startBar, bool play)
 {
     auto next = makeComposer(scene, seed);
     startBar = juce::jlimit(0, next->totalBars() - 1, startBar);
@@ -1081,7 +1150,7 @@ void Engine::start(uint64_t seed, int startBar)
         t.live = 0;
         t.slots[1].state = Idle;
         t.slots[1].entry = -1;
-        if (auto e = loadInto(t.slots[0], i, entry); e.isNotEmpty()) DBG(e);
+        guarded([&] { if (auto e = loadInto(t.slots[0], i, entry); e.isNotEmpty()) DBG(e); });
         t.slots[0].state = Live;
     }
     changesMade = 0;
@@ -1096,8 +1165,7 @@ void Engine::start(uint64_t seed, int startBar)
     bar = startBar;
     quiet_ = 0;
     finished_ = false;
-    panic_ = true;
-    playing_ = true;
+    if (play) go();
 }
 
 void Engine::stop()
@@ -1524,6 +1592,7 @@ void Engine::renderChunk(float* const* out, int numChannels, int offset, int len
         }
     }
 
+    if (numChannels > 1) masterFx.process(pa[0], pa[1], len, composer_ ? composer_->bpm() : 120.0);
     if (mixStage && numChannels > 1) glue.process(pa[0], pa[1], len);
     float pre = 0;
     for (int c = 0; c < 2; ++c)
@@ -1804,6 +1873,11 @@ void InternalSynth::start(int note, float velocity)
             {
                 x.note = note;
                 x.target = juce::MathConstants<double>::twoPi * 440.0 * std::pow(2.0, (note - 69) / 12.0) / sr_;
+                // 2026-11-11 (Kerem: Ecstatic part 5 "something in bass is out of tune"): the slide was an exponential
+                // approach (tau 50 ms) that needed ~275 ms to come within 5 cents of an octave, a quarter of every note.
+                // Now an even glide in pitch that lands exactly on the note after 50 ms.
+                x.glideLeft = juce::jmax(1, int(0.05 * sr_));
+                x.glideMul = std::pow(x.target / x.inc, 1.0 / x.glideLeft);
                 return;
             }
     Voice* v = &voices_[0];
@@ -1831,6 +1905,7 @@ void InternalSynth::start(int note, float velocity)
     v->decay = std::exp(-1.0 / (tau * sr_));
     v->phase2 = v->phase3 = 0;
     v->target = v->inc;
+    v->glideLeft = 0;
     const bool struck = kind_ != Sub && kind_ != Blip && kind_ != Bass808;
     v->attack = struck ? 1.0 : 1.0 / ((kind_ == Sub ? 0.04 : kind_ == Bass808 ? 0.002 : 0.001) * sr_);
     v->release = std::exp(-1.0 / ((kind_ == Bass808 ? 0.09 : 0.4) * sr_));
@@ -1862,7 +1937,7 @@ void InternalSynth::run(float* l, float* r, int from, int to)
                 // in 12 ms, and glides to a new note in 50 ms
                 if (v.held) { if (v.attack > 0) { v.env += v.gain * v.attack; if (v.env >= v.gain) { v.env = v.gain; v.attack = 0; } } else v.env *= v.decay; }
                 else v.env *= v.release;
-                v.inc += (v.target - v.inc) * (1.0 - std::exp(-1.0 / (0.05 * sr_)));
+                if (v.glideLeft > 0) v.inc = --v.glideLeft == 0 ? v.target : v.inc * v.glideMul;
                 v.phase += v.inc * (1 + 0.5 * std::exp(-double(v.age) / (0.012 * sr_)));
                 if (v.phase > juce::MathConstants<double>::twoPi) v.phase -= juce::MathConstants<double>::twoPi;
                 ++v.age;
@@ -1989,6 +2064,144 @@ void InternalSynth::render(const juce::MidiBuffer& midi, float* l, float* r, int
         else if (m.isAllNotesOff() || m.isAllSoundOff()) allOff();
     }
     run(l, r, at, numSamples);
+}
+
+// ---------------------------------------------------------------- the master FX rack
+void MasterFx::prepare(double sr, int maxBlock)
+{
+    sr_ = sr;
+    glide_ = 1.0f - std::exp(-1.0f / float(0.03 * sr)); // a knob's move glides over about 30 ms
+    toneA_ = 1.0f - std::exp(-juce::MathConstants<float>::twoPi * 900.0f / float(sr));
+    lowA_ = 1.0f - std::exp(-juce::MathConstants<float>::twoPi * 160.0f / float(sr));
+    envA_ = 1.0f - std::exp(-1.0f / float(0.3 * sr));
+    for (int c = 0; c < 2; ++c)
+    {
+        push_[c].peak(sr, 900, 0.7, 9);   // the mid hump an overdrive or an amp is driven through
+        ampTight_[c].highpass(sr, 80);
+        ampInter_[c].highpass(2 * sr, 30); // between the amp's stages, at the doubled rate
+        cab_[c].lowpass(sr, 5200, 0.9);    // the speaker's top roll-off
+        last_[c] = toneLp_[c] = dcIn_[c] = dcOut_[c] = ic1_[c] = ic2_[c] = lowPre_[c] = lowPost_[c] = 0;
+    }
+    delay_.prepare(sr);
+    timeIndex_ = -1;
+    bpm_ = 0;
+    echoL_.assign(size_t(maxBlock), 0.0f);
+    echoR_.assign(size_t(maxBlock), 0.0f);
+    envIn_ = envOut_ = 1e-6f;
+    for (auto& ch : eq_) for (auto& f : ch) f = {};
+    for (auto& d : eqDb_) d = 0;
+}
+
+float MasterFx::shape(float x, int style, float k, int c)
+{
+    switch (style)
+    {
+        case 0: return std::tanh(k * x);                                  // tape: round and symmetric
+        case 1: return std::tanh(k * x + 0.3f) - std::tanh(0.3f);         // tube: lopsided, even harmonics
+        case 2: return 0.6366f * std::atan(k * x);                        // overdrive: a long soft knee
+        case 3: x = ampInter_[c].process(std::tanh(k * x));               // amp: two stages, the second lopsided
+                return std::tanh(3 * x + 0.25f) - std::tanh(0.25f);
+        default: return juce::jlimit(-0.6f, 0.8f, 3 * k * x);             // fuzz: clipped flat, unevenly
+    }
+}
+
+void MasterFx::process(float* l, float* r, int n, double bpm)
+{
+    // ponytail: the shapers run at twice the rate by midpoint only, so the fuzz aliases a little; oversample properly if it fizzes
+    const int style = juce::jlimit(0, 4, int(p[Style].load()));
+    const float driveT = p[Drive], lowT = p[Low], toneT = p[Tone], outT = juce::Decibels::decibelsToGain(p[Output].load()),
+                driveWetT = p[DriveOn] > 0.5f ? p[DriveMix].load() : 0.0f, cutT = juce::jlimit(20.0f, 4000.0f, p[LowCut].load()),
+                sendT = p[DelayOn] > 0.5f ? 1.0f : 0.0f, delayMixT = p[DelayMix];
+
+    // the delay: its time a bar division of the song's tempo (a new time jumps; the feedback glides)
+    if (const int ti = juce::jlimit(0, 6, int(p[Time].load())); ti != timeIndex_ || bpm != bpm_)
+    {
+        timeIndex_ = ti;
+        bpm_ = bpm;
+        delay_.set(timeBeats[ti] * 60.0 / bpm, p[Feedback]);
+    }
+    delay_.glideTo(p[Feedback], float(n / (0.5 * sr_)));
+
+    for (int i = 0; i < n; ++i)
+    {
+        const float g = glide_;
+        drive_ += (driveT - drive_) * g;  low_ += (lowT - low_) * g;  tone_ += (toneT - tone_) * g;
+        driveWet_ += (driveWetT - driveWet_) * g;  out_ += (outT - out_) * g;  cutHz_ += (cutT - cutHz_) * g;  send_ += (sendT - send_) * g;
+        float io[2] = { l[i], r[i] };
+
+        if (driveWet_ > 1e-4f)
+        {
+            const float k = 1 + 40 * drive_ * drive_;      // up to +32 dB into the shaper
+            const float lo = std::exp(-0.69f * tone_);     // tone tilts the result about 900 Hz, +-6 dB
+            // the low push (Kerem: "good low frequency driving"): below 160 Hz up to +12 dB into the shaper, half of it
+            // taken back after, so the bass is what saturates hardest and comes out thicker, not thinner
+            const float push = juce::Decibels::decibelsToGain(12.0f * low_), back = 1 / std::sqrt(push);
+            float wet[2];
+            for (int c = 0; c < 2; ++c)
+            {
+                float x = io[c];
+                if (style == 3) x = ampTight_[c].process(x);
+                if (style >= 2 && style <= 3) x = push_[c].process(x);
+                lowPre_[c] += (x - lowPre_[c]) * lowA_;
+                x += lowPre_[c] * (push - 1);
+                float y = 0.5f * (shape(0.5f * (last_[c] + x), style, k, c) + shape(x, style, k, c));
+                last_[c] = x;
+                if (style == 3) y = cab_[c].process(y);
+                lowPost_[c] += (y - lowPost_[c]) * lowA_;
+                y += lowPost_[c] * (back - 1);
+                toneLp_[c] += (y - toneLp_[c]) * toneA_;
+                y = toneLp_[c] * lo + (y - toneLp_[c]) / lo;
+                const float o = y - dcIn_[c] + 0.9995f * dcOut_[c]; // the lopsided styles leave DC behind
+                dcIn_[c] = y;
+                dcOut_[c] = o;
+                wet[c] = o;
+            }
+            // the level follows the dry mix's (slowly, so it still squashes like a driven tape); the output knob sits on top
+            envIn_ += (0.5f * (io[0] * io[0] + io[1] * io[1]) - envIn_) * envA_;
+            envOut_ += (0.5f * (wet[0] * wet[0] + wet[1] * wet[1]) - envOut_) * envA_;
+            const float match = juce::jlimit(0.25f, 4.0f, std::sqrt((envIn_ + 1e-9f) / (envOut_ + 1e-9f)));
+            for (int c = 0; c < 2; ++c) io[c] += (wet[c] * match * out_ - io[c]) * driveWet_;
+        }
+
+        l[i] = io[0];
+        r[i] = io[1];
+        // the delay's send, high-passed (12 dB/oct) at the low cut: the low end is never echoed
+        const float G = std::tan(juce::MathConstants<float>::pi * cutHz_ / float(sr_)), K = 1.4142f;
+        const float a1 = 1 / (1 + G * (G + K)), a2 = G * a1, a3 = G * a2;
+        float sent[2];
+        for (int c = 0; c < 2; ++c)
+        {
+            const float v3 = io[c] - ic2_[c], v1 = a1 * ic1_[c] + a2 * v3, v2 = ic2_[c] + a2 * ic1_[c] + a3 * v3;
+            ic1_[c] = 2 * v1 - ic1_[c];
+            ic2_[c] = 2 * v2 - ic2_[c];
+            sent[c] = (io[c] - K * v1 - v2) * send_;
+        }
+        echoL_[size_t(i)] = sent[0];
+        echoR_[size_t(i)] = sent[1];
+    }
+
+    delay_.process(echoL_.data(), echoR_.data(), n); // only the echoes come back
+    for (int i = 0; i < n; ++i)
+    {
+        delayMix_ += (delayMixT - delayMix_) * glide_;
+        l[i] += echoL_[size_t(i)] * delayMix_;
+        r[i] += echoR_[size_t(i)] * delayMix_;
+    }
+
+    // the EQ: each band glides a block at a time (about 30 ms across), flat when off; a flat band is passed by
+    const bool eqOn = p[EqOn] > 0.5f;
+    const float step = juce::jmin(1.0f, glide_ * float(n));
+    for (int b = 0; b < 4; ++b)
+    {
+        const float target = eqOn ? juce::jlimit(-12.0f, 12.0f, p[EqLow + b].load()) : 0.0f;
+        if (std::abs(target - eqDb_[b]) < 0.01f && std::abs(eqDb_[b]) < 0.01f) { eqDb_[b] = target; continue; }
+        eqDb_[b] += (target - eqDb_[b]) * step;
+        Biquad t;
+        if (b == 0 || b == 3) t.shelf(sr_, eqHz[b], eqDb_[b], b == 3);
+        else t.peak(sr_, eqHz[b], 0.9, eqDb_[b]);
+        for (auto& ch : eq_) ch[b].retune(t);
+        for (int i = 0; i < n; ++i) { l[i] = eq_[0][b].process(l[i]); r[i] = eq_[1][b].process(r[i]); }
+    }
 }
 
 // ---------------------------------------------------------------- one track's echo

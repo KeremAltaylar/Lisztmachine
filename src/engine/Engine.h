@@ -1,5 +1,7 @@
 #pragma once
 #include "Composer.h"
+#include <cmath>
+#include <functional>
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <atomic>
 #include <memory>
@@ -64,6 +66,18 @@ struct Palette
     juce::String load(const juce::File& file, const std::string& scene = "berlin"); // returns an error or empty
 };
 juce::File findPalette(const juce::String& name); // sounds/<name>.txt, searched upward from the executable
+// Improvisation song k of chain `seed`: its palette (borrowed track by track, src/core/Improv.cpp) written to a temporary file
+juce::File writeImprovPalette(uint64_t seed, int k);
+// Improvisation's changeover sums two songs, each limited to -1 dBFS on its own; together they passed full scale
+// (+0.13 dBFS measured, 2026-11-14). Untouched below -1 dBFS, above it a soft knee that never reaches 0 dBFS.
+inline float ceilingClip(float x)
+{
+    constexpr float k = 0.891f, top = 0.999f;
+    const float a = std::abs(x);
+    return a <= k ? x : std::copysign(k + (top - k) * std::tanh((a - k) / (top - k)), x);
+}
+// A song's show for the visuals, through its notes (JSON without the closing brace): what liszt_render writes, and the app sends live
+juce::String showHead(const std::string& scene, uint64_t seed, double levelRate);
 
 // When each part changes sound, and to which palette entry.
 struct SoundChange { int bar, track, entry; };
@@ -95,7 +109,7 @@ public:
     void allOff() { for (auto& v : voices_) v.note = -1; for (auto& st : strings_) st.held = false; }
 
 private:
-    struct Voice { int note = -1; double phase = 0, phase2 = 0, phase3 = 0, inc = 0, env = 0, gain = 0, decay = 0, attack = 0, release = 0; double target = 0; float panL = 0.7f, panR = 0.7f;
+    struct Voice { int note = -1; double phase = 0, phase2 = 0, phase3 = 0, inc = 0, env = 0, gain = 0, decay = 0, attack = 0, release = 0; double target = 0, glideMul = 1; int glideLeft = 0; float panL = 0.7f, panR = 0.7f;
                     std::array<float, 8> y1 {}, y2 {}, c1 {}, c2 {}, gin {}; int modes = 0; float exc = 1, excTarget = 1, maxTau = 0, nextImp = 0, impGap = 0; bool noise = false, held = false; float lastNoise = 0, lastNoise2 = 0; int64_t age = 0; };
     void start(int note, float velocity);
     void stopNote(int note);
@@ -230,6 +244,8 @@ struct Biquad
     void highpass(double sampleRate, double hz, double q = 0.7071);
     void lowpass(double sampleRate, double hz, double q = 0.7071);
     void peak(double sampleRate, double hz, double q, double dB);
+    void shelf(double sampleRate, double hz, double dB, bool high); // RBJ shelf, slope 1
+    void retune(const Biquad& o) { b0 = o.b0; b1 = o.b1; b2 = o.b2; a1 = o.a1; a2 = o.a2; } // new coefficients, the state kept: no click
     float process(float x) { const float y = b0 * x + z1; z1 = b1 * x - a1 * y + z2; z2 = b2 * x - a2 * y; return y; }
 };
 
@@ -318,6 +334,48 @@ private:
     float env_ = 0, attack_ = 0, release_ = 0;
 };
 
+// The master FX rack (Kerem, 2026-11-11: "a master fx panel ... everything will go through those fx and I can
+// adjust ... the feedback of delay"): the whole PA mix, before the glue and the limiter, runs through a drive
+// (Decapitator-like: five styles, a low push, tone, auto level, mix, output) and a tempo-synced ping-pong delay whose
+// send is high-passed, so the low end stays dry ("1000 Hz cut won't be affected by delay"). The app's knobs write the
+// atomics; the audio thread glides to them, so nothing clicks. Every unit starts off. A delay switched off stops
+// taking signal and lets its echoes ring out. Last, a four-band EQ for the frequency balance (Kerem: "a master eq
+// that I can adjust"): shelves at 100 Hz and 8 kHz, bells at 400 Hz and 2.5 kHz, +-12 dB each.
+class MasterFx
+{
+public:
+    enum Param { DriveOn, Drive, Style, Low, Tone, DriveMix, Output, DelayOn, Time, LowCut, Feedback, DelayMix,
+                 EqOn, EqLow, EqLowMid, EqHighMid, EqHigh, NumParams };
+    static constexpr const char* paramNames[NumParams] = { "DriveOn", "Drive", "Style", "Low", "Tone", "DriveMix", "Output",
+        "DelayOn", "Time", "LowCut", "Feedback", "DelayMix", "EqOn", "EqLow", "EqLowMid", "EqHighMid", "EqHigh" };
+    static constexpr float eqHz[4] = { 100, 400, 2500, 8000 };
+    static constexpr const char* styleNames[] = { "Tape", "Tube", "Overdrive", "Amp", "Fuzz" };
+    static constexpr float timeBeats[] = { 0.25f, 0.5f, 0.75f, 1, 1.5f, 2, 4 };
+    static constexpr const char* timeNames[] = { "1/16", "1/8", "1/8 dotted", "1/4", "1/4 dotted", "1/2", "1 bar" };
+    static constexpr float defaults[NumParams] = { 0, 0.5f, 0, 0.5f, 0, 1, 0, 0, 3, 1000, 0.5f, 0.3f, 0, 0, 0, 0, 0 };
+    std::atomic<float> p[NumParams];
+
+    MasterFx() { for (int i = 0; i < NumParams; ++i) p[i] = defaults[i]; }
+    void prepare(double sampleRate, int maxBlock);
+    void process(float* left, float* right, int numSamples, double bpm);
+
+private:
+    double sr_ = 48000;
+    float glide_ = 0.001f;
+    // glided: drive, low push, tone, drive wet, output gain, delay low cut, delay send, delay mix
+    float drive_ = 0.5f, low_ = 0.5f, tone_ = 0, driveWet_ = 0, out_ = 1, cutHz_ = 1000, send_ = 0, delayMix_ = 0.3f;
+    float last_[2] = {}, toneLp_[2] = {}, toneA_ = 0, dcIn_[2] = {}, dcOut_[2] = {}, envIn_ = 1e-6f, envOut_ = 1e-6f, envA_ = 0;
+    float lowPre_[2] = {}, lowPost_[2] = {}, lowA_ = 0;
+    Biquad push_[2], ampTight_[2], ampInter_[2], cab_[2];
+    float ic1_[2] = {}, ic2_[2] = {};   // the delay send's high-pass (a state-variable filter, stable while its knob moves)
+    FeedbackBus delay_;
+    int timeIndex_ = -1;
+    double bpm_ = 0;
+    std::vector<float> echoL_, echoR_;
+    Biquad eq_[2][4];
+    float eqDb_[4] = {}; // the bands' gains as they glide (a block at a time)
+    float shape(float x, int style, float k, int c);
+};
 class Engine
 {
 public:
@@ -327,7 +385,12 @@ public:
     // Message thread. Creates two Surge instances per part and the shared buses.
     juce::String load(double sampleRate, int maxBlock, const Palette& palette);
     // Message thread. A new concert from this seed, from bar 0 or from any later bar.
-    void start(uint64_t seed, int startBar = 0);
+    // play = false: everything made ready (the composer, the first sounds loaded) but silent until go()
+    void start(uint64_t seed, int startBar = 0, bool play = true);
+    void go() { panic_ = true; playing_ = true; }
+    // Set by a caller that loads off the message thread (the app's next Improvisation song): every plugin is made and
+    // given its sound inside it, so it can take the message manager's lock for just that long.
+    std::function<void(const std::function<void()>&)> onMessageThread;
     std::string scene = "berlin"; // which composer start() uses: the palette's scene
     float feedbackOverride = -1;  // >= 0: every track's echo feeds back this much (the app's control, the renderer's --feedback)
     std::atomic<float> feedbackBus { -1 }; // >= 0: the feedback bus's amount, live (the app's slider, 0 to 0.8); -1: the palette's
@@ -361,6 +424,7 @@ public:
     float clickLevel = 0.5f;
     PeakLimiter limiter;
     GlueBus glue;
+    MasterFx masterFx;             // the app's master FX panel: the whole PA mix, before the glue
     bool mixStage = true;          // false: no ducking, low cuts, width or glue (the renderer's --raw)
     uint32_t enabledTracks = 0xFFFFFFFF; // bit per track; the renderer's --solo
     float* const* stemOut = nullptr;     // the renderer's --stems: 2 channels per track, then the delay and the reverb returns, before the glue
@@ -414,6 +478,7 @@ private:
         juce::AudioBuffer<float> mix; // the track's slots summed, before the mix stage
     };
     juce::String loadInto(Slot& slot, int track, int entry);
+    void guarded(const std::function<void()>& f) { if (onMessageThread) onMessageThread(f); else f(); }
     void changeSound(int track, int at);
 
     void renderChunk(float* const* out, int numChannels, int offset, int len);

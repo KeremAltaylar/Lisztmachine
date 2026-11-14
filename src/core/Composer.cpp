@@ -1,5 +1,6 @@
 #include "Composer.h"
 #include "Genres.h"
+#include "Improv.h"
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
@@ -863,12 +864,14 @@ const SceneInfo& sceneInfo(const std::string& scene)
         "berlin", 8, { "pad", "bass", "seq", "lead", "guitar", "solo", "sub", "boom" }, { 0, 1, 2, 3, 1, 3, 1, 1 },
         { { .15f, .35f }, { .05f, .15f }, { .35f, .25f }, { .30f, .35f }, { .05f, .15f }, { .30f, .40f }, { 0, .03f }, { 0, .12f } }, { -1, -1, -1, -1, -1, -1, -1, -1 }, {}, false,
     };
+    if (int k; improvScene(scene, k)) return *genreSceneInfo(GenreComposer::all()[0]->scene); // the genre tracks
     if (auto* g = genreSceneInfo(scene)) return *g;
     return berlin;
 }
 
 std::unique_ptr<Composer> makeComposer(const std::string& scene, uint64_t seed)
 {
+    if (int k; improvScene(scene, k)) return std::make_unique<GenreComposer>(improvSong(seed, k).spec, seed * 7919 + uint64_t(k) + 1);
     if (auto* g = GenreComposer::find(scene)) return std::make_unique<GenreComposer>(*g, seed);
     return std::make_unique<BerlinComposer>(seed);
 }

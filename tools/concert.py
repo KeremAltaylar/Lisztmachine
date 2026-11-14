@@ -18,7 +18,7 @@ for piece, name in ORDER:
     if not out['songs']:
         out.update(bpm=d['bpm'], tracks=d['tracks'], levelNames=d['levelNames'], levelRate=d['levelRate'])
     assert d['levelRate'] == out['levelRate'] and d['tracks'] == out['tracks'], name
-    out['songs'].append(dict(piece=piece, media='media/' + name, t=round(t0, 4), bpm=d['bpm'], key=d['key']))
+    out['songs'].append(dict(piece=piece, media='media/' + name, t=round(t0, 4), bpm=d['bpm'], key=d['key'], voices=d.get('voices')))
     out['notes'] += [[round(n[0] + t0, 4)] + n[1:] for n in d['notes']]
     out['sections'] += [dict(s, t=round(s['t'] + t0, 4), song=len(out['songs']) - 1) for s in d['sections']]
     out['levels'] += d['levels']

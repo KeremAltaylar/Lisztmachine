@@ -1104,6 +1104,7 @@ void GenreComposer::emitLead(int bar, std::vector<Event>& out)
     // opera voice as a lead soloist so it connects the parts"; 2026-11-09: "a leading soloist that connects
     // parts, continuous, but changing with the parts"): the Soloist's line from the fourth bar on.
     if (bar < 4) return;
+    if (spec_.quietEdges && (sectionOfBar_[size_t(bar)] == 0 || sectionOfBar_[size_t(bar)] + 1 == int(sections_.size()))) return;
     auto& sec = sectionAt(bar);
     const int64_t t0 = int64_t(bar) * kBarTicks;
     const bool theme = spec_.hook && spec_.lead != Arp && active(Arp, bar); // the hook plays: the soloist sings long notes under it

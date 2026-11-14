@@ -11,7 +11,9 @@
   "perc": "Deep Metal",
   "fx": "Unsettler",
   "chord": "E.Piano",
-  "harm": "Choir"
+  "harm": "Choir",
+  "riff": "Brass Synth",
+  "drone": "Voice Synth"
  },
  "sections": [
   {
@@ -41,6 +43,7 @@
     "ground",
     "body",
     "texture",
+    "drone",
     "delay",
     "reverb"
    ]
@@ -63,6 +66,7 @@
     "body",
     "mallet",
     "texture",
+    "drone",
     "delay",
     "reverb"
    ]
@@ -84,6 +88,7 @@
     "mallet",
     "texture",
     "riff",
+    "drone",
     "delay",
     "reverb"
    ]
@@ -109,6 +114,7 @@
     "texture",
     "impact",
     "riff",
+    "drone",
     "delay",
     "reverb"
    ]
@@ -129,6 +135,7 @@
     "mallet",
     "texture",
     "riff",
+    "drone",
     "delay",
     "reverb"
    ]
@@ -154,6 +161,7 @@
     "texture",
     "impact",
     "riff",
+    "drone",
     "delay",
     "reverb"
    ]
@@ -172,6 +180,7 @@
     "body",
     "texture",
     "riff",
+    "drone",
     "delay",
     "reverb"
    ]
@@ -181,20 +190,20 @@
  "base": {
   "pulse": 0.0,
   "metal": -2.3,
-  "tick": 6.9,
+  "tick": -11.5,
   "perc": -8.2,
   "pad": -2.8,
   "bass": 1.0,
-  "sub": -13.0,
-  "arp": 9.1,
-  "chord": -6.5,
+  "sub": -4.5,
+  "arp": 12.5,
+  "chord": -2.7,
   "fx": -10.0,
-  "harm": -6.8,
+  "harm": 1.1,
   "ground": -23.5,
   "body": -20.4,
   "mallet": -26.4,
   "texture": -18.6,
-  "impact": -4.0,
+  "impact": -10.2,
   "riff": -15.1
  },
  "returns": {}

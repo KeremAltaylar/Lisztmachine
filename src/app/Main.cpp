@@ -1,6 +1,10 @@
 // Lisztmachine: the rehearsal panel. Plays a concert live through the audio device;
 // outputs 1/2 are the PA mix, 3/4 the click for the drummer's in-ears.
 #include "Engine.h"
+#include "Improv.h"
+#include "LiveLink.h"
+#include <map>
+#include <mutex>
 #include <juce_audio_utils/juce_audio_utils.h>
 
 using namespace liszt;
@@ -15,6 +19,20 @@ constexpr int s2 = 8, s3 = 12, s4 = 16, s5 = 24;
 
 // JUCE reads a plain string literal as ASCII; the middle dot is spelled out as UTF-8 bytes.
 static const juce::String dot = juce::String::fromUTF8("  \xc2\xb7  ");
+
+// The master FX panel's knobs: which engine value each moves, and how the knob shows it (engine value = knob / scale).
+struct FxKnob { MasterFx::Param param; const char* name; double lo, hi, step, scale; const char* suffix; int unit; };
+static const FxKnob kFxKnobs[] = {
+    { MasterFx::Drive, "Drive", 0, 100, 1, 100, " %", 0 },      { MasterFx::Low, "Low", 0, 100, 1, 100, " %", 0 },
+    { MasterFx::Tone, "Tone", -100, 100, 1, 100, "", 0 },       { MasterFx::DriveMix, "Mix", 0, 100, 1, 100, " %", 0 },
+    { MasterFx::Output, "Output", -12, 12, 0.5, 1, " dB", 0 },
+    { MasterFx::LowCut, "Low cut", 20, 4000, 10, 1, " Hz", 1 }, { MasterFx::Feedback, "Feedback", 0, 110, 1, 100, " %", 1 },
+    { MasterFx::DelayMix, "Mix", 0, 100, 1, 100, " %", 1 },
+    { MasterFx::EqLow, "Low 100", -12, 12, 0.5, 1, " dB", 2 },       { MasterFx::EqLowMid, "Low mid 400", -12, 12, 0.5, 1, " dB", 2 },
+    { MasterFx::EqHighMid, "High mid 2.5k", -12, 12, 0.5, 1, " dB", 2 }, { MasterFx::EqHigh, "High 8k", -12, 12, 0.5, 1, " dB", 2 },
+};
+static const MasterFx::Param kFxOn[] = { MasterFx::DriveOn, MasterFx::DelayOn, MasterFx::EqOn };
+static const char* const kFxUnits[] = { "Drive", "Delay", "EQ" };
 
 static juce::String clock(double secs)
 {
@@ -41,20 +59,26 @@ public:
             sceneBox.addItem(kSceneTitles[i], i + 1);
             if (scene == kScenes[i]) sceneBox.setSelectedId(i + 1, juce::dontSendNotification);
         }
+        // 2026-11-14 (Kerem): Improvisation, endless generated songs (src/core/Improv.cpp), after the songs
+        sceneBox.addSeparator();
+        sceneBox.addItem("Improvisation", kImprovId);
+        if (scene == "improv") sceneBox.setSelectedId(kImprovId, juce::dontSendNotification);
         if (sceneBox.getSelectedId() == 0) { scene = "berlin"; sceneBox.setSelectedId(1, juce::dontSendNotification); }
         sceneBox.onChange = [this] {
-            scene = kScenes[sceneBox.getSelectedId() - 1];
+            scene = sceneBox.getSelectedId() == kImprovId ? std::string("improv") : std::string(kScenes[sceneBox.getSelectedId() - 1]);
             props.getUserSettings()->setValue("scene", juce::String(scene));
             reload();
             preview();
         };
 
+        seed = juce::jmax<int64_t>(1, props.getUserSettings()->getIntValue("seed", 1)); // before the engine: Improvisation's chain is the seed
+        levelThread.tick = [this] { sendLevels(); };
+        levelThread.startThread();
         auto saved = props.getUserSettings()->getXmlValue("audio");
         deviceManager.initialise(0, 4, saved.get(), true);
         deviceManager.addChangeListener(this);
         reload();
 
-        seed = juce::jmax<int64_t>(1, props.getUserSettings()->getIntValue("seed", 1));
         seedBox.setText(juce::String(seed), false);
         seedBox.setInputRestrictions(10, "0123456789");
         seedBox.setJustification(juce::Justification::centred);
@@ -65,7 +89,8 @@ public:
             seed = juce::Random::getSystemRandom().nextInt({ 1, 1000000 });
             seedBox.setText(juce::String(seed), false);
             preview();
-            if (engine && engine->isPlaying()) engine->start(uint64_t(seed));
+            if (improv()) { if (engine && engine->isPlaying()) { stopAll(); reload(); togglePlay(); } } // a new endless chain
+            else if (engine && engine->isPlaying()) { engine->start(uint64_t(seed)); announce(*engine, 0); }
         };
         audio.onClick = [this] { showAudioSettings(); };
         // the feedback bus (Kerem, 2026-11-09: "the feedback amount from 0 to 80 percent as a slider"), per song, remembered
@@ -75,7 +100,7 @@ public:
         feedback.setTextBoxStyle(juce::Slider::TextBoxRight, false, 56, 24);
         feedback.onValueChange = [this] {
             props.getUserSettings()->setValue("feedback." + juce::String(scene), feedback.getValue());
-            if (engine) engine->feedbackBus = float(feedback.getValue() / 100.0);
+            for (auto* e : { engine.get(), nextEngine.get() }) if (e && e->hasFeedbackBus()) e->feedbackBus = float(feedback.getValue() / 100.0);
         };
         feedback.setColour(juce::Slider::trackColourId, tok::accent);
         feedback.setColour(juce::Slider::backgroundColourId, tok::sunk);
@@ -87,8 +112,57 @@ public:
         feedbackLabel.setFont(juce::FontOptions(13.0f));
         addAndMakeVisible(feedback);
         addAndMakeVisible(feedbackLabel);
+        // the master FX panel (Kerem, 2026-11-11): everything through it, every knob remembered, every unit off at first
+        for (int u = 0; u < 3; ++u)
+        {
+            auto& b = fxOn[u];
+            b.setButtonText(kFxUnits[u]);
+            b.setToggleState(fxValue(kFxOn[u]) > 0.5f, juce::dontSendNotification);
+            b.onClick = [this, u] { setFx(kFxOn[u], fxOn[u].getToggleState() ? 1.0f : 0.0f); };
+            b.setColour(juce::ToggleButton::textColourId, tok::ink);
+            b.setColour(juce::ToggleButton::tickColourId, tok::lamp);
+            addAndMakeVisible(b);
+        }
+        for (size_t k = 0; k < std::size(kFxKnobs); ++k)
+        {
+            const auto& d = kFxKnobs[k];
+            auto& sl = fxKnob[k];
+            sl.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
+            sl.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 72, 18);
+            sl.setRange(d.lo, d.hi, d.step);
+            if (d.param == MasterFx::LowCut) sl.setSkewFactorFromMidPoint(400);
+            sl.setTextValueSuffix(d.suffix);
+            sl.setDoubleClickReturnValue(true, MasterFx::defaults[d.param] * d.scale);
+            sl.setValue(fxValue(d.param) * d.scale, juce::dontSendNotification);
+            sl.onValueChange = [this, k] { setFx(kFxKnobs[k].param, float(fxKnob[k].getValue() / kFxKnobs[k].scale)); };
+            sl.setColour(juce::Slider::rotarySliderFillColourId, tok::accent);
+            sl.setColour(juce::Slider::rotarySliderOutlineColourId, tok::sunk);
+            sl.setColour(juce::Slider::thumbColourId, tok::lamp);
+            sl.setColour(juce::Slider::textBoxTextColourId, tok::ink);
+            sl.setColour(juce::Slider::textBoxOutlineColourId, juce::Colours::transparentBlack);
+            addAndMakeVisible(sl);
+            auto& lb = fxLabel[k];
+            lb.setText(d.name, juce::dontSendNotification);
+            lb.setJustificationType(juce::Justification::centred);
+            lb.setColour(juce::Label::textColourId, tok::dim);
+            lb.setFont(juce::FontOptions(12.0f));
+            addAndMakeVisible(lb);
+        }
+        auto fxBox = [this](juce::ComboBox& box, MasterFx::Param param, const char* const* names, int count) {
+            for (int i = 0; i < count; ++i) box.addItem(names[i], i + 1);
+            box.setSelectedId(int(fxValue(param)) + 1, juce::dontSendNotification);
+            box.onChange = [this, &box, param] { setFx(param, float(box.getSelectedId() - 1)); };
+            box.setColour(juce::ComboBox::backgroundColourId, tok::raised);
+            box.setColour(juce::ComboBox::textColourId, tok::ink);
+            box.setColour(juce::ComboBox::outlineColourId, tok::hairline);
+            box.setColour(juce::ComboBox::arrowColourId, tok::dim);
+            addAndMakeVisible(box);
+        };
+        fxBox(styleBox, MasterFx::Style, MasterFx::styleNames, int(std::size(MasterFx::styleNames)));
+        fxBox(timeBox, MasterFx::Time, MasterFx::timeNames, int(std::size(MasterFx::timeNames)));
+
         click.setToggleState(true, juce::dontSendNotification);
-        click.onClick = [this] { if (engine) engine->clickLevel = click.getToggleState() ? 0.5f : 0.0f; };
+        click.onClick = [this] { for (auto* e : { engine.get(), nextEngine.get() }) if (e) e->clickLevel = click.getToggleState() ? 0.5f : 0.0f; };
 
         for (auto* b : { &play, &fresh, &audio })
         {
@@ -118,13 +192,18 @@ public:
 
         preview();
         setWantsKeyboardFocus(true);
-        setSize(1000, 500);
+        setSize(1000, 690);
         startTimerHz(20);
     }
 
     ~MainComponent() override
     {
+        levelThread.stopThread(1000);
         deviceManager.removeAudioCallback(this);
+        stopAll(); // the next-song thread first: it uses this component
+        for (auto& t : graveyard) t->stopThread(4000);
+        graveyard.clear();
+        { const std::lock_guard<std::mutex> l(loadedMutex); results.clear(); }
         if (auto xml = deviceManager.createStateXml()) props.getUserSettings()->setValue("audio", xml.get());
         props.getUserSettings()->setValue("seed", juce::String(seed));
         props.saveIfNeeded();
@@ -133,11 +212,16 @@ public:
     void paint(juce::Graphics& g) override
     {
         g.fillAll(tok::ground);
+        g.setColour(tok::panel);
+        for (auto& u : fxUnit) g.fillRoundedRectangle(u.toFloat(), 6.0f);
         auto r = getLocalBounds().reduced(tok::s5);
 
         g.setColour(tok::faint);
         g.setFont(juce::FontOptions(11.0f).withStyle("Bold"));
-        g.drawText("LISZTMACHINE" + dot + juce::String(kSceneTitles[sceneBox.getSelectedId() - 1]).toUpperCase(), r.removeFromTop(16), juce::Justification::left);
+        const juce::String head = improv() ? "Improvisation" + dot + "song " + juce::String(improvK + 1)
+                                              + (oldEngine ? dot + "changing over" : nextEngine ? dot + "next song ready" : loader ? dot + "writing the next song" : juce::String())
+                                           : juce::String(kSceneTitles[sceneBox.getSelectedId() - 1]);
+        g.drawText("LISZTMACHINE" + dot + head.toUpperCase(), r.removeFromTop(16), juce::Justification::left);
         r.removeFromTop(tok::s2);
 
         if (error.isNotEmpty())
@@ -167,7 +251,7 @@ public:
 
         // What each part is playing now: the palette rotates these over the concert. The part's name
         // above, its sound below, up to ten parts across.
-        const auto& info = sceneInfo(scene);
+        const auto& info = sceneInfo(engine ? engine->scene : scene);
         if (engine && playing)
         {
             auto row = r.removeFromTop(34);
@@ -229,6 +313,28 @@ public:
         auto area = getLocalBounds().reduced(tok::s5);
         auto row = area.removeFromBottom(36);
         auto fbRow = area.removeFromBottom(tok::s3 + 28).removeFromTop(28);
+        // the FX panel above it: the three units side by side, each as wide as its controls
+        auto fx = area.removeFromBottom(tok::s3 + 140).removeFromTop(140);
+        const int cells[3] = { 5, 3, 4 }; // knobs per unit
+        const float cellW = float(fx.getWidth() - 2 * tok::s3) / 12.0f;
+        for (int u = 0; u < 3; ++u)
+        {
+            fxUnit[u] = u == 2 ? fx : fx.removeFromLeft(int(cellW * float(cells[u])));
+            fx.removeFromLeft(tok::s3);
+            auto in = fxUnit[u].reduced(tok::s2);
+            auto head = in.removeFromTop(28);
+            if (u < 2) (u == 0 ? styleBox : timeBox).setBounds(head.removeFromRight(juce::jmin(130, head.getWidth() - 90)));
+            fxOn[u].setBounds(head.removeFromLeft(90));
+            in.removeFromTop(tok::s2 / 2);
+            const int w = in.getWidth() / cells[u];
+            for (size_t k = 0; k < std::size(kFxKnobs); ++k)
+                if (kFxKnobs[k].unit == u)
+                {
+                    auto cell = in.removeFromLeft(w);
+                    fxLabel[k].setBounds(cell.removeFromTop(16));
+                    fxKnob[k].setBounds(cell);
+                }
+        }
         feedbackLabel.setBounds(fbRow.removeFromLeft(190));
         feedback.setBounds(fbRow.removeFromLeft(360));
         juce::FlexBox fb;
@@ -247,7 +353,7 @@ public:
 private:
     void preview()
     {
-        previewComposer = makeComposer(scene, uint64_t(seed));
+        previewComposer = makeComposer(songScene(0), uint64_t(seed));
         composer = previewComposer.get();
         props.getUserSettings()->setValue("seed", juce::String(seed));
         repaint();
@@ -256,12 +362,16 @@ private:
     void togglePlay()
     {
         if (!engine || error.isNotEmpty()) return;
-        if (engine->isPlaying()) engine->stop();
+        if (engine->isPlaying()) { if (improv()) stopAll(); else engine->stop(); live.stop(); }
         else
         {
             seed = juce::jmax<int64_t>(1, seedBox.getText().getLargeIntValue());
+            // Improvisation always begins at its first song (the chain is the seed)
+            if (improv() && (improvK != 0 || chainSeed != seed || engine->isFinished())) { reload(); if (!engine) return; }
             engine->limiter.maxReductionDb = 0;
             engine->start(uint64_t(seed));
+            if (improv()) changeAt = changeTime(*engine->composer());
+            announce(*engine, improvK);
         }
     }
 
@@ -269,26 +379,38 @@ private:
     void reload()
     {
         deviceManager.removeAudioCallback(this);
+        stopAll();
         auto* dev = deviceManager.getCurrentAudioDevice();
         loadedRate = dev ? dev->getCurrentSampleRate() : 48000.0;
         loadedBlock = dev ? dev->getCurrentBufferSizeSamples() : 512;
-        engine = std::make_unique<Engine>();
-        Palette palette;
-        error = palette.load(findPalette(scene), scene);
-        engine->scene = scene;
-        if (error.isEmpty())
-            error = dev ? engine->load(loadedRate, juce::jmax(512, loadedBlock), palette) : juce::String("no audio output device");
-        if (error.isNotEmpty()) engine.reset();
+        mixBuf.setSize(8, juce::jmax(8192, loadedBlock));
+        improvK = 0;
+        chainSeed = seed;
+        { std::unique_ptr<Engine> gone; { const juce::SpinLock::ScopedLockType sl(audioLock); gone = std::move(engine); } }
+        error = {};
+        std::unique_ptr<Engine> fresh; // swapped in under the lock: the level thread reads the engines
+        if (dev) fresh = build(0, error, false);
+        else error = "no audio output device";
+        if (error.isNotEmpty()) fresh.reset();
+        { const juce::SpinLock::ScopedLockType sl(audioLock); engine = std::move(fresh); }
         // the song's own amount until Kerem moves it (at most 80 %); a song without the bus greys the slider out
         const bool bus = engine && engine->hasFeedbackBus();
         const double own = engine ? juce::jmin(80.0, std::round(engine->palette().fbAmount * 100.0)) : 0.0;
         feedback.setValue(bus ? double(props.getUserSettings()->getDoubleValue("feedback." + juce::String(scene), own)) : 0.0, juce::dontSendNotification);
         feedback.setEnabled(bus);
         feedback.setAlpha(bus ? 1.0f : 0.35f);
-        feedbackLabel.setText(bus ? "Feedback" : "Feedback (none in this song)", juce::dontSendNotification);
+        feedbackLabel.setText(bus ? "Song feedback" : "Song feedback (none in this song)", juce::dontSendNotification);
         if (engine && bus) engine->feedbackBus = float(feedback.getValue() / 100.0);
+        if (engine) settle(*engine);
         deviceManager.addAudioCallback(this);
         repaint();
+    }
+
+    float fxValue(MasterFx::Param p) { return float(props.getUserSettings()->getDoubleValue("fx." + juce::String(MasterFx::paramNames[p]), MasterFx::defaults[p])); }
+    void setFx(MasterFx::Param p, float v)
+    {
+        props.getUserSettings()->setValue("fx." + juce::String(MasterFx::paramNames[p]), v);
+        for (auto* e : { engine.get(), nextEngine.get(), oldEngine.get() }) if (e) e->masterFx.p[p] = v;
     }
 
     void changeListenerCallback(juce::ChangeBroadcaster*) override
@@ -317,6 +439,7 @@ private:
         {
             meterPeak = engine->peakPost.exchange(0);
             engine->service(); // load each part's next sound ahead of its change
+            if (improv()) improvise();
             if (engine->isPlaying() || engine->isFinished()) composer = engine->composer();
         }
         play.setButtonText(engine && engine->isPlaying() ? "Stop" : "Play");
@@ -326,11 +449,226 @@ private:
     void audioDeviceIOCallbackWithContext(const float* const*, int, float* const* out, int numOut, int n,
                                           const juce::AudioIODeviceCallbackContext&) override
     {
+        const juce::SpinLock::ScopedLockType sl(audioLock); // held by the message thread only to swap the engines
         if (engine) engine->render(out, numOut, n);
         else for (int c = 0; c < numOut; ++c) juce::FloatVectorOperations::clear(out[c], n);
+        // Improvisation's changeover: the last song's Release rings out under the new song's Seed
+        if (oldEngine && numOut <= mixBuf.getNumChannels() && n <= mixBuf.getNumSamples())
+        {
+            oldEngine->render(mixBuf.getArrayOfWritePointers(), numOut, n);
+            for (int c = 0; c < numOut; ++c) juce::FloatVectorOperations::add(out[c], mixBuf.getReadPointer(c), n);
+            for (int c = 0; c < juce::jmin(2, numOut); ++c) for (int i = 0; i < n; ++i) out[c][i] = ceilingClip(out[c][i]);
+        }
+        double sq = 0;
+        for (int c = 0; c < juce::jmin(2, numOut); ++c) for (int i = 0; i < n; ++i) sq += double(out[c][i]) * out[c][i];
+        masterSq = masterSq.load() + sq;
+        masterN = masterN.load() + 2 * n;
     }
     void audioDeviceAboutToStart(juce::AudioIODevice*) override {}
     void audioDeviceStopped() override {}
+
+    // ---- Improvisation (Kerem, 2026-11-14: "generate songs on the run ... near the end it will generate another song and
+    // transition to it component by component"). Song k plays in `engine`; song k+1 is written and its instruments loaded
+    // on a thread meanwhile (40 s on the PC). JUCE makes plugins on the message thread only, so each plugin step is handed
+    // there and waited for (a lock held instead deadlocked: the creation waited for the thread the lock had stopped);
+    // between steps the panel keeps moving.
+    // A quarter of the way into song k's Release, song k+1 starts (its Seed: the drone alone, inside k's last chord,
+    // src/core/Improv.cpp) and song k rings out under it in `oldEngine` until it has finished. Endless; the seed is the chain.
+    static constexpr int kImprovId = 1000;
+    bool improv() const { return scene == "improv"; }
+    std::string songScene(int k) const { return improv() ? "improv/" + std::to_string(k) : scene; }
+    // seconds into a song where the next one begins: a quarter into its Release
+    static double changeTime(const Composer& c)
+    {
+        const auto& r = c.sections().back();
+        return (r.startBar + 0.25 * r.bars) * 240.0 / c.bpm();
+    }
+    std::unique_ptr<Engine> build(int k, juce::String& err, bool offThread)
+    {
+        Palette palette;
+        const auto sc = songScene(k);
+        err = palette.load(improv() ? writeImprovPalette(uint64_t(chainSeed), k) : findPalette(scene), sc);
+        if (err.isNotEmpty()) return nullptr;
+        auto e = std::make_unique<Engine>();
+        if (offThread)
+            e->onMessageThread = [](const std::function<void()>& f) {
+                if (juce::Thread::currentThreadShouldExit()) return; // cancelled: the rest is skipped, the load fails
+                juce::MessageManager::getInstance()->callFunctionOnMessageThread(
+                    [](void* p) -> void* { (*static_cast<const std::function<void()>*>(p))(); return nullptr; },
+                    const_cast<void*>(static_cast<const void*>(&f)));
+            };
+        e->scene = sc;
+        err = e->load(loadedRate, juce::jmax(512, loadedBlock), palette);
+        if (err.isNotEmpty()) return nullptr;
+        return e;
+    }
+    // the panel's settings on an engine: master FX, click, the song feedback (where the song has the bus)
+    void settle(Engine& e)
+    {
+        for (int k = 0; k < MasterFx::NumParams; ++k) e.masterFx.p[k] = fxValue(MasterFx::Param(k));
+        e.clickLevel = click.getToggleState() ? 0.5f : 0.0f;
+        if (e.hasFeedbackBus()) e.feedbackBus = float(feedback.getValue() / 100.0);
+    }
+    struct Loader : juce::Thread
+    {
+        std::function<void()> job;
+        explicit Loader(std::function<void()> j) : juce::Thread("Lisztmachine next song"), job(std::move(j)) {}
+        void run() override { job(); }
+    };
+    void prepareNext()
+    {
+        const int k = improvK + 1, gen = ++loadGen;
+        improvSong(uint64_t(chainSeed), k); // planned here: the chain's cache is filled on this thread only
+        loader = std::make_unique<Loader>([this, k, gen] {
+            juce::String err;
+            auto e = build(k, err, true);
+            if (e && !juce::Thread::currentThreadShouldExit()) e->start(uint64_t(chainSeed), 0, false); // ready, silent
+            const std::lock_guard<std::mutex> l(loadedMutex);
+            results.push_back({ gen, std::move(e), err });
+        });
+        loader->startThread();
+    }
+    void improvise()
+    {
+        std::vector<Loaded> got;
+        { const std::lock_guard<std::mutex> l(loadedMutex); got.swap(results); }
+        for (auto& r : got) // a result of a cancelled load is let go here, on this thread, like every plugin
+            if (r.gen == loadGen && loader)
+            {
+                nextEngine = std::move(r.engine);
+                if (nextEngine) settle(*nextEngine);
+                else error = "next song: " + r.error;
+            }
+        if (loader && !loader->isThreadRunning()) loader.reset();
+        graveyard.erase(std::remove_if(graveyard.begin(), graveyard.end(), [](auto& t) { return !t->isThreadRunning(); }), graveyard.end());
+        const bool going = engine->isPlaying() || engine->isFinished();
+        if (going && !loader && !nextEngine && engine->seconds.load() > 2.0) prepareNext();
+        if (nextEngine && (engine->isFinished() || (engine->isPlaying() && engine->seconds.load() >= changeAt))) changeover();
+        if (oldEngine)
+        {
+            oldEngine->service();
+            if (oldEngine->isFinished() || !oldEngine->isPlaying())
+            {
+                std::unique_ptr<Engine> gone;
+                { const juce::SpinLock::ScopedLockType sl(audioLock); gone = std::move(oldEngine); }
+            }
+        }
+    }
+    void changeover()
+    {
+        std::unique_ptr<Engine> gone;
+        engine->clickLevel = 0; // the click follows the new song from its first beat
+        {
+            const juce::SpinLock::ScopedLockType sl(audioLock);
+            gone = std::move(oldEngine);
+            if (engine->isFinished()) { if (!gone) gone = std::move(engine); else engine.reset(); }
+            else oldEngine = std::move(engine);
+            engine = std::move(nextEngine);
+        }
+        engine->go();
+        ++improvK;
+        changeAt = changeTime(*engine->composer());
+        announce(*engine, improvK);
+        composer = engine->composer();
+        const bool bus = engine->hasFeedbackBus();
+        feedback.setEnabled(bus);
+        feedback.setAlpha(bus ? 1.0f : 0.35f);
+    }
+    void stopAll()
+    {
+        // a load under way is told to stop and left to finish on its own (joining it here could wait on this very thread)
+        if (loader) { loader->signalThreadShouldExit(); graveyard.push_back(std::move(loader)); }
+        ++loadGen;
+        std::unique_ptr<Engine> a, b;
+        {
+            const juce::SpinLock::ScopedLockType sl(audioLock);
+            a = std::move(oldEngine);
+            b = std::move(nextEngine);
+        }
+        if (engine) engine->stop();
+    }
+    // ---- the live link to the visuals page (LiveLink.h)
+    LiveLink live;
+    double outLatency() const
+    {
+        auto* d = const_cast<juce::AudioDeviceManager&>(deviceManager).getCurrentAudioDevice();
+        return d ? (d->getOutputLatencyInSamples() + d->getCurrentBufferSizeSamples()) / d->getCurrentSampleRate() : 0.0;
+    }
+    // a song starts: its show, and when its first bar is heard on the app's clock
+    void announce(Engine& e, int k)
+    {
+        if (!e.composer()) return;
+        const double at = LiveLink::now() + double(e.preRollSamples()) / loadedRate + outLatency();
+        juce::MemoryOutputStream j;
+        j << showHead(e.scene, uint64_t(improv() ? chainSeed : seed), 20.0) << ",\"at\":" << juce::String(at, 4) << ",\"now\":" << juce::String(LiveLink::now(), 4) << ",\"k\":" << k
+          << ",\"piece\":\"" << (improv() ? juce::String("improv") : juce::String(scene)) << "\"";
+        if (improv()) j << ",\"plan\":" << juce::String(improvJson(improvSong(uint64_t(chainSeed), k)));
+        j << "}";
+        songAt = at;
+        live.song(j.toString());
+    }
+    // the seven levels of a show.json block (roles, delay, reverb, master), from the engines' meters since the last tick
+    struct MeterMark { double sq[kMaxTracks + 2] = {}; int64_t n[kMaxTracks + 2] = {}; };
+    std::map<const Engine*, MeterMark> marks;
+    std::atomic<double> masterSq { 0 };
+    std::atomic<int64_t> masterN { 0 };
+    double masterSqWas = 0;
+    std::atomic<double> songAt { 0 }; // when the newest song's bar 0 was heard (app clock): the page's levels and clock follow its playhead
+    int64_t masterNWas = 0;
+    // On its own thread, 20 times a second: the message thread is busy for seconds at a time while the next song's
+    // instruments load, and the page's picture should not stall with it.
+    struct LevelThread : juce::Thread
+    {
+        std::function<void()> tick;
+        LevelThread() : juce::Thread("live link levels") {}
+        void run() override { while (!threadShouldExit()) { tick(); wait(50); } }
+    } levelThread;
+    void sendLevels()
+    {
+        double role[4] = {}, bus[2] = {};
+        const juce::SpinLock::ScopedLockType sl(audioLock); // the engines stay put while their meters are read (a few dozen atomics)
+        for (auto it = marks.begin(); it != marks.end();) it = it->first == engine.get() || it->first == oldEngine.get() ? std::next(it) : marks.erase(it);
+        for (auto* e : { engine.get(), oldEngine.get() })
+        {
+            if (!e) continue;
+            auto& mk = marks[e];
+            const auto& info = sceneInfo(e->scene);
+            for (int k = 0; k < info.numTracks + 2; ++k)
+            {
+                const auto& m = k < info.numTracks ? e->meters[k] : k == info.numTracks ? e->delayMeter : e->reverbMeter;
+                const double sq = m.sumSquares.load();
+                const int64_t n = m.samples.load();
+                const double pw = n > mk.n[k] ? juce::jmax(0.0, sq - mk.sq[k]) / (double(n - mk.n[k]) / 2) : 0.0; // as the renderer: per frame
+                mk.sq[k] = sq; mk.n[k] = n;
+                if (k < info.numTracks) role[info.role[k]] += pw;
+                else bus[k - info.numTracks] += pw;
+            }
+        }
+        const double msq = masterSq.load(), mn = double(masterN.load());
+        const double master = mn > double(masterNWas) ? std::sqrt(juce::jmax(0.0, msq - masterSqWas) / (mn - double(masterNWas))) : 0.0;
+        masterSqWas = msq; masterNWas = int64_t(mn);
+        if (live.clients() == 0 || !engine || !(engine->isPlaying() || oldEngine.get() != nullptr)) return;
+        // where the newest song is, as heard: its playhead less what is still on its way to the speakers
+        const double pos = engine->seconds.load() - outLatency();
+        juce::String j = "{\"now\":" + juce::String(LiveLink::now(), 4) + ",\"at\":" + juce::String(LiveLink::now() + outLatency(), 4)
+                       + ",\"song\":" + juce::String(songAt.load(), 4) + ",\"pos\":" + juce::String(pos, 4) + ",\"v\":[";
+        for (int r = 0; r < 4; ++r) j << juce::String(std::sqrt(role[r]), 5) << ",";
+        j << juce::String(std::sqrt(bus[0]), 5) << "," << juce::String(std::sqrt(bus[1]), 5) << "," << juce::String(master, 5) << "]}";
+        live.post("lv", j);
+    }
+
+    int improvK = 0;
+    int64_t chainSeed = 1;
+    double changeAt = 1e9;
+    std::unique_ptr<Engine> nextEngine, oldEngine;
+    std::unique_ptr<Loader> loader;
+    std::vector<std::unique_ptr<Loader>> graveyard;
+    struct Loaded { int gen; std::unique_ptr<Engine> engine; juce::String error; };
+    std::vector<Loaded> results;
+    std::mutex loadedMutex;
+    int loadGen = 0;
+    juce::SpinLock audioLock;
+    juce::AudioBuffer<float> mixBuf;
 
     juce::ApplicationProperties props;
     juce::AudioDeviceManager deviceManager;
@@ -349,7 +687,12 @@ private:
     juce::ComboBox sceneBox;
     juce::ToggleButton click { "Click on out 3/4" };
     juce::Slider feedback;
-    juce::Label feedbackLabel { {}, "Feedback" };
+    juce::Label feedbackLabel { {}, "Song feedback" };
+    juce::ToggleButton fxOn[3];
+    juce::Slider fxKnob[std::size(kFxKnobs)];
+    juce::Label fxLabel[std::size(kFxKnobs)];
+    juce::ComboBox styleBox, timeBox;
+    juce::Rectangle<int> fxUnit[3];
 };
 
 struct App : juce::JUCEApplication
@@ -363,7 +706,7 @@ struct App : juce::JUCEApplication
         window->setUsingNativeTitleBar(true);
         window->setContentOwned(new MainComponent(), true);
         window->setResizable(true, false);
-        window->setResizeLimits(960, 500, 4000, 2000);
+        window->setResizeLimits(960, 690, 4000, 2000);
         window->centreWithSize(window->getWidth(), window->getHeight());
         window->setVisible(true);
     }

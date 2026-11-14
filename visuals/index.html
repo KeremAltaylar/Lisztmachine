@@ -97,6 +97,7 @@ nav button[aria-pressed="true"] { color: var(--ember); }
       <button class="go" id="piece-doom" data-piece="doom" disabled>Doom</button>
       <button class="go" id="piece-blackgaze" data-piece="blackgaze" disabled>Blackgaze</button>
       <button class="go" id="piece-concert" data-piece="concert" disabled>The whole concert</button>
+      <button class="go" id="piece-live" data-piece="live" disabled>Live from the app</button>
     </div>
     <button class="go" id="go" hidden disabled>Loading…</button>
     <p class="keys"><kbd>1</kbd>–<kbd>9</kbd> study · <kbd>G</kbd> new look · <kbd>Space</kbd> pause · <kbd>←</kbd><kbd>→</kbd> 10 s · <kbd>↑</kbd><kbd>↓</kbd> section · <kbd>S</kbd> strobe on/off · <kbd>B</kbd> feedback on/off · <kbd>K</kbd> test drum hit · <kbd>[</kbd><kbd>]</kbd> pad sensitivity · <kbd>,</kbd><kbd>.</kbd> pad effect · <kbd>P</kbd> hits: affect / layer / off · <kbd>M</kbd> metronome on/off · <kbd>C</kbd> code in the picture on/off · <kbd>V</kbd> the machine's voice: bottom, top, off · <kbd>H</kbd> hide controls · <kbd>F</kbd> full screen</p>
@@ -126,6 +127,9 @@ nav button[aria-pressed="true"] { color: var(--ember); }
     <label class="amt" for="look-colour">Colour <input id="look-colour" type="range" min="0" max="100" value="70"> <span id="look-colour-v">70</span></label>
     <label class="amt" for="look-churn">Churn <input id="look-churn" type="range" min="0" max="100" value="50"> <span id="look-churn-v">50</span></label>
   </div>
+  <div class="row pad cam" id="fx1" hidden><span>Master FX</span></div>
+  <div class="row pad cam" id="fx2" hidden><span>Master FX</span></div>
+  <div class="row pad cam" id="fx3" hidden><span>Master EQ</span></div>
   <div class="row pad">
     <button id="pad-go">Drum pad</button>
     <label for="pad-device" class="sr">Input device</label><select id="pad-device"><option value="">Default input</option></select>
@@ -153,7 +157,11 @@ nav button[aria-pressed="true"] { color: var(--ember); }
 const PIECES = {
   berlin: { name: 'Berlin', study: 'dust', media: 'media/seed1', ranges: [[48, 76], [28, 52], [52, 81], [60, 88]],
     world: { name: 'Sodium Night', lo: [0.2, 0.55, 1.0], hi: [0.92, 0.97, 1.0],  // cold teal night, steel white, sodium accents
-      palette: [[0.3, 0.9, 1], [0.5, 0.65, 1], [1, 0.55, 0.15], [0.9, 0.95, 1], [0.2, 1, 0.8], [1, 0.3, 0.55]] } },
+      palette: [[0.3, 0.9, 1], [0.5, 0.65, 1], [1, 0.55, 0.15], [0.9, 0.95, 1], [0.2, 1, 0.8], [1, 0.3, 0.55]] },
+    // 2026-11-10 (Kerem: "one voice affects a visual parameter, another voice another ... audio and visual a whole
+    // total body"): every voice owns one property and nothing else moves it. Slow voices on slow properties.
+    // Kerem (same day): the melodies and harmonies "a little bit more, so we can feel their change and existence".
+    body: { pad: 'light', sub: 'gravity', bass: 'size', seq: 'speed', solo: 'camera', guitar: 'colour', boom: 'shock', lead: 'glow' } },
   // The genre songs (named for their genre until Kerem names them). Ranges by role from the
   // composer's registers: harmony pad and chords, bass kick sub and bass, rhythm snare hats perc, melody the arpeggio.
   jungle: { name: 'Liquid', study: 'tunnel', strobeBeats: 1, media: 'media/jungle1', ranges: [[36, 86], [22, 64], [42, 62], [60, 86]],
@@ -186,11 +194,122 @@ const PIECES = {
   // 2026-11-03 (Kerem: "a concert song that includes all 45 minutes, so I can practice the concert non stop"):
   // the eight songs back to back from tools/concert.py; each one switches in its own study, colours and tempo.
   concert: { name: 'The whole concert', concert: true, media: 'media/concert1' },
+  // 2026-11-14 (Kerem: the visuals follow the app as it plays): whatever the Lisztmachine app on this computer is playing,
+  // a song or Improvisation, from its live link (src/app/LiveLink.h, http://127.0.0.1:8737/live). No recording here: the
+  // app makes the sound, the page the light. Works from the local package (Start Visuals.command).
+  live: { name: 'Live from the app', concert: true, live: true },
 };
 // 2026-11-05: each song's photographs for the image layer, public domain (Library of Congress FSA/OWI and
 // Gottlieb, NASA, NOAA, US Forest Service, the Met, old maps and prints, via Wikimedia Commons), one per story
 for (const [k, n] of Object.entries({ berlin: 4, jungle: 4, ecstatic: 4, noir: 4, deconstructed: 4, halftime: 4, doom: 4, blackgaze: 2 }))
   PIECES[k].images = Array.from({ length: n }, (_, i) => `media/img/${k}/${i + 1}.jpg`);
+// Every song's body (2026-11-10, Kerem: "create these kind of interactivities for each song"), on Berlin's rule: one
+// voice owns one property. The main harmony the light, the second harmony the colour, the lead melody the camera,
+// the hook the glow, the busiest line the speed, the bass the size, the sub the gravity, the booms the shock.
+const BODIES = {
+  stoner:        { pad: 'light', harm: 'colour', drone: 'camera', chord: 'glow', arp: 'speed', riff: 'size', sub: 'gravity', boom: 'shock' },   // the sax leads, the bass sax runs, the doom guitar weighs
+  jungle:        { pad: 'light', harm: 'colour', drone: 'camera', arp: 'glow', chord: 'speed', bass: 'size', sub: 'gravity', boom: 'shock' },
+  ecstatic:      { pad: 'light', harm: 'colour', lead: 'camera', riff: 'glow', arp: 'speed', bass: 'size', sub: 'gravity', boom: 'shock' },
+  noir:          { pad: 'light', harm: 'colour', arp: 'camera', drone: 'glow', chord: 'speed', bass: 'size', sub: 'gravity', boom: 'shock' },     // the sax is the lead
+  deconstructed: { pad: 'light', harm: 'colour', lead: 'camera', arp: 'glow', riff: 'speed', bass: 'size', sub: 'gravity', boom: 'shock' },
+  halftime:      { pad: 'light', harm: 'colour', lead: 'camera', arp: 'glow', riff: 'speed', bass: 'size', sub: 'gravity', boom: 'shock' },
+  doom:          { pad: 'light', harm: 'colour', lead: 'camera', arp: 'glow', riff: 'speed', bass: 'size', sub: 'gravity', boom: 'shock' },
+  blackgaze:     { pad: 'light', harm: 'colour', lead: 'camera', arp: 'glow', riff: 'speed', bass: 'size', sub: 'gravity', boom: 'shock' },   // the tremolo guitar is the speed
+};
+for (const k in BODIES) PIECES[k].body = BODIES[k];
+// Improvisation's looks (Kerem, 2026-11-14: "visuals in the same manner"), made as each generated song arrives live: for each generated song a study, a colour world and a way of moving,
+// each different from the song before (and the study from the two before), so no two runs look alike. The colour
+// world is one of the songs' worlds turned round the colour wheel; the pitch ranges and the body follow the song's plan.
+function improviser() {
+  const studies = ['dust', 'tunnel', 'form', 'interference', 'horizon', 'mill', 'lumen'];   // no Ikeda (Kerem, 2026-11-10)
+  const worlds = Object.values(PIECES).filter(p => p.world).map(p => p.world);
+  const pick = (a, not = []) => { const b = a.filter(x => !not.includes(x)); return b[Math.floor(Math.random() * b.length)]; };
+  // hue rotation about the grey axis (Rodrigues), the brightness kept
+  const turn = (rgb, a) => {
+    const c = Math.cos(a), s = Math.sin(a), k = (1 - c) / 3, r3 = Math.sqrt(1 / 3) * s;
+    const m = [c + k, k - r3, k + r3, k + r3, c + k, k - r3, k - r3, k + r3, c + k];
+    return [0, 1, 2].map(i => Math.max(0, Math.min(1, m[3 * i] * rgb[0] + m[3 * i + 1] * rgb[1] + m[3 * i + 2] * rgb[2])));
+  };
+  let lastStudy = [], lastWorld = null, lastTurn = 0;
+  return (s, k) => {
+    const plan = s.plan ?? {};
+    const study = pick(studies, lastStudy);
+    lastStudy = [study, lastStudy[0]];
+    const base = pick(worlds, [lastWorld]);
+    lastWorld = base;
+    let a; do a = Math.random() * 2 * Math.PI; while (Math.abs(((a - lastTurn + 3 * Math.PI) % (2 * Math.PI)) - Math.PI) < 1.2);
+    lastTurn = a;
+    const world = { name: (plan.name ?? 'Improvisation') + ' light', lo: turn(base.lo, a), hi: turn(base.hi, a), palette: base.palette.map(c => turn(c, a)) };
+    const sax = (plan.soloist ?? '').startsWith('saxophone');
+    const id = 'improv' + k;
+    PIECES[id] = {
+      name: plan.name ?? 'Improvisation ' + (k + 1), study, world, strobeBeats: Math.random() < 0.5 ? 1 : 2, hits: 'affect',
+      ranges: (PIECES[plan.melody] ?? PIECES.jungle).ranges,
+      body: sax ? { pad: 'light', harm: 'colour', arp: 'camera', drone: 'glow', chord: 'speed', bass: 'size', sub: 'gravity', boom: 'shock' }
+                : { pad: 'light', harm: 'colour', lead: 'camera', arp: 'glow', riff: 'speed', bass: 'size', sub: 'gravity', boom: 'shock' },
+    };
+    s.piece = id;
+  };
+}
+// The live link: resolves with the first song the app announces; later songs and the levels keep arriving.
+// Time here is the first song's time: t = (the app's clock) - (when that song's bar 0 was heard).
+function liveLink(waiting) {
+  return new Promise((res, rej) => {
+    const L = window.__live = { off: Infinity, T0: null, show: null, onSong: null, songs: 0, levels: 0, stopped: false };
+    const es = new EventSource('http://127.0.0.1:8737/live');
+    let shown = false;
+    const tell = setTimeout(() => { if (!L.show) waiting(); shown = true; }, 1500);
+    es.onerror = () => { if (!L.show && shown) waiting(true); };
+    const seen = m => { if (m.now != null) L.off = Math.min(L.off, m.now - performance.now() / 1000); };   // the least delayed message sets the clock
+    es.addEventListener('song', e => {
+      const m = JSON.parse(e.data);
+      seen(m);
+      if (!L.show) {
+        L.T0 = m.at;
+        L.show = { live: true, bpm: m.bpm, key: m.key, tracks: m.tracks, levelNames: m.levelNames, levelRate: 20, sections: [], notes: [], levels: [[0, 0, 0, 0, 0, 0, 0]], songs: [], voices: m.voices };
+        L.add(m);
+        clearTimeout(tell);
+        res(L);
+      } else L.add(m);
+      L.stopped = false;
+    });
+    es.addEventListener('lv', e => {
+      const m = JSON.parse(e.data);
+      seen(m);
+      if (!L.show) return;
+      // the app's playhead, as heard: the page's time follows it (smoothed; a jump of half a second or more is taken at once),
+      // so a slow or stalled app never leaves the light ahead of the sound
+      let tm = m.at - L.T0;
+      if (m.song != null && m.pos != null) {
+        tm = m.song - L.T0 + m.pos;
+        const v = tm - performance.now() / 1000;
+        L.base = L.base == null || Math.abs(v - L.base) > 0.5 ? v : L.base + (v - L.base) * 0.05;
+      }
+      const lv = L.show.levels, i = Math.floor(tm * 20);
+      if (i < 0) return;
+      while (lv.length < i) lv.push(lv[lv.length - 1]);
+      lv[i] = m.v;
+      L.levels++;
+    });
+    es.addEventListener('stop', () => { L.stopped = true; });
+    // a song: its notes, parts and look join the show where it is heard
+    L.add = m => {
+      const sh = L.show, t = m.at - L.T0;
+      if (sh.songs.some(x => Math.abs(x.t - t) < 0.01)) return;   // sent again after a reconnect
+      const k = sh.songs.length;
+      const song = { piece: m.piece, media: null, t, bpm: m.bpm, key: m.plan ? m.plan.name + ' · ' + m.plan.key + ' · ' + m.plan.bpm + ' bpm' : m.key, voices: m.voices, plan: m.plan };
+      if (m.piece === 'improv') (L.look ??= improviser())(song, k);
+      else if (!PIECES[m.piece]) song.piece = 'jungle';
+      sh.songs.push(song);
+      const fresh = m.notes.map(n => [n[0] + t, ...n.slice(1)]);
+      const secs = m.sections.map(x => ({ ...x, t: x.t + t, song: k }));
+      L.songs++;
+      if (L.onSong) L.onSong(fresh, secs);
+      else { sh.notes.push(...fresh); sh.sections.push(...secs); }
+    };
+  });
+}
+
 let RANGE = PIECES.berlin.ranges;
 const TAU = [1.2, 0.28, 0.16, 0.4];                          // how long a note-on lights up, seconds
 const L01 = rms => Math.min(1, Math.max(0, (20 * Math.log10(rms + 1e-9) + 54) / 42)); // -54..-12 dBFS
@@ -259,6 +378,49 @@ class Features {
     this.section = sec; this.si = si;
     this.progress = Math.min(1, (t - sec.t) / (sec.bars * this.secLen));
   }
+  // The body (a piece's own mapping, from the voices in the show): 12 numbers, 0 when the piece has none.
+  // light, gravity, size, speed · camera (-1..1), colour, shock age (s), shock strength · on, chord swell, glow, whole-frame
+  body(t, dt, map) {
+    const out = this.bodyOut ??= new Float32Array(12);
+    const V = this.show.voices;
+    if (!map || !V) { out.fill(0); out[6] = 99; return out; }
+    if (!this.vr) {          // each voice's pitch range, for the camera
+      this.vr = V.map(() => [127, 0]);
+      const [w0, w1] = this.vWin ?? [0, 1e9];
+      for (const n of this.notes) if (n[5] !== undefined && n[0] >= w0 && n[0] < w1) { const r = this.vr[n[5]]; r[0] = Math.min(r[0], n[3]); r[1] = Math.max(r[1], n[3]); }
+      this.vEnv = new Float32Array(V.length); this.vOn = V.map(() => -99); this.vVel = new Float32Array(V.length); this.vPitch = new Float32Array(V.length);
+      this.bs = new Float32Array(12);
+    }
+    const held = new Float32Array(V.length);
+    for (let k = 0; k < V.length; k++) if (this.vOn[k] > t) this.vOn[k] = -99;   // a seek back
+    for (let i = lowerBound(this.notes, t - 40); i < this.notes.length && this.notes[i][0] <= t; i++) {
+      const [s, d, , p, v, k] = this.notes[i];
+      if (k === undefined || s < (this.vWin?.[0] ?? 0)) continue;   // (in the concert: only this song's notes)
+      if (s + d > t) held[k] = Math.max(held[k], v);
+      if (s > this.vOn[k] + 1e-4) { this.vOn[k] = s; this.vVel[k] = v; const r = this.vr[k]; this.vPitch[k] = (p - r[0]) / Math.max(1, r[1] - r[0]); }
+      else if (Math.abs(s - this.vOn[k]) < 1e-4) this.vVel[k] = Math.max(this.vVel[k], v);   // a chord: its loudest note
+    }
+    const ease = (x, y, up, down) => x + (y - x) * (1 - Math.exp(-Math.max(0, dt) / (y > x ? up : down)));
+    for (let k = 0; k < V.length; k++) this.vEnv[k] = ease(this.vEnv[k], held[k], 0.08, 0.6);
+    const own = Object.fromEntries(Object.entries(map).map(([voice, prop]) => [prop, V.indexOf(voice)]));
+    const env = prop => own[prop] >= 0 ? this.vEnv[own[prop]] : 0;
+    const hit = (prop, tau) => own[prop] >= 0 ? this.vVel[own[prop]] * Math.exp(-(t - this.vOn[own[prop]]) / tau) : 0;
+    const b = this.bs;
+    b[0] = ease(b[0], env('light'), 0.5, 1.5);                       // the pad breathes the light
+    b[1] = ease(b[1], env('gravity'), 0.3, 1.2);                     // the sub pulls the dust down while it holds
+    b[2] = hit('size', 0.3);                                         // each bass note swells the grains
+    b[3] = ease(b[3], hit('speed', 0.15), 0.03, 0.4);                // the sequence makes the flow rush
+    const c = own.camera >= 0 ? (this.vPitch[own.camera] * 2 - 1) * Math.min(1, env('camera') * 1.5) : 0;
+    b[4] = ease(b[4], c, 0.35, 2.0);                                 // the soloist's pitch lifts the camera, gliding
+    b[5] = ease(b[5], Math.min(1, env('colour') + 0.5 * hit('colour', 0.3)), 0.06, 1.0);   // the guitar warms the light, a pulse per note
+    b[6] = own.shock >= 0 ? t - this.vOn[own.shock] : 99;            // a boom: a shock ring
+    b[7] = own.shock >= 0 ? this.vVel[own.shock] : 0;
+    b[8] = 1;
+    b[9] = hit('light', 0.8);                                        // each new chord: a swell of light
+    b[10] = ease(b[10], Math.min(1, env('glow') * 0.3 + 0.7 * hit('glow', 0.5)), 0.04, 0.8);   // the hook melody blooms the picture, note by note
+    out.set(b);
+    return out;
+  }
   // A pitch spectrum of what sounds at t: band b is MIDI 28 + b/2 (half-semitone bands), with a few harmonics.
   bands(t, out) {
     out.fill(0);
@@ -302,6 +464,7 @@ struct U {
   padx: vec4f,             // agitation (builds while you play), brightness of the last hit
   jour: vec4f,             // this study's camera journey: yaw, pitch, distance factor, roll
   trav: vec4f,             // and its travel through space: x, y, z
+  body: array<vec4f, 3>,   // the piece's voices, one property each (Features.body); body[2].x = 1 when on
 };
 @group(0) @binding(0) var<uniform> u: U;
 fn gene(k: i32) -> f32 { return u.gene[k / 4][k % 4]; }
@@ -453,6 +616,27 @@ fn padWarp(uv: vec2f) -> vec2f {
   let c = select(vec2f(0.5), vec2f(0.5 + h0.x * 0.45, 0.5 - h0.y * 0.45), g == 2);
   return (c - uv) * (1.0 - 1.0 / (1.0 + s)) + vec2f(0.0, d);
 }
+// A piece's voices on the whole frame (body[2].w = 1: every study but the Dust Score, which moves its particles
+// instead): size swells the frame, gravity sinks it, a shock ring ripples out from the middle.
+fn bodyWarp(uv: vec2f) -> vec2f {
+  if (u.body[2].w < 0.5) { return vec2f(0.0); }
+  let asp = u.res.x / u.res.y;
+  let d = 0.035 * u.body[0].y;                                               // gravity: the picture sinks while it holds
+  let s = 0.07 * u.body[0].z + 2.2 * d;                                      // size: a swell; zoomed as far as it sinks, so no edge shows
+  var w = (vec2f(0.5) - uv) * (1.0 - 1.0 / (1.0 + s)) - vec2f(0.0, d);
+  let q = (uv - 0.5) * vec2f(asp, 1.0);
+  let r = length(q);
+  let sa = u.body[1].z;
+  let ring = exp(-pow((r - sa * 1.3) / (0.05 + 0.1 * sa), 2.0)) * u.body[1].w * exp(-sa * 2.0);
+  w -= q / max(r, 1e-3) / vec2f(asp, 1.0) * ring * 0.025;                     // shock: the ring pushes the picture outward as it passes
+  return w;
+}
+fn bodyRing(uv: vec2f) -> f32 {
+  if (u.body[2].w < 0.5) { return 0.0; }
+  let r = length((uv - 0.5) * vec2f(u.res.x / u.res.y, 1.0));
+  let sa = u.body[1].z;
+  return exp(-pow((r - sa * 1.3) / (0.03 + 0.06 * sa), 2.0)) * u.body[1].w * exp(-sa * 2.5);
+}
 fn padLift() -> f32 {
   if (padFn() < 0) { return 0.0; }
   var f = 0.0;
@@ -584,10 +768,10 @@ fn padLayer(uv: vec2f) -> vec4f {
 }
 
 @fragment fn composite(i: VO) -> @location(0) vec4f {
-  let tuv = i.uv + padWarp(i.uv);
+  let tuv = i.uv + padWarp(i.uv) + bodyWarp(i.uv);
   var c = tap(tuv);
   let b = min(textureSampleLevel(bloom, smp, tuv, 0.0).rgb, vec3f(6e4));
-  c = mix(c, b, post.a.y) * post.a.x * (1.0 + padLift());
+  c = mix(c, b, post.a.y) * post.a.x * (1.0 + padLift() + 0.6 * bodyRing(i.uv));
   c *= post.wb.rgb;                                                          // automatic white balance
   let l = luma(c);                                                           // the colour world: light by brightness
   let tone = mix(post.lo.rgb, post.hi.rgb, smoothstep(0.0, 0.22, l / (1.0 + l)));   // only the deepest shadow takes lo: halfway they would meet in grey
@@ -831,9 +1015,10 @@ STUDIES.push({
       fn aim() -> vec3f { return vec3f(0.2, 0.0, 0.0) + travel() * vec3f(1.2, 0.6, 1.0); }
       fn eye() -> vec3f {
         let j = traj(1.0);
-        let a = 0.6 + u.cam.x * 0.7 + u.time * 0.015 + j.x;
-        let el = u.cam.y + j.y;
-        let d = max(3.2, 4.4 * u.cam.z * j.z * (1.0 - 0.25 * u.hit.y));   // the bass pushes the camera in, never into the dust
+        let a0 = 0.6 + u.cam.x * 0.7 + u.time * 0.015 + j.x;
+        let el = u.cam.y + j.y + 0.9 * u.body[1].x;                         // the soloist lifts and lowers the camera
+        let a = a0 + 0.5 * u.body[1].x;                                      // and swings it round
+        let d = max(3.2, 4.4 * u.cam.z * j.z * (1.0 - 0.25 * u.hit.y * (1.0 - u.body[2].x)));   // the bass pushes the camera in, never into the dust
         return aim() + vec3f(sin(a) * d * cos(el), 0.6 + sin(el) * d, -cos(a) * d * cos(el)) + shake() * 0.4;
       }
       fn basis() -> mat3x3f {
@@ -928,12 +1113,15 @@ STUDIES.push({
         }
         let e = u.energy;
         let age = 1.0 - p.w;
-        let att = attractor(p.xyz) * (0.15 + 0.9 * e + 0.6 * u.hit.y) * (0.2 + gene(1));
+        let off = 1.0 - u.body[2].x;                   // a piece with a body: each voice moves only its own property
+        let att = attractor(p.xyz) * (0.15 + 0.9 * e + 0.6 * u.hit.y * off) * (0.2 + gene(1));
         let fl = curl(p.xyz * (0.3 + 2.2 * gene(5)) + vec3f(0.0, u.time * 0.04, u.time * 0.02)) * (0.05 + 0.4 * gene(6)) * (1.0 + u.hit.y);
         var goal = att + fl;
         if (born > 0.5 && born < 4.5) { goal = mix(scroll + fl * 0.25, att + fl, smoothstep(0.25, 0.95, age)); }   // trails peel off into the attractor
         let rc = length(p.xyz - C0);
         goal -= (p.xyz - C0) * 0.5 * max(0.0, rc - 1.8);
+        let grav = u.body[0].y;                        // gravity: the dust sinks and draws in
+        goal += (vec3f(0.0, -1.6, 0.0) - (p.xyz - C0) * vec3f(0.3, 0.0, 0.3)) * grav;
         v = mix(v, goal, 1.0 - exp(-u.dt * 3.0));
         var shock = 0.0;                               // drum hits: a shock bubble pushes through the dust and glows
         for (var k = 0; k < 8; k++) {
@@ -945,14 +1133,18 @@ STUDIES.push({
           v += dp / (r + 1e-3) * prof * u.dt * 40.0;
           shock += prof;
         }
-        if (u.since.y < u.dt) { v += normalize(p.xyz - C0 + vec3f(1e-4)) * (0.4 + 0.7 * u.hit.y) * (1.0 + 2.0 * e); }   // each bass note: a breath outward
+        if (u.since.y < u.dt) { v += normalize(p.xyz - C0 + vec3f(1e-4)) * (0.4 + 0.7 * u.hit.y) * (1.0 + 2.0 * e) * off; }   // each bass note: a breath outward
+        let sa = u.body[1].z;                          // a boom: a ring of shock from the attractor's heart
+        let ring = exp(-pow((rc - sa * 2.2) / (0.08 + 0.15 * sa), 2.0)) * u.body[1].w * exp(-sa * 1.2);
+        v += normalize(p.xyz - C0 + vec3f(1e-4)) * ring * u.dt * 25.0;
         if (u.fx.x > 0.95) { v += normalize(p.xyz - C0 + vec3f(1e-4)) * 2.5; }                                         // a section change: it explodes
-        p = vec4f(p.xyz + v * u.dt, p.w);
+        p = vec4f(p.xyz + v * u.dt * (1.0 + 2.0 * u.body[0].w), p.w);   // speed: the sequence rushes the flow
         P[i] = p;
         V[i] = vec4f(v, born);
 
-        let shell = exp(-pow((rc - u.since.z * 2.6) / 0.1, 2.0)) * u.hit.z;
-        let w = smoothstep(0.0, 0.15, p.w) * (1.0 - smoothstep(0.85, 1.0, p.w)) * select(0.55, 1.5, born > 0.5) * (1.0 + 8.0 * shell + 5.0 * shock);
+        let shell = exp(-pow((rc - u.since.z * 2.6) / 0.1, 2.0)) * u.hit.z * off;
+        let size = u.body[0].z;                        // size: each bass note swells the grains
+        let w = smoothstep(0.0, 0.15, p.w) * (1.0 - smoothstep(0.85, 1.0, p.w)) * select(0.55, 1.5, born > 0.5) * (1.0 + 8.0 * shell + 5.0 * shock + 8.0 * ring) * (1.0 + 1.5 * size);
         let layer = select(0u, 1u, born > 0.5);
         let focus = 4.4 * u.cam.z * traj(1.0).z;
         let mirror = u32(gene(14) * 3.0);
@@ -962,7 +1154,7 @@ STUDIES.push({
           if (m == 2u) { q.z = -q.z; }
           let s = project(q);
           if (s.z < 0.3) { continue; }
-          let coc = abs(s.z - focus) * (1.0 + 4.0 * gene(15)) * u.res.y / 1080.0;
+          let coc = (abs(s.z - focus) * (1.0 + 4.0 * gene(15)) + 5.0 * size) * u.res.y / 1080.0;
           let j = vec2f(rnd(i ^ (fr * 9781u + m)), rnd((i * 7u) ^ (fr * 6271u + m))) - 0.5;
           splat(s.xy + j * coc, w / (1.0 + 0.02 * coc * coc), layer);
         }
@@ -970,11 +1162,16 @@ STUDIES.push({
     this.resolve = g.fullscreen(COMMON + RESOLVE(0.8, 1.6));
 
     // The score's lines, and the read-out of notes, through the same camera.
-    const notes = F.notes;
-    const data = new Float32Array(notes.length * 4);
-    notes.forEach(([s, d, tr, p, v], k) => data.set([s, d, p, tr + Math.min(v, 0.999)], k * 4));
-    this.n = notes.length;
-    this.nb = g.buffer(data, GPUBufferUsage.VERTEX);
+    this.F = F;
+    this.renotes = g => {   // (live: the score grows song by song)
+      const notes = F.notes;
+      const data = new Float32Array(Math.max(1, notes.length) * 4);
+      notes.forEach(([s, d, tr, p, v], k) => data.set([s, d, p, tr + Math.min(v, 0.999)], k * 4));
+      this.nb?.destroy();
+      this.n = notes.length;
+      this.nb = g.buffer(data, GPUBufferUsage.VERTEX);
+    };
+    this.renotes(g);
     this.chars = ' 0123456789.:-+/ABCDEFGHIJKLMNOPQRSTUVWXYZ%#=_<>';
     const cw = 32, ch = 56, cv = document.createElement('canvas');
     cv.width = cw * 16; cv.height = ch * 4;
@@ -1110,6 +1307,7 @@ STUDIES.push({
     c.end();
     g.draw(enc, this.resolve, this.bgR);
     const pass = enc.beginRenderPass({ colorAttachments: [{ view: g.sceneView, loadOp: 'load', storeOp: 'store' }] });
+    if (this.n !== this.F.notes.length) this.renotes(g);
     pass.setVertexBuffer(0, this.nb);
     pass.setPipeline(this.dropPipe); pass.setBindGroup(0, this.bgD); pass.draw(6, this.n);
     pass.setPipeline(this.notePipe); pass.setBindGroup(0, this.bgN); pass.draw(6, this.n);
@@ -2148,15 +2346,22 @@ async function boot() {
   $('go').hidden = false;
   $('meta').textContent = 'Loading the ' + piece.name + '…';
   const title = piece.name, concert = piece.concert;
-  const show = await fetch(piece.media + '.show.json').then(r => { if (!r.ok) throw new Error('show data ' + r.status); return r.json(); })
+  const LIVE = piece.live ? await liveLink(down => { $('meta').textContent = down
+    ? 'No Lisztmachine app found on this computer. Open the app (it listens on port 8737) and press Play.'
+    : 'Waiting for the app: press Play in Lisztmachine.'; }) : null;
+  const show = LIVE ? LIVE.show : await fetch(piece.media + '.show.json').then(r => { if (!r.ok) throw new Error('show data ' + r.status); return r.json(); })
     .catch(e => { fail('Could not load the concert (' + e.message + ').'); });
   if (!show) return;
   // One recording per song; a single piece is a concert of one.
   const songs = show.songs ?? [{ piece: Object.keys(PIECES).find(k => PIECES[k] === piece), media: piece.media, t: 0, bpm: show.bpm, key: show.key }];
+  const improv = !!LIVE;
   const songIndex = t => { let k = 0; songs.forEach((s, i) => { if (s.t <= t + 1e-6) k = i; }); return k; };
   piece = PIECES[songs[0].piece];
   RANGE = piece.ranges;
   const F = window.__F = new Features(show);
+  if (LIVE) F.duration = 1e9;   // live: no end
+  if (songs[0].voices) show.voices = songs[0].voices;   // the concert: the first song's voices (enterSong sets the rest)
+  F.vWin = [songs[0].t, songs[1]?.t ?? 1e9];
   // Web Audio rather than an <audio> element: the artifact sandbox refused the element's blob URL,
   // so the clock never started. The context's output timestamp is also the time actually heard.
   const actx = new AudioContext();
@@ -2196,17 +2401,17 @@ async function boot() {
     .then(b => { note('fetched ' + k + ' ' + (b.byteLength / 1e6).toFixed(1) + ' MB'); return b; })
     .catch(e => { note('FETCH ' + k + ' ' + e); delete mp3s[k]; throw e; });
   // fetched one after another in the concert's order, so the first song is not sharing the line with eight others
-  songs.reduce((p, _, k) => p.then(() => mp3For(k)).catch(() => {}), Promise.resolve());
+  if (!LIVE) songs.reduce((p, _, k) => p.then(() => mp3For(k)).catch(() => {}), Promise.resolve());
   // A failed load is forgotten, so the next frame tries again instead of the concert going quiet for good.
   const pcmFor = k => pcms[k] ??= mp3For(k)
     .then(b => { note('decode ' + k); return actx.decodeAudioData(b.slice(0)); })
     .then(d => { note('decoded ' + k + ' ' + d.duration.toFixed(0) + ' s'); return d; })
     .catch(e => { note('DECODE ' + k + ' ' + e); delete pcms[k]; throw e; });
-  const first = await pcmFor(0).catch(e => { fail('Could not load the recording (' + e.message + ').'); });
+  const first = LIVE ? true : await pcmFor(0).catch(e => { fail('Could not load the recording (' + e.message + ').'); });
   if (!first) return;
   const out = actx.createGain();
   out.gain.value = location.hash === '#silent' ? 0 : 1;   // #silent: for checking the page without sound
-  out.connect(actx.destination);
+  await masterFx(out);
   let srcs = [], startAt = 0, startT = 0, run = 0, queued = -1;
   const heard = now => {
     const ts = actx.getOutputTimestamp?.();
@@ -2214,12 +2419,208 @@ async function boot() {
     return actx.currentTime - (actx.outputLatency || actx.baseLatency || 0);
   };
 
+  // The master FX panel (Kerem, 2026-11-11): the app's MasterFx (src/engine/Engine.cpp), the same code in an AudioWorklet,
+  // so the recording sounds through it here as the live engine does there: drive (Decapitator-like, five styles, a low push), and
+  // a tempo-synced delay with its feedback whose send is high-passed (the lows stay dry). Every unit starts off;
+  // the settings are remembered.
+  async function masterFx(src) {
+    const FX = `
+const SR = sampleRate, TAU = 2 * Math.PI;
+const bq = () => ({ b0: 1, b1: 0, b2: 0, a1: 0, a2: 0, z1: 0, z2: 0 });
+const run = (f, x) => { const y = f.b0 * x + f.z1; f.z1 = f.b1 * x - f.a1 * y + f.z2; f.z2 = f.b2 * x - f.a2 * y; return y; };
+function hp(f, sr, hz, q = Math.SQRT1_2) { const w = TAU * hz / sr, c = Math.cos(w), al = Math.sin(w) / (2 * q), a0 = 1 + al;
+  f.b0 = (1 + c) / 2 / a0; f.b1 = -(1 + c) / a0; f.b2 = f.b0; f.a1 = -2 * c / a0; f.a2 = (1 - al) / a0; return f; }
+function lp(f, sr, hz, q = Math.SQRT1_2) { const w = TAU * hz / sr, c = Math.cos(w), al = Math.sin(w) / (2 * q), a0 = 1 + al;
+  f.b0 = (1 - c) / 2 / a0; f.b1 = (1 - c) / a0; f.b2 = f.b0; f.a1 = -2 * c / a0; f.a2 = (1 - al) / a0; return f; }
+function shelf(f, sr, hz, dB, high) { const A = Math.pow(10, dB / 40), w = TAU * hz / sr, c = Math.cos(w), k = 2 * Math.sqrt(A) * Math.sin(w) / 2 * Math.SQRT2, s = high ? 1 : -1;
+  const a0 = (A + 1) - s * (A - 1) * c + k;
+  f.b0 = A * ((A + 1) + s * (A - 1) * c + k) / a0; f.b1 = -2 * s * A * ((A - 1) + s * (A + 1) * c) / a0; f.b2 = A * ((A + 1) + s * (A - 1) * c - k) / a0;
+  f.a1 = 2 * s * ((A - 1) - s * (A + 1) * c) / a0; f.a2 = ((A + 1) - s * (A - 1) * c - k) / a0; return f; }
+function pk(f, sr, hz, q, dB) { const A = Math.pow(10, dB / 40), w = TAU * hz / sr, c = Math.cos(w), al = Math.sin(w) / (2 * q), a0 = 1 + al / A;
+  f.b0 = (1 + al * A) / a0; f.b1 = -2 * c / a0; f.b2 = (1 - al * A) / a0; f.a1 = f.b1; f.a2 = (1 - al / A) / a0; return f; }
+const TIMES = [0.25, 0.5, 0.75, 1, 1.5, 2, 4], KEYS = ['drive', 'low', 'tone', 'wet', 'out', 'cut', 'send', 'mix'];
+class MasterFx extends AudioWorkletProcessor {
+  constructor() {
+    super();
+    this.p = { DriveOn: 0, Drive: 0.5, Style: 0, Low: 0.5, Tone: 0, DriveMix: 1, Output: 0,
+               DelayOn: 0, Time: 3, LowCut: 1000, Feedback: 0.5, DelayMix: 0.3, EqOn: 0, EqLow: 0, EqLowMid: 0, EqHighMid: 0, EqHigh: 0, bpm: 120 };
+    // the EQ: shelves at 100 Hz and 8 kHz, bells at 400 Hz and 2.5 kHz; each band's gain glides a block at a time
+    this.eq = [0, 1].map(() => [0, 1, 2, 3].map(bq)); this.eqDb = [0, 0, 0, 0]; this.eqT = bq();
+    this.port.onmessage = e => Object.assign(this.p, e.data);
+    this.g = 1 - Math.exp(-1 / (0.03 * SR));
+    this.toneA = 1 - Math.exp(-TAU * 900 / SR);
+    this.lowA = 1 - Math.exp(-TAU * 160 / SR);
+    this.envA = 1 - Math.exp(-1 / (0.3 * SR));
+    this.push = [pk(bq(), SR, 900, 0.7, 9), pk(bq(), SR, 900, 0.7, 9)];
+    this.tight = [hp(bq(), SR, 80), hp(bq(), SR, 80)];
+    this.inter = [hp(bq(), 2 * SR, 30), hp(bq(), 2 * SR, 30)];
+    this.cab = [lp(bq(), SR, 5200, 0.9), lp(bq(), SR, 5200, 0.9)];
+    this.s = { drive: 0.5, low: 0.5, tone: 0, wet: 0, out: 1, cut: 1000, send: 0, mix: 0.3 };
+    this.last = [0, 0]; this.tlp = [0, 0]; this.dcI = [0, 0]; this.dcO = [0, 0]; this.envI = 1e-6; this.envO = 1e-6;
+    this.lpre = [0, 0]; this.lpost = [0, 0];
+    this.ic1 = [0, 0]; this.ic2 = [0, 0]; this.wet = [0, 0]; this.io = [0, 0]; this.sent = [0, 0];
+    // the delay: the engine's FeedbackBus, ping-pong, darker and thinner each time round, soft-clipped so it cannot run away
+    this.size = Math.floor(SR * 4.5) + 8; this.dl = new Float32Array(this.size); this.dr = new Float32Array(this.size);
+    this.w = 0; this.d = 1; this.fb = 0.5; this.ti = -1; this.bpm = 0;
+    this.look = Math.max(1, Math.floor(0.0015 * SR)); this.need = new Float32Array(this.look).fill(1);
+    this.ldl = new Float32Array(this.look); this.ldr = new Float32Array(this.look); this.at = 0; this.lg = 1;
+    this.thr = Math.pow(10, -1 / 20); this.att = 1 - Math.exp(-5 / this.look); this.rel = Math.exp(-1 / (0.15 * SR));
+    this.lpA = 1 - Math.exp(-TAU * 3500 / SR); this.hpA = 1 - Math.exp(-TAU * 70 / SR); this.lpL = this.lpR = this.hpL = this.hpR = 0;
+  }
+  shape(x, st, k, c) {
+    switch (st) {
+      case 0: return Math.tanh(k * x);
+      case 1: return Math.tanh(k * x + 0.3) - Math.tanh(0.3);
+      case 2: return 0.6366 * Math.atan(k * x);
+      case 3: x = run(this.inter[c], Math.tanh(k * x)); return Math.tanh(3 * x + 0.25) - Math.tanh(0.25);
+      default: return Math.max(-0.6, Math.min(0.8, 3 * k * x));
+    }
+  }
+  process(inputs, outputs) {
+    const inp = inputs[0], o = outputs[0];
+    const n = o[0].length, L = o[0], R = o[1] || o[0];
+    const iL = inp[0], iR = inp[1] || inp[0];
+    const P = this.p, S = this.s, g = this.g;
+    const st = Math.max(0, Math.min(4, P.Style | 0));
+    const T = { drive: P.Drive, low: P.Low, tone: P.Tone, wet: P.DriveOn > 0.5 ? P.DriveMix : 0, out: Math.pow(10, P.Output / 20),
+                cut: Math.max(20, Math.min(4000, P.LowCut)), send: P.DelayOn > 0.5 ? 1 : 0, mix: P.DelayMix };
+    const ti = Math.max(0, Math.min(6, P.Time | 0));
+    if (ti !== this.ti || P.bpm !== this.bpm) { this.ti = ti; this.bpm = P.bpm; this.d = Math.max(1, Math.min(this.size - 1, Math.round(TIMES[ti] * 60 / P.bpm * SR))); }
+    const fbT = Math.max(0, Math.min(1.5, P.Feedback)), step = n / (0.5 * SR);
+    this.fb += Math.max(-step, Math.min(step, fbT - this.fb));
+    const clip = x => 0.5 * Math.tanh(2 * x);
+    for (let i = 0; i < n; i++) {
+      for (const k of KEYS) S[k] += (T[k] - S[k]) * g;
+      let l = iL ? iL[i] : 0, r = iR ? iR[i] : 0;
+      if (S.wet > 1e-4) {
+        // the low push: below 160 Hz up to +12 dB into the shaper, half of it taken back after
+        const k = 1 + 40 * S.drive * S.drive, lo = Math.exp(-0.69 * S.tone), push = Math.pow(10, 12 * S.low / 20), back = 1 / Math.sqrt(push);
+        const wet = this.wet, io = this.io; io[0] = l; io[1] = r;
+        for (let c = 0; c < 2; c++) {
+          let x = io[c];
+          if (st === 3) x = run(this.tight[c], x);
+          if (st === 2 || st === 3) x = run(this.push[c], x);
+          this.lpre[c] += (x - this.lpre[c]) * this.lowA;
+          x += this.lpre[c] * (push - 1);
+          let y = 0.5 * (this.shape(0.5 * (this.last[c] + x), st, k, c) + this.shape(x, st, k, c));
+          this.last[c] = x;
+          if (st === 3) y = run(this.cab[c], y);
+          this.lpost[c] += (y - this.lpost[c]) * this.lowA;
+          y += this.lpost[c] * (back - 1);
+          this.tlp[c] += (y - this.tlp[c]) * this.toneA;
+          y = this.tlp[c] * lo + (y - this.tlp[c]) / lo;
+          const out = y - this.dcI[c] + 0.9995 * this.dcO[c]; this.dcI[c] = y; this.dcO[c] = out;
+          wet[c] = out;
+        }
+        this.envI += (0.5 * (l * l + r * r) - this.envI) * this.envA;
+        this.envO += (0.5 * (wet[0] * wet[0] + wet[1] * wet[1]) - this.envO) * this.envA;
+        const m = Math.max(0.25, Math.min(4, Math.sqrt((this.envI + 1e-9) / (this.envO + 1e-9))));
+        l += (wet[0] * m * S.out - l) * S.wet; r += (wet[1] * m * S.out - r) * S.wet;
+      }
+      // the delay's send, high-passed at the low cut: the low end is never echoed
+      const G = Math.tan(Math.PI * S.cut / SR), K = 1.4142, a1 = 1 / (1 + G * (G + K)), a2 = G * a1, a3 = G * a2;
+      const io = this.io, sent = this.sent; io[0] = l; io[1] = r;
+      for (let c = 0; c < 2; c++) {
+        const v3 = io[c] - this.ic2[c], v1 = a1 * this.ic1[c] + a2 * v3, v2 = this.ic2[c] + a2 * this.ic1[c] + a3 * v3;
+        this.ic1[c] = 2 * v1 - this.ic1[c]; this.ic2[c] = 2 * v2 - this.ic2[c];
+        sent[c] = (io[c] - K * v1 - v2) * S.send;
+      }
+      const rd = (this.w - this.d + this.size) % this.size, el = this.dl[rd], er = this.dr[rd];
+      this.lpL += (er - this.lpL) * this.lpA; this.lpR += (el - this.lpR) * this.lpA;
+      this.hpL += (this.lpL - this.hpL) * this.hpA; this.hpR += (this.lpR - this.hpR) * this.hpA;
+      this.dl[this.w] = 0.5 * (sent[0] + sent[1]) + clip(this.fb * (this.lpL - this.hpL));
+      this.dr[this.w] = clip(this.fb * (this.lpR - this.hpR));
+      this.w = (this.w + 1) % this.size;
+      // 3 dB of headroom (Kerem: "keep everything lower a little"), then the EQ, then the engine's PeakLimiter at -1 dBFS:
+      // the recordings already peak near 0 dBFS, so echoes on top would clip the output
+      L[i] = 0.708 * (l + el * S.mix); R[i] = 0.708 * (r + er * S.mix);
+    }
+    this.eqBlock(L, R, n);
+    for (let i = 0; i < n; i++) {
+      const ol = L[i], or = R[i], pk = Math.max(Math.abs(ol), Math.abs(or));
+      this.need[this.at] = pk > this.thr ? this.thr / pk : 1;
+      let lowest = 1; for (let j = 0; j < this.look; j++) if (this.need[j] < lowest) lowest = this.need[j];
+      this.lg = lowest < this.lg ? this.lg + (lowest - this.lg) * this.att : lowest + (this.lg - lowest) * this.rel;
+      L[i] = Math.max(-this.thr, Math.min(this.thr, this.ldl[this.at] * this.lg));
+      R[i] = Math.max(-this.thr, Math.min(this.thr, this.ldr[this.at] * this.lg));
+      this.ldl[this.at] = ol; this.ldr[this.at] = or;
+      this.at = (this.at + 1) % this.look;
+    }
+    return true;
+  }
+  eqBlock(l, r, n) {
+    const P = this.p, HZ = [100, 400, 2500, 8000], KEY = ['EqLow', 'EqLowMid', 'EqHighMid', 'EqHigh'], step = Math.min(1, this.g * n);
+    for (let b = 0; b < 4; b++) {
+      const target = P.EqOn > 0.5 ? Math.max(-12, Math.min(12, P[KEY[b]])) : 0;
+      if (Math.abs(target - this.eqDb[b]) < 0.01 && Math.abs(this.eqDb[b]) < 0.01) { this.eqDb[b] = target; continue; }
+      this.eqDb[b] += (target - this.eqDb[b]) * step;
+      const t = this.eqT;
+      if (b === 0 || b === 3) shelf(t, SR, HZ[b], this.eqDb[b], b === 3); else pk(t, SR, HZ[b], 0.9, this.eqDb[b]);
+      for (const ch of this.eq) { const f = ch[b]; f.b0 = t.b0; f.b1 = t.b1; f.b2 = t.b2; f.a1 = t.a1; f.a2 = t.a2; }
+      const fl = this.eq[0][b], fr = this.eq[1][b];
+      for (let i = 0; i < n; i++) { l[i] = run(fl, l[i]); r[i] = run(fr, r[i]); }
+    }
+  }
+}
+registerProcessor('master-fx', MasterFx);`;
+    let node;
+    try {
+      await actx.audioWorklet.addModule(URL.createObjectURL(new Blob([FX], { type: 'text/javascript' })));
+      node = new AudioWorkletNode(actx, 'master-fx', { outputChannelCount: [2] });
+    } catch (e) { note('master fx unavailable: ' + e.message); src.connect(actx.destination); return; }
+    src.connect(node).connect(actx.destination);
+    window.__fx = { node, src, actx };   // for checking it from outside (the artifact's console cannot be read)
+    // the panel: values as the app shows them (engine value = shown / scale), remembered in this browser
+    const P = { DriveOn: 0, Drive: 0.5, Style: 0, Low: 0.5, Tone: 0, DriveMix: 1, Output: 0, DelayOn: 0, Time: 3, LowCut: 1000, Feedback: 0.5, DelayMix: 0.3, EqOn: 0, EqLow: 0, EqLowMid: 0, EqHighMid: 0, EqHigh: 0 };
+    try { const saved = JSON.parse(localStorage.getItem('lisztmachine-fx') || '{}'); for (const k in P) if (k in saved) P[k] = saved[k]; } catch {}
+    const send = (k, v) => { P[k] = v; node.port.postMessage({ [k]: v }); try { localStorage.setItem('lisztmachine-fx', JSON.stringify(P)); } catch {} };
+    node.port.postMessage(P);
+    let bpm = 0;
+    setInterval(() => { if (show.bpm && show.bpm !== bpm) node.port.postMessage({ bpm: bpm = show.bpm }); }, 250);
+    const units = [
+      ['fx1', 'DriveOn', 'Drive', ['Style', ['Tape', 'Tube', 'Overdrive', 'Amp', 'Fuzz']],
+        [['Drive', 'Drive', 0, 100, 1, 100, ' %'], ['Low', 'Low', 0, 100, 1, 100, ' %'], ['Tone', 'Tone', -100, 100, 1, 100, ''],
+         ['DriveMix', 'Mix', 0, 100, 1, 100, ' %'], ['Output', 'Output', -12, 12, 0.5, 1, ' dB']]],
+      ['fx2', 'DelayOn', 'Delay', ['Time', ['1/16', '1/8', '1/8 dotted', '1/4', '1/4 dotted', '1/2', '1 bar']],
+        [['LowCut', 'Low cut', 20, 4000, 10, 1, ' Hz'], ['Feedback', 'Feedback', 0, 110, 1, 100, ' %'], ['DelayMix', 'Mix', 0, 100, 1, 100, ' %']]],
+      ['fx3', 'EqOn', 'EQ', null, [['EqLow', 'Low 100 Hz', -12, 12, 0.5, 1, ' dB'], ['EqLowMid', 'Low mid 400 Hz', -12, 12, 0.5, 1, ' dB'],
+        ['EqHighMid', 'High mid 2.5 kHz', -12, 12, 0.5, 1, ' dB'], ['EqHigh', 'High 8 kHz', -12, 12, 0.5, 1, ' dB']]],
+    ];
+    const DEF = { Drive: 50, Low: 50, Tone: 0, DriveMix: 100, Output: 0, LowCut: 1000, Feedback: 50, DelayMix: 30, EqLow: 0, EqLowMid: 0, EqHighMid: 0, EqHigh: 0 };
+    for (const [row, on, name, menu, knobs] of units) {
+      const box = $(row), b = document.createElement('button');
+      const show_ = () => { const v = P[on] > 0.5; b.textContent = name + (v ? ' on' : ' off'); b.setAttribute('aria-pressed', v); };
+      b.onclick = () => { send(on, P[on] > 0.5 ? 0 : 1); show_(); };
+      show_(); box.append(b);
+      if (menu) {
+        const sel = document.createElement('select');
+        sel.setAttribute('aria-label', name + ' ' + menu[0].toLowerCase());
+        menu[1].forEach((t, i) => sel.add(new Option(t, i)));
+        sel.value = P[menu[0]]; sel.onchange = () => send(menu[0], +sel.value);
+        box.append(sel);
+      }
+      for (const [k, label, lo, hi, st, sc, suf] of knobs) {
+        const l = document.createElement('label'), inp = document.createElement('input'), v = document.createElement('span');
+        l.className = 'amt';
+        Object.assign(inp, { type: 'range', min: lo, max: hi, step: st, value: P[k] * sc });
+        const shown = () => { v.textContent = (+inp.value > 0 && lo < 0 ? '+' : '') + inp.value + suf; };
+        inp.oninput = () => { send(k, +inp.value / sc); shown(); };
+        inp.ondblclick = () => { inp.value = DEF[k]; inp.oninput(); };
+        shown();
+        l.append(label + ' ', inp, ' ', v);
+        box.append(l);
+      }
+      box.hidden = false;
+    }
+  }
+
   const canvas = $('view');
   const ctx = canvas.getContext('webgpu');
   const format = navigator.gpu.getPreferredCanvasFormat();
   ctx.configure({ device, format, alphaMode: 'opaque' });
   const smp = device.createSampler({ magFilter: 'linear', minFilter: 'linear', addressModeU: 'clamp-to-edge', addressModeV: 'clamp-to-edge' });
-  const Udata = new Float32Array(112);
+  const Udata = new Float32Array(124);
+  let studyT = 0;   // the studies' clock: visT's pace, faster while a piece's speed voice plays
   const g = {
     device,
     U: device.createBuffer({ size: Udata.byteLength, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST }),
@@ -2350,10 +2751,32 @@ async function boot() {
     const x = Math.sin(i * 57.3 + 4.1) * 43758.5453;
     return x - Math.floor(x) < 0.22;
   });
+  if (LIVE) {
+    $('form').hidden = true;   // no timeline (Kerem, 2026-11-14)
+    const add = (fresh, secs) => {
+      const keep = (F.prevT ?? 0) - 600;
+      const all = F.notes.filter(n => n[0] + n[1] > keep).concat(fresh).sort((a, b) => a[0] - b[0]);
+      F.notes.length = 0; F.notes.push(...all);
+      show.notes = F.notes;
+      F.pad = F.notes.filter(n => n[2] === 0);
+      for (const x of secs) {
+        sec.push(x);
+        const prev = sec[sec.length - 2];
+        imgScore.push(!!prev && prev.song === x.song && x.energy >= 0.6 && x.energy > prev.energy + 0.1);
+        codeScore.push(null);
+      }
+      sec.sort((a, b) => a.t - b.t);
+      F.reset(F.prevT ?? 0);
+      F.vr = null;
+    };
+    add([], []);
+    LIVE.onSong = add;
+  }
   window.__imgScore = () => { let on = 0; imgScore.forEach((c, i) => { if (c) on += (sec[i + 1]?.t ?? F.duration) - sec[i].t; }); return on / F.duration; };
   window.__codeScore = () => { let on = 0; codeScore.forEach((c, i) => { if (c) on += (sec[i + 1]?.t ?? F.duration) - sec[i].t; }); return on / F.duration; };
   let playing = false, musicT = concert ? 0 : (sec.find(s => ['Summit', 'Apotheosis', 'Possession', 'Ascension', 'Black', 'Computation', 'Submersion', 'Supercodex', 'Possessed', 'Rebirth', 'Gravity'].includes(s.name)) ?? sec[0]).t + 14;
   const clock = now => {
+    if (LIVE) return (musicT = Math.max(0, now / 1000 + (LIVE.base ?? LIVE.off - LIVE.T0)));   // what the app is playing now (its playhead)
     if (!playing) return musicT;
     musicT = Math.max(startT, startT + heard(now) - startAt);
     if (musicT >= F.duration) { stop(); musicT = F.duration - 0.01; }
@@ -2361,6 +2784,7 @@ async function boot() {
   };
   // Each song's recording is scheduled on the audio clock where the last one ends, so the concert runs without a gap.
   const play = (k, buf) => {
+    if (LIVE) return;
     const s = actx.createBufferSource();
     s.buffer = buf;
     s.connect(out);
@@ -2375,6 +2799,7 @@ async function boot() {
     queued = k;
   };
   const start = async from => {
+    if (LIVE) { playing = true; return; }
     const my = ++run, k = songIndex(from);
     const buf = await pcmFor(k).catch(e => { fail('Could not load the recording (' + e.message + ').'); });
     if (!buf || my !== run) return;
@@ -2386,6 +2811,7 @@ async function boot() {
   };
   // Called every frame: the next song decoded and scheduled well before this one ends, the rest let go.
   const queueNext = t => {
+    if (LIVE) return;
     const k = songIndex(t), j = k + 1;
     if (!playing || j >= songs.length || queued >= j) return;
     for (const i of Object.keys(pcms)) if (+i !== k && +i !== j) delete pcms[i];
@@ -2395,6 +2821,7 @@ async function boot() {
   window.__audio = () => ({ queued, sources: srcs.length, decoded: Object.keys(pcms) });
   const stop = () => { run++; for (const s of srcs) { try { s.stop(); } catch {} } srcs = []; queued = -1; playing = false; };
   const seek = t => {
+    if (LIVE) return;   // the app leads
     musicT = Math.max(0, Math.min(F.duration - 0.1, t));
     if (playing) { stop(); start(musicT); }
   };
@@ -2430,7 +2857,7 @@ async function boot() {
   });
   form.onclick = e => { const r = form.getBoundingClientRect(); seek((e.clientX - r.left) / r.width * F.duration); };
   const mmss = t => Math.floor(t / 60) + ':' + String(Math.floor(t % 60)).padStart(2, '0');
-  $('meta').textContent = title + ' · seed ' + show.seed + ' · ' + show.key;
+  $('meta').textContent = title + (LIVE ? '' : ' · seed ' + show.seed) + ' · ' + show.key;
 
   let hudTimer = 0, hudHidden = false;
   const hud = $('hud');
@@ -2537,7 +2964,7 @@ async function boot() {
   });
   // beat n of song k, in concert time; Infinity once it reaches the next song (whose beat 0 takes over). The click
   // keeps its own song k, from the audio clock: the frame loop's song change can come a beat or more late.
-  if (concert) {
+  if (concert && !improv) {   // (Improvisation: no timeline of songs, Kerem 2026-11-14)
     const pct = t => t / F.duration * 100 + '%', box = $('songs');
     songs.forEach((s, k) => {
       const e = document.createElement('span'), end = songs[k + 1]?.t ?? F.duration;
@@ -2605,10 +3032,13 @@ async function boot() {
     show.bpm = songs[k].bpm;
     F.secLen = 4 * 60 / show.bpm;
     F.songT = songs[k].t;
+    if (songs[k].voices) show.voices = songs[k].voices;                     // each song's own voices for its body
+    F.vr = null; F.vWin = [songs[k].t, songs[k + 1]?.t ?? 1e9];
     setLayer(piece.hits || 'affect');
     pieceLook();
     choose(STUDIES.find(s => s.id === piece.study) ?? study);
-    if (concert) $('meta').textContent = title + ' · ' + (k + 1) + '/' + songs.length + ' · ' + songs[k].key;
+    if (concert) $('meta').textContent = title + ' · ' + (LIVE ? (songs[k].plan ? 'Improvisation · song ' + (songs[k].plan.k + 1) + ' · ' + songs[k].key + ' · ' + songs[k].plan.move : PIECES[songs[k].piece].name + ' · ' + songs[k].key)
+      : improv ? 'song ' + (k + 1) + ' · ' + songs[k].key + ' · ' + songs[k].plan.move : (k + 1) + '/' + songs.length + ' · ' + songs[k].key);
   };
   const hitLayer = () => {
     if (pad.layer === 'off') return 0;
@@ -3215,6 +3645,10 @@ async function boot() {
     try { voiceTick(t); } catch (e) { console.error(e); window.__errors.push('voice: ' + e.message); }
     try { codeTick(t); } catch (e) { console.error(e); window.__errors.push('code layer: ' + e.message); CODE.block = null; }   // never stops the picture
     const bpm = show.bpm, beats = (t - F.songT) * bpm / 60;
+    const bodyNow = F.body(t, dt, piece.body);
+    const generic = bodyNow[8] > 0 && study.id !== 'dust';                    // the Dust Score moves its particles instead
+    bodyNow[11] = generic ? 1 : 0;
+    studyT += dt * (generic ? 1 + 1.5 * bodyNow[3] : 1);                      // speed: the study's own clock runs faster
     const padArr = new Float32Array(36);
     pad.kick = 0;
     const PK = padK();
@@ -3234,9 +3668,10 @@ async function boot() {
       use(s);
       s.cpu?.(g, F, t, D, pad, padAge);
       // the shaders' music time (u.beats * 60 / u.bpm) is the concert's; the beat and bar phases are the song's
-      Udata.set([visT, dt, beats % 1, (beats / 4) % 1, s.W, s.H, F.energy, F.progress,
+      const camB = generic ? [D.cam[0] + 0.6 * bodyNow[4], D.cam[1] + 0.15 * bodyNow[4], D.cam[2], D.cam[3]] : D.cam;   // the camera voice
+      Udata.set([studyT, dt, beats % 1, (beats / 4) % 1, s.W, s.H, F.energy, F.progress,
         ...F.lv.slice(0, 4), F.lv[4], F.lv[5], F.lv[6], F.si, ...F.hit, ...F.pitch, ...F.since, ...F.chord, ...F.count,
-        t * bpm / 60, frameNo, bpm, s.W / s.H, ...D.cam, ...D.fx, ...D.col, ...geneNow, ...padArr, ...journey(STUDIES.indexOf(s) + 1, dt)]);
+        t * bpm / 60, frameNo, bpm, s.W / s.H, ...camB, ...D.fx, ...D.col, ...geneNow, ...padArr, ...journey(STUDIES.indexOf(s) + 1, dt), ...bodyNow]);
       device.queue.writeBuffer(s.U, 0, Udata);
       s.frame(g, enc, (next ? 0.5 : 1) * (0.4 + 0.6 * Q));   // two studies at once: half the particles each; less when frames are late
     }
@@ -3245,8 +3680,11 @@ async function boot() {
     device.queue.writeBuffer(mixU, 0, M);
     const b = next ?? study;
     const W = piece.world, wb = whiteBalance(dt);
-    device.queue.writeBuffer(postU, 0, new Float32Array([1.0, study.bloom + (b.bloom - study.bloom) * blend, 0.05, 1,
-      ...wb, 0, ...W.lo, 0.85 * LOOK.colour / 100, ...W.hi, 0]));
+    const on = bodyNow[8], warm = bodyNow[5], hot = W.palette[2];
+    const hi = W.hi.map((x, k) => x + (hot[k] - x) * warm), lo = W.lo.map((x, k) => x + (hot[k] * 0.6 - x) * warm * 0.5);
+    device.queue.writeBuffer(postU, 0, new Float32Array([on ? (bodyNow[11] ? 0.55 + 0.7 * bodyNow[0] + 0.25 * bodyNow[9] : 0.35 + 1.15 * bodyNow[0] + 0.4 * bodyNow[9]) : 1.0,   // the whole-frame studies are bright already: a narrower range
+      study.bloom + (b.bloom - study.bloom) * blend + (bodyNow[11] ? 0.15 : 0.3) * bodyNow[10], 0.05, 1,
+      ...wb, 0, ...lo, 0.85 * LOOK.colour / 100 + 0.5 * warm, ...hi, 0]));
     fbi = 1 - fbi;
     g.draw(enc, pMix, mixGroup(study, b, fbi), g.fbViews[fbi]);
     g.draw(enc, pOuter, outerBG[fbi], g.fboViews[fbi]);
