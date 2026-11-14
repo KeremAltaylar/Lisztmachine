@@ -731,13 +731,25 @@ juce::String Palette::load(const juce::File& file, const std::string& sceneName)
             continue;
         }
         if (!isEngineSound(patch) && !isDexedSound(patch) && !isSfzSound(patch) && !isVstSound(patch) && !findSurgePatch(patch).existsAsFile())
-            return where + "no Surge patch '" + patch + "'";
+        {   // not in this Surge (Kerem's Mac, 2026-11-14: its Surge lacks 3rd/A.Liv/Basses/Sqweird): skipped like a missing
+            // sampled instrument, the track plays its other sounds; tools/install-mac.sh lists them
+            DBG(where + "no Surge patch '" + patch + "', skipped");
+            continue;
+        }
         for (int t : targets) parts[t].push_back({ patch, tokens[1].getFloatValue(), tokens[2].getFloatValue() });
     }
     for (auto& p : parts)
         std::stable_sort(p.begin(), p.end(), [](auto& a, auto& b) { return a.brightness < b.brightness; });
     for (int t = 0; t < info->numTracks; ++t)
-        if (parts[t].empty()) return file.getFileName() + ": no patches for " + info->trackNames[t];
+        if (parts[t].empty())
+        {   // none of its sounds installed here: one of the engine's own, so the song still plays (and says nothing it cannot)
+            const juce::String n = info->trackNames[t];
+            const char* own = n == "bass" || n == "sub" ? "internal/808"
+                            : n == "metal" || n == "perc" || n == "tick" || n == "ground" || n == "body" || n == "impact" || n == "mallet" ? "internal/metal"
+                            : n == "pulse" || n == "boom" ? "internal/none" : "internal/blip";
+            DBG(file.getFileName() + ": no installed sound for " + n + ", the engine's " + own);
+            parts[t].push_back({ own, 0.0f, 1000.0f });
+        }
     return {};
 }
 

@@ -109,4 +109,15 @@ while IFS= read -r n; do
   have "$n" || { echo "   MISSING plugin: $n.vst3"; missing=1; }
 done < <(grep -hoE "vst/[^/]+" "$REPO"/sounds/*.txt | sed 's|vst/||' | sort -u)
 [ -d "$REPO/plugins/Dexed.vst3" ] || [ -d "/Library/Audio/Plug-Ins/VST3/Dexed.vst3" ] || { echo "   MISSING plugin: Dexed.vst3"; missing=1; }
+# Surge's own sounds: a Surge release can rename or drop a patch (the app then skips it; listed here to replace)
+SURGE="/Library/Application Support/Surge XT"
+while IFS= read -r patch; do
+  case "$patch" in
+    3rd/*) f="$SURGE/patches_3rdparty/${patch#3rd/}.fxp" ;;
+    *) f="$SURGE/patches_factory/$patch.fxp" ;;
+  esac
+  [ -f "$f" ] || { echo "   MISSING Surge patch: $patch"; missing=1; }
+done < <(sed 's/#.*//' "$REPO"/sounds/*.txt | awk 'NF >= 4 && $1 !~ /^(gain|delay|drive|crush|comp|duck|lowcut|amp|release|feed|send|return|feedback|shimmer|master)$/ {
+           p = $0; sub(/^[ \t]*[^ \t]+[ \t]+[^ \t]+[ \t]+[^ \t]+[ \t]+/, "", p); sub(/[ \t]+$/, "", p); print p }' |
+         grep -vE '^(internal|sfz|vst|dexed|sample)/' | sort -u)
 if [ $missing -eq 0 ] && [ $fail -eq 0 ]; then echo "   ALL INSTRUMENTS FOUND"; else echo "   Some are missing: send this output to Claude."; fi
