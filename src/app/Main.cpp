@@ -846,7 +846,7 @@ private:
 struct App : juce::JUCEApplication
 {
     const juce::String getApplicationName() override { return "Lisztmachine"; }
-    const juce::String getApplicationVersion() override { return "0.1.0"; }
+    const juce::String getApplicationVersion() override { return "0.12.0"; }
 
     void initialise(const juce::String&) override
     {

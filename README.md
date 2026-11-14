@@ -4,6 +4,18 @@ A generative piano/synth player for a one-hour live concert with an acoustic dru
 with audio-reactive visuals to follow. This is milestone 1: one Berlin-school scene,
 about ten minutes, played by four Surge XT instances.
 
+## Install on a Mac (one command)
+
+On a Mac with Apple silicon, in Terminal:
+
+    curl -fsSL https://raw.githubusercontent.com/KeremAltaylar/Lisztmachine/master/tools/setup-mac.sh | bash
+
+It installs Xcode's command line tools and CMake, gets the code into `~/Lisztmachine`, installs Surge XT, the plugin
+synths, the sampled instruments and the visuals' media (`tools/install-mac.sh`, asks for the password once), builds the
+app and puts **Start Lisztmachine** on the Desktop: the app opens and the visuals follow it in Chrome, where the page
+drives the app (song, Improvisation, the whole concert, play, metronome, in-ear mix). A version:
+`curl -fsSL .../setup-mac.sh | LISZT_VERSION=v0.12.0 bash`. Run it again to update.
+
 ## Layout
 
 | | |

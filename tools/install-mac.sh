@@ -71,6 +71,8 @@ plugin() { # name url file
   if have "$1"; then echo "   $1: already there"; return; fi
   get "$2" "$3" && install_from "$3" && echo "   $1: installed" || { echo "   $1: could not install ($3)"; fail=1; }
 }
+# Surge XT itself (the engine's main synth and its delay/reverb buses), when this Mac has none
+plugin "Surge XT" https://github.com/surge-synthesizer/releases-xt/releases/download/1.3.4/surge-xt-macOS-1.3.4.dmg surge-xt-macOS-1.3.4.dmg
 FB=https://www.fullbucket.de/music/dl
 plugin fb3300   $FB/fb3300_1_2_5_mac.pkg   fb3300_1_2_5_mac.pkg
 plugin fb7999   $FB/fb7999_1_1_7_mac.pkg   fb7999_1_1_7_mac.pkg
