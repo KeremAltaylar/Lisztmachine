@@ -89,6 +89,16 @@ if [ ! -d "$REPO/plugins/Dexed.vst3" ] && [ ! -d "/Library/Audio/Plug-Ins/VST3/D
   v=$(find "$tmp" -maxdepth 4 -name Dexed.vst3 | head -1) && [ -n "$v" ] && cp -R "$v" "$REPO/plugins/" && echo "   Dexed: installed" || { echo "   Dexed: could not install"; fail=1; }
 else echo "   Dexed: already there"; fi
 
+say "Visuals media (the code shown in the picture, the photographs, the songs' recordings)"
+# not in the repository (too large): from the newest GitHub release's visuals zip, into visuals/media
+if [ ! -f "$REPO/visuals/media/code.json" ]; then
+  url=$(curl -fsL https://api.github.com/repos/KeremAltaylar/Lisztmachine/releases/latest | grep -o '"browser_download_url": *"[^"]*visuals[^"]*\.zip"' | head -1 | sed 's/.*"\(http[^"]*\)"/\1/')
+  if [ -n "$url" ] && get "$url" visuals-media.zip; then
+    tmp=$(mktemp -d) && ditto -x -k "$DL/visuals-media.zip" "$tmp" &&
+    mkdir -p "$REPO/visuals/media" && cp -Rn "$tmp"/visuals/media/ "$REPO/visuals/media/" && echo "   visuals media: installed" || { echo "   visuals media: could not unpack"; fail=1; }
+  else echo "   visuals media: could not download"; fail=1; fi
+else echo "   visuals media: already there"; fi
+
 say "Check: every sound the songs name"
 missing=0
 while IFS= read -r p; do

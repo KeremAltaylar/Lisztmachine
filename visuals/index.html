@@ -252,6 +252,7 @@ function improviser() {
     const id = 'improv' + k;
     PIECES[id] = {
       name: plan.name ?? 'Improvisation ' + (k + 1), study, world, strobeBeats: Math.random() < 0.5 ? 1 : 2, hits: 'affect',
+      codeOf: plan.form, images: PIECES[plan.form]?.images,   // the song its form came from lends its code, stories, photographs
       ranges: (PIECES[plan.melody] ?? PIECES.jungle).ranges,
       body: sax ? { pad: 'light', harm: 'colour', arp: 'camera', drone: 'glow', chord: 'speed', bass: 'size', sub: 'gravity', boom: 'shock' }
                 : { pad: 'light', harm: 'colour', lead: 'camera', arp: 'glow', riff: 'speed', bass: 'size', sub: 'gravity', boom: 'shock' },
@@ -329,7 +330,9 @@ function liveLink(waiting) {
       const sh = L.show, t = m.at - L.T0;
       if (sh.songs.some(x => Math.abs(x.t - t) < 0.01)) return;   // sent again after a reconnect
       const k = sh.songs.length;
-      const song = { piece: m.piece, media: null, t, bpm: m.bpm, key: m.plan ? m.plan.name + ' · ' + m.plan.key + ' · ' + m.plan.bpm + ' bpm' : m.key, voices: m.voices, plan: m.plan };
+      const last = m.sections[m.sections.length - 1];
+      const song = { piece: m.piece, media: null, t, bpm: m.bpm, key: m.plan ? m.plan.name + ' · ' + m.plan.key + ' · ' + m.plan.bpm + ' bpm' : m.key, voices: m.voices, plan: m.plan,
+                     len: last ? last.t + last.bars * 240 / m.bpm : 0 };
       if (m.piece === 'improv') (L.look ??= improviser())(song, k);
       else if (!PIECES[m.piece]) song.piece = 'jungle';
       sh.songs.push(song);
@@ -2801,7 +2804,12 @@ registerProcessor('master-fx', MasterFx);`;
         sec.push(x);
         const prev = sec[sec.length - 2];
         imgScore.push(!!prev && prev.song === x.song && x.energy >= 0.6 && x.energy > prev.energy + 0.1);
-        codeScore.push(null);
+        const i = sec.length - 1, d = x.bars * 240 / (show.songs[x.song]?.bpm ?? 120), h = k => { const v = Math.sin(k * 91.7 + 17.3) * 43758.5453; return v - Math.floor(v); };
+        LIVE.codeT = (LIVE.codeT ?? 0) + d;
+        const pick = i > 0 && ((LIVE.codeOn ?? 0) + d / 2) / LIVE.codeT < 0.3 + (h(i) - 0.5) * 0.16;
+        if (pick) LIVE.codeOn = (LIVE.codeOn ?? 0) + d;
+        const r = h(i + 50);
+        codeScore.push(pick ? { q: r < 0.35 ? 0.15 + 0.3 * h(i + 80) : r < 0.7 ? 0.5 + 0.25 * h(i + 80) : 0.9 + 0.1 * h(i + 80) } : null);
       }
       sec.sort((a, b) => a.t - b.t);
       F.reset(F.prevT ?? 0);
@@ -3395,8 +3403,9 @@ registerProcessor('master-fx', MasterFx);`;
   const NOTE = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
   const noteName = p => NOTE[p % 12] + (Math.floor(p / 12) - 1);
   const fx = (v, n = 2) => v.toFixed(n);
-  const srcOf = s => (CODE.src?.[songs[songK].piece] ?? {})[s] ?? [];
-  const fileOf = () => (CODE.src?.[songs[songK].piece] ?? {}).file ?? 'src/core';
+  const codeKey = () => CODE.src?.[songs[songK].piece] ? songs[songK].piece : PIECES[songs[songK].piece]?.codeOf;
+  const srcOf = s => (CODE.src?.[codeKey()] ?? {})[s] ?? [];
+  const fileOf = () => (CODE.src?.[codeKey()] ?? {}).file ?? 'src/core';
   const fnLines = fn => fn.toString().split('\n');
   const around = (lines, re, before = 2, after = 3) => { const i = Math.max(0, lines.findIndex(l => re.test(l))); return lines.slice(Math.max(0, i - before), i + after); };
   const code = (lines, mark) => lines.map(l => ({ t: l, k: mark?.test(l) ? '>' : ' ' }));
@@ -3637,8 +3646,8 @@ registerProcessor('master-fx', MasterFx);`;
     const now = performance.now() / 1000;
     if (VOICE.until && now > VOICE.until) { $('voice').classList.remove('on'); VOICE.until = 0; }
     if (!VOICE.on || !playing) return;
-    const s = songs[songK], len = (songs[songK + 1]?.t ?? F.duration) - s.t, x = t - s.t;
-    for (const [f, line, c, o = 0] of STORY[s.piece] ?? []) {
+    const s = songs[songK], len = s.len || (songs[songK + 1]?.t ?? F.duration) - s.t, x = t - s.t;
+    for (const [f, line, c, o = 0] of STORY[s.piece] ?? STORY[PIECES[s.piece]?.codeOf] ?? []) {
       const key = songK + '/' + f + '/' + o, at = f * len + o;
       if (x < at || x > at + 3 || VOICE.said === key || (c && songs.length < 2)) continue;   // a seek past a line skips it
       VOICE.said = key;
