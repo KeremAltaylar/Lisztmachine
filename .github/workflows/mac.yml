@@ -39,7 +39,10 @@ jobs:
           APP="$(find build -name Lisztmachine.app -type d | head -1)"
           mkdir -p "$APP/Contents/Resources/plugins" && cp -R plugins/Dexed.vst3 "$APP/Contents/Resources/plugins/"
           codesign --force --deep -s - "$APP"
-          ditto -c -k --keepParent "$APP" Lisztmachine-mac.zip
+          # beside it the visuals page (its Live from the app mode needs no media; the songs' media come with the releases)
+          mkdir -p "pkg/Lisztmachine Visuals" && cp -R "$APP" pkg/
+          cp visuals/index.html "visuals/Start Visuals.command" "pkg/Lisztmachine Visuals/" && chmod +x "pkg/Lisztmachine Visuals/Start Visuals.command"
+          ditto -c -k pkg Lisztmachine-mac.zip
 
       - uses: actions/upload-artifact@v4
         with:
