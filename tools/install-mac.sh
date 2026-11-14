@@ -116,7 +116,8 @@ while IFS= read -r patch; do
     3rd/*) f="$SURGE/patches_3rdparty/${patch#3rd/}.fxp" ;;
     *) f="$SURGE/patches_factory/$patch.fxp" ;;
   esac
-  [ -f "$f" ] || { echo "   MISSING Surge patch: $patch"; missing=1; }
+  carried="$REPO/sounds/surge-patches/${f#$SURGE/}"   # the songs carry the ones some Surge releases lack
+  [ -f "$f" ] || [ -f "$carried" ] || { echo "   MISSING Surge patch: $patch"; missing=1; }
 done < <(sed 's/#.*//' "$REPO"/sounds/*.txt | awk 'NF >= 4 && $1 !~ /^(gain|delay|drive|crush|comp|duck|lowcut|amp|release|feed|send|return|feedback|shimmer|master)$/ {
            p = $0; sub(/^[ \t]*[^ \t]+[ \t]+[^ \t]+[ \t]+[^ \t]+[ \t]+/, "", p); sub(/[ \t]+$/, "", p); print p }' |
          grep -vE '^(internal|sfz|vst|dexed|sample)/' | sort -u)

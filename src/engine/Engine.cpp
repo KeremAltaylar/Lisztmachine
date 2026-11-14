@@ -38,7 +38,11 @@ juce::File findSurgePatch(const juce::String& categoryAndName)
     auto root = firstExisting({ "C:/Program Files/Common Files/VST3/Surge Synth Team/SurgeXTData/" + set,
                                 "C:/ProgramData/Surge XT/" + set,
                                 "/Library/Application Support/Surge XT/" + set });
-    return root.getChildFile((third ? categoryAndName.substring(4) : categoryAndName) + ".fxp");
+    const auto rel = set + "/" + (third ? categoryAndName.substring(4) : categoryAndName) + ".fxp";
+    if (auto f = root.getChildFile(rel.fromFirstOccurrenceOf("/", false, false)); f.existsAsFile()) return f;
+    // the ones this Surge release does not ship, carried with the songs (sounds/surge-patches; Kerem's Mac lacked 15)
+    if (auto f = findPalette("berlin").getParentDirectory().getChildFile("surge-patches").getChildFile(rel); f.existsAsFile()) return f;
+    return root.getChildFile(rel.fromFirstOccurrenceOf("/", false, false));
 }
 
 juce::File findSurgeEffects()
