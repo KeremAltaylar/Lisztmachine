@@ -297,7 +297,15 @@ juce::String setParameterText(juce::AudioPluginInstance& plugin, const juce::Str
 
     // Numbers compare as numbers ("7 s" vs "7.00 s"); choices compare as text.
     const bool numeric = value.trimStart().containsAnyOf("0123456789") && (juce::CharacterFunctions::isDigit(value.trimStart()[0]) || value.trimStart()[0] == '-');
-    auto num = [](const juce::String& s) { return s.retainCharacters("-0123456789.").getDoubleValue(); };
+    // in one unit: Surge on Kerem's Mac shows the reverb's pre-delay in seconds ("0.040 s") where the PC's showed
+    // "40 ms"; compared as bare numbers, "40 ms" found "2.000 s" (2026-11-14)
+    auto num = [](const juce::String& s) {
+        const double x = s.retainCharacters("-0123456789.").getDoubleValue();
+        const auto unit = s.retainCharacters("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ").toLowerCase();
+        if (unit.startsWith("ms")) return x / 1000.0;
+        if (unit.startsWith("khz")) return x * 1000.0;
+        return x;
+    };
     auto matches = [&] {
         auto t = p->getCurrentValueAsText();
         return numeric ? std::abs(num(t) - num(value)) <= 0.02 * std::abs(num(value)) + 0.011 : t.equalsIgnoreCase(value);
