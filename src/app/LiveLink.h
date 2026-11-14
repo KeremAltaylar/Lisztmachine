@@ -5,10 +5,14 @@
 //         Improvisation, its plan; "at" = when its bar 0 is heard, on the app's clock
 //   lv    the seven levels the renders' show.json carries per block (roles, delay, reverb, master), with "at"
 //   stop  the playing stopped
+//   state the app's controls (playing, song, click), sent when they change: the page shows them as its own
+// and the page drives the app back: GET /cmd/play, /cmd/stop, /cmd/scene/<id>, /cmd/click/1|0, /cmd/clickmain/1|0
+// (Kerem, 2026-11-14: "make it a smoother app that works like before", one interface, the click on the music's clock).
 // Only this computer can connect (it listens on 127.0.0.1). A page that joins mid-song is sent the songs still sounding.
 #include <juce_core/juce_core.h>
 #include <algorithm>
 #include <deque>
+#include <functional>
 #include <memory>
 #include <mutex>
 #include <vector>
@@ -39,6 +43,14 @@ public:
         post("song", json);
     }
     void stop() { { const std::lock_guard<std::mutex> l(m); songs.clear(); } post("stop", "{}"); }
+    // the app's controls, for the page; sent only when they change
+    void state(const juce::String& json)
+    {
+        { const std::lock_guard<std::mutex> l(m); if (json == lastState) return; lastState = json; }
+        post("state", json);
+    }
+    // a command from the page, called on the link's own thread (the app hands it to its message thread)
+    std::function<void(const juce::String&)> onCommand;
     void post(const char* event, const juce::String& json)
     {
         if (clients() == 0) return;
@@ -65,6 +77,14 @@ private:
                 if (c->waitUntilReady(true, 1000) == 1) c->read(req, sizeof req - 1, false);
                 const juce::String head = "HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nCache-Control: no-cache\r\n"
                                           "Access-Control-Allow-Origin: *\r\nAccess-Control-Allow-Private-Network: true\r\nConnection: keep-alive\r\n\r\n";
+                const juce::String line = juce::String(req).upToFirstOccurrenceOf("\r", false, false);
+                if (line.startsWith("GET /cmd/"))
+                {
+                    if (o.onCommand) o.onCommand(line.fromFirstOccurrenceOf("/cmd/", false, false).upToFirstOccurrenceOf(" ", false, false));
+                    const juce::String r = "HTTP/1.1 204 No Content\r\nAccess-Control-Allow-Origin: *\r\nAccess-Control-Allow-Private-Network: true\r\nContent-Length: 0\r\n\r\n";
+                    c->write(r.toRawUTF8(), int(r.getNumBytesAsUTF8()));
+                    continue;
+                }
                 if (!juce::String(req).startsWith("GET /live")) // a CORS preflight or anything else: answer and close
                 {
                     const juce::String r = "HTTP/1.1 204 No Content\r\nAccess-Control-Allow-Origin: *\r\nAccess-Control-Allow-Private-Network: true\r\n"
@@ -74,6 +94,11 @@ private:
                 }
                 c->write(head.toRawUTF8(), int(head.getNumBytesAsUTF8()));
                 const std::lock_guard<std::mutex> l(o.m);
+                if (o.lastState.isNotEmpty())
+                {
+                    const juce::String ev = "event: state\ndata: " + o.lastState + "\n\n";
+                    c->write(ev.toRawUTF8(), int(ev.getNumBytesAsUTF8()));
+                }
                 for (auto& s : o.songs) // what is sounding now, so a page that joins mid-song can follow
                 {
                     const juce::String ev = "event: song\ndata: " + s + "\n\n";
@@ -117,6 +142,7 @@ private:
     juce::StreamingSocket server;
     std::vector<std::unique_ptr<juce::StreamingSocket>> socks;
     std::deque<juce::String> songs, queue;
+    juce::String lastState;
     Acceptor acceptor { *this };
     Sender sender { *this };
 };

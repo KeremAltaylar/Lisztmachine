@@ -422,6 +422,9 @@ public:
     bool effects = true;           // false: no delay or reverb (the renderer's --dry)
     std::atomic<int> changesMade { 0 }, missedChanges { 0 };
     float clickLevel = 0.5f;
+    // the click also on outputs 1/2 (Kerem, 2026-11-14: rehearsing without the in-ear outputs, the click must come
+    // from the same clock as the music), a little lower than on 3/4
+    std::atomic<bool> clickToMain { false };
     PeakLimiter limiter;
     GlueBus glue;
     MasterFx masterFx;             // the app's master FX panel: the whole PA mix, before the glue

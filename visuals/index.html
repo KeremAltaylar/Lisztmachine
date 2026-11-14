@@ -36,6 +36,14 @@ button:focus-visible { outline: 1px solid var(--ember); outline-offset: 3px; }
 .keys { margin: 0; color: var(--dim); font-size: 11px; line-height: 1.9; }
 kbd { font: inherit; color: var(--ink); border: 1px solid var(--rule); padding: 0 5px; }
 .err { color: var(--ember); margin: 0; }
+/* the app's controls, live (Kerem, 2026-11-14: "one program like before"): the page drives the Lisztmachine app */
+.appbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; font-size: 12px; color: var(--dim); }
+.appbar select { font: inherit; color: var(--ink); background: var(--void); border: 1px solid var(--rule); padding: 6px 8px; max-width: 70vw; }
+.appbar button { padding: 6px 14px; border: 1px solid var(--rule); color: var(--ink); letter-spacing: 0.06em; }
+.appbar button:hover { border-color: var(--ember); color: var(--ember); }
+.appbar button[aria-pressed="true"] { border-color: var(--ember); color: var(--ember); }
+.appbar .play { border-color: var(--ember); color: var(--ember); text-transform: uppercase; }
+.appbar .play:hover { background: var(--ember); color: var(--void); }
 
 #hud { position: fixed; left: 0; right: 0; bottom: 0; display: grid; gap: 10px;
   padding: 14px max(16px, env(safe-area-inset-right, 0px)) calc(14px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px));
@@ -255,11 +263,35 @@ function improviser() {
 // Time here is the first song's time: t = (the app's clock) - (when that song's bar 0 was heard).
 function liveLink(waiting) {
   return new Promise((res, rej) => {
-    const L = window.__live = { off: Infinity, T0: null, show: null, onSong: null, songs: 0, levels: 0, stopped: false };
+    const L = window.__live = { off: Infinity, T0: null, show: null, onSong: null, songs: 0, levels: 0, stopped: false, app: null };
     const es = new EventSource('http://127.0.0.1:8737/live');
+    // the app's controls on the page: one place to play, choose the song and switch the click, which comes from the
+    // app's engine on the music's own clock (the page's metronome cannot keep the app's time)
+    const cmd = c => fetch('http://127.0.0.1:8737/cmd/' + c, { mode: 'no-cors' }).catch(() => {});
+    const bar = L.bar = Object.assign(document.createElement('div'), { className: 'appbar' });
+    const sel = document.createElement('select'), play = document.createElement('button'), click = document.createElement('button'),
+      main = document.createElement('button'), note = document.createElement('span');
+    sel.setAttribute('aria-label', 'Song'); play.className = 'play'; play.textContent = 'Play';
+    click.title = 'The click on the app\'s outputs 3/4 (in-ears)'; main.title = 'The click on the main outputs too (rehearsing without in-ears)';
+    bar.append(sel, play, click, main, note);
+    sel.onchange = () => cmd('scene/' + sel.value);
+    play.onclick = () => cmd(L.app?.playing ? 'stop' : 'play');
+    click.onclick = () => cmd('click/' + (L.app?.click ? 0 : 1));
+    main.onclick = () => cmd('clickmain/' + (L.app?.clickMain ? 0 : 1));
+    L.toggle = () => play.onclick();
+    es.addEventListener('state', e => {
+      const a = L.app = JSON.parse(e.data);
+      if (sel.options.length !== a.scenes.length) { sel.length = 0; for (const [id, name] of a.scenes) sel.add(new Option(name, id)); }
+      sel.value = a.scene;
+      play.textContent = a.playing ? 'Stop' : 'Play';
+      click.textContent = 'Metronome ' + (a.click ? 'on' : 'off'); click.setAttribute('aria-pressed', a.click);
+      main.textContent = 'On speakers ' + (a.clickMain ? 'on' : 'off'); main.setAttribute('aria-pressed', a.clickMain);
+      note.textContent = a.error ? 'App: ' + a.error : '';
+      if (!L.show) waiting(false, true);
+    });
     let shown = false;
-    const tell = setTimeout(() => { if (!L.show) waiting(); shown = true; }, 1500);
-    es.onerror = () => { if (!L.show && shown) waiting(true); };
+    const tell = setTimeout(() => { if (!L.show && !L.app) waiting(); shown = true; }, 1500);
+    es.onerror = () => { if (!L.show && shown && !L.app) waiting(true); };
     const seen = m => { if (m.now != null) L.off = Math.min(L.off, m.now - performance.now() / 1000); };   // the least delayed message sets the clock
     es.addEventListener('song', e => {
       const m = JSON.parse(e.data);
@@ -2346,9 +2378,11 @@ async function boot() {
   $('go').hidden = false;
   $('meta').textContent = 'Loading the ' + piece.name + '…';
   const title = piece.name, concert = piece.concert;
-  const LIVE = piece.live ? await liveLink(down => { $('meta').textContent = down
-    ? 'No Lisztmachine app found on this computer. Open the app (it listens on port 8737) and press Play.'
-    : 'Waiting for the app: press Play in Lisztmachine.'; }) : null;
+  const LIVE = piece.live ? await liveLink((down, ready) => {
+    if (ready && window.__live.bar && !window.__live.bar.isConnected) $('pieces').after(window.__live.bar);
+    $('meta').textContent = ready ? 'Choose a song and press Play' : down
+      ? 'No Lisztmachine app found on this computer. Open the app (it listens on port 8737).'
+      : 'Waiting for the Lisztmachine app…'; }) : null;
   const show = LIVE ? LIVE.show : await fetch(piece.media + '.show.json').then(r => { if (!r.ok) throw new Error('show data ' + r.status); return r.json(); })
     .catch(e => { fail('Could not load the concert (' + e.message + ').'); });
   if (!show) return;
@@ -2411,7 +2445,11 @@ async function boot() {
   if (!first) return;
   const out = actx.createGain();
   out.gain.value = location.hash === '#silent' ? 0 : 1;   // #silent: for checking the page without sound
-  await masterFx(out);
+  if (!LIVE) await masterFx(out);
+  if (LIVE) {   // the app makes the sound, the click and the effects: their page controls would do nothing here
+    $('metro').hidden = true; $('metro-vol').closest('label').hidden = true;
+    $('hud').prepend(LIVE.bar);
+  }
   let srcs = [], startAt = 0, startT = 0, run = 0, queued = -1;
   const heard = now => {
     const ts = actx.getOutputTimestamp?.();
@@ -2865,7 +2903,7 @@ registerProcessor('master-fx', MasterFx);`;
   addEventListener('pointermove', poke);
   addEventListener('keydown', e => {
     if (e.key >= '1' && e.key <= String(STUDIES.length)) choose(STUDIES[+e.key - 1]);
-    else if (e.key === ' ') { e.preventDefault(); if ($('veil').hidden) toggle(); }
+    else if (e.key === ' ') { e.preventDefault(); if (LIVE) LIVE.toggle(); else if ($('veil').hidden) toggle(); }
     else if (e.key === 'ArrowRight') seek(musicT + 10);
     else if (e.key === 'ArrowLeft') seek(musicT - 10);
     else if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
@@ -2878,7 +2916,7 @@ registerProcessor('master-fx', MasterFx);`;
     else if (e.key === ',') { setAmt(pad.amt - 10); }
     else if (e.key === '.') { setAmt(pad.amt + 10); }
     else if (e.key === 'p' || e.key === 'P') { nextLayer(); }
-    else if (e.key === 'm' || e.key === 'M') { setMetro(!metro.on); }
+    else if (e.key === 'm' || e.key === 'M') { if (LIVE) LIVE.bar.children[2].click(); else setMetro(!metro.on); }
     else if (e.key === '[') { setThr(1.25); }
     else if (e.key === ']') { setThr(0.8); }
     else if (e.key === 'g' || e.key === 'G') { roll(); }
@@ -2894,7 +2932,7 @@ registerProcessor('master-fx', MasterFx);`;
     if (playing) { stop(); return; }
     actx.resume().then(() => start(musicT)).catch(e => fail('The audio would not start: ' + e.message));
   };
-  $('go').disabled = false; $('go').textContent = 'Play from the start';
+  $('go').disabled = false; $('go').textContent = LIVE ? 'Show the visuals' : 'Play from the start';
   $('go').onclick = () => { $('veil').hidden = true; stop(); musicT = 0; toggle(); poke(); };
 
   // The drum pad: one input of the audio interface, heard by an onset detector running on the audio
@@ -3699,7 +3737,7 @@ registerProcessor('master-fx', MasterFx);`;
     device.queue.onSubmittedWorkDone().then(() => { inFlight--; gpuMs += (performance.now() - sent - gpuMs) * 0.1; });
 
     const name = next ? study.name + ' → ' + next.name + ' ' + Math.round(blend * 100) + '%' : study.name;
-    $('now').innerHTML = '<b>' + name + '</b>  <span>' + F.section.name + ' · ' + (D.feedback ? D.fbMode : 'NO FEEDBACK') + ' · GEN ' + D.gen + ' · ' + Math.round(rawFps) + ' FPS · QUALITY ' + Math.round(Q * 100) + '%</span>  ' + mmss(t) + ' <span>/ ' + mmss(F.duration) + '</span>';
+    $('now').innerHTML = '<b>' + name + '</b>  <span>' + F.section.name + ' · ' + (D.feedback ? D.fbMode : 'NO FEEDBACK') + ' · GEN ' + D.gen + ' · ' + Math.round(rawFps) + ' FPS · QUALITY ' + Math.round(Q * 100) + '%</span>  ' + mmss(t) + (LIVE ? '' : ' <span>/ ' + mmss(F.duration) + '</span>');
     $('head').style.left = (t / F.duration * 100) + '%';
     [...nav.children].forEach((bt, k) => bt.setAttribute('aria-pressed', STUDIES[k] === study || STUDIES[k] === next));
     requestAnimationFrame(frame);

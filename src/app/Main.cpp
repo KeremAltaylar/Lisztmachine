@@ -112,6 +112,28 @@ public:
         feedbackLabel.setFont(juce::FontOptions(13.0f));
         addAndMakeVisible(feedback);
         addAndMakeVisible(feedbackLabel);
+        // the output level (Kerem, 2026-11-14: "clipping because of too high volume, on my sound card's meter it's on the
+        // limit roof red"): the mix leaves the limiter at -1 dBFS; this takes it down before the interface, -6 dB at first
+        output.setSliderStyle(juce::Slider::LinearHorizontal);
+        output.setRange(-30, 0, 0.5);
+        output.setTextValueSuffix(" dB");
+        output.setTextBoxStyle(juce::Slider::TextBoxRight, false, 64, 24);
+        output.setDoubleClickReturnValue(true, -6.0);
+        output.setValue(props.getUserSettings()->getDoubleValue("output", -6.0), juce::dontSendNotification);
+        outGain = juce::Decibels::decibelsToGain(float(output.getValue()));
+        output.onValueChange = [this] {
+            props.getUserSettings()->setValue("output", output.getValue());
+            outGain = juce::Decibels::decibelsToGain(float(output.getValue()));
+        };
+        for (auto id : { juce::Slider::trackColourId, juce::Slider::thumbColourId }) output.setColour(id, id == juce::Slider::thumbColourId ? tok::lamp : tok::accent);
+        output.setColour(juce::Slider::backgroundColourId, tok::sunk);
+        output.setColour(juce::Slider::textBoxTextColourId, tok::ink);
+        output.setColour(juce::Slider::textBoxOutlineColourId, tok::hairline);
+        output.setColour(juce::Slider::textBoxBackgroundColourId, tok::sunk);
+        outputLabel.setColour(juce::Label::textColourId, tok::dim);
+        outputLabel.setFont(juce::FontOptions(13.0f));
+        addAndMakeVisible(output);
+        addAndMakeVisible(outputLabel);
         // the master FX panel (Kerem, 2026-11-11): everything through it, every knob remembered, every unit off at first
         for (int u = 0; u < 3; ++u)
         {
@@ -162,7 +184,17 @@ public:
         fxBox(timeBox, MasterFx::Time, MasterFx::timeNames, int(std::size(MasterFx::timeNames)));
 
         click.setToggleState(true, juce::dontSendNotification);
-        click.onClick = [this] { for (auto* e : { engine.get(), nextEngine.get() }) if (e) e->clickLevel = click.getToggleState() ? 0.5f : 0.0f; };
+        click.onClick = [this] { applyClick(); };
+        // the click on the main outputs too, for rehearsing without the in-ear outputs (remembered)
+        clickMain.setToggleState(props.getUserSettings()->getBoolValue("clickMain", false), juce::dontSendNotification);
+        clickMain.onClick = [this] { props.getUserSettings()->setValue("clickMain", clickMain.getToggleState()); applyClick(); };
+        clickMain.setColour(juce::ToggleButton::textColourId, tok::dim);
+        clickMain.setColour(juce::ToggleButton::tickColourId, tok::lamp);
+        addAndMakeVisible(clickMain);
+        // the visuals page drives the app (LiveLink.h): its commands come on the link's thread, run here
+        live.onCommand = [sp = juce::Component::SafePointer<MainComponent>(this)](const juce::String& c) {
+            juce::MessageManager::callAsync([sp, c] { if (sp) sp->command(c); });
+        };
 
         for (auto* b : { &play, &fresh, &audio })
         {
@@ -337,10 +369,13 @@ public:
         }
         feedbackLabel.setBounds(fbRow.removeFromLeft(190));
         feedback.setBounds(fbRow.removeFromLeft(360));
+        fbRow.removeFromLeft(tok::s5);
+        outputLabel.setBounds(fbRow.removeFromLeft(70));
+        output.setBounds(fbRow.removeFromLeft(juce::jmin(300, fbRow.getWidth())));
         juce::FlexBox fb;
         // JUCE's FlexBox has no gap property, so each item carries the gap as a right margin.
         auto item = [](juce::Component& c, float w) { return juce::FlexItem(c).withWidth(w).withMargin({ 0, float(tok::s3), 0, 0 }); };
-        fb.items = { item(sceneBox, 190), item(play, 100), item(fresh, 130), item(seedBox, 90), item(click, 150), item(audio, 110) };
+        fb.items = { item(sceneBox, 190), item(play, 100), item(fresh, 130), item(seedBox, 90), item(click, 150), item(clickMain, 120), item(audio, 110) };
         fb.performLayout(row);
     }
 
@@ -440,6 +475,7 @@ private:
             meterPeak = engine->peakPost.exchange(0);
             engine->service(); // load each part's next sound ahead of its change
             if (improv()) improvise();
+            sendState();
             if (engine->isPlaying() || engine->isFinished()) composer = engine->composer();
         }
         play.setButtonText(engine && engine->isPlaying() ? "Stop" : "Play");
@@ -457,11 +493,14 @@ private:
         {
             oldEngine->render(mixBuf.getArrayOfWritePointers(), numOut, n);
             for (int c = 0; c < numOut; ++c) juce::FloatVectorOperations::add(out[c], mixBuf.getReadPointer(c), n);
-            for (int c = 0; c < juce::jmin(2, numOut); ++c) for (int i = 0; i < n; ++i) out[c][i] = ceilingClip(out[c][i]);
         }
+        // the output level, then a ceiling under 0 dBFS: two songs at a changeover, or the click on the main outputs,
+        // add to a limited mix
+        const float g = outGain.load();
+        for (int c = 0; c < juce::jmin(2, numOut); ++c) for (int i = 0; i < n; ++i) out[c][i] = ceilingClip(g * out[c][i]);
         double sq = 0;
         for (int c = 0; c < juce::jmin(2, numOut); ++c) for (int i = 0; i < n; ++i) sq += double(out[c][i]) * out[c][i];
-        masterSq = masterSq.load() + sq;
+        masterSq = masterSq.load() + sq / double(juce::jmax(1e-6f, g * g)); // the visuals read the mix before the output level
         masterN = masterN.load() + 2 * n;
     }
     void audioDeviceAboutToStart(juce::AudioIODevice*) override {}
@@ -507,6 +546,7 @@ private:
     {
         for (int k = 0; k < MasterFx::NumParams; ++k) e.masterFx.p[k] = fxValue(MasterFx::Param(k));
         e.clickLevel = click.getToggleState() ? 0.5f : 0.0f;
+        e.clickToMain = clickMain.getToggleState();
         if (e.hasFeedbackBus()) e.feedbackBus = float(feedback.getValue() / 100.0);
     }
     struct Loader : juce::Thread
@@ -587,6 +627,45 @@ private:
         }
         if (engine) engine->stop();
     }
+    // the click's switches on every engine (an old song ringing out keeps its click off: the click follows the new one)
+    void applyClick()
+    {
+        for (auto* e : { engine.get(), nextEngine.get() })
+            if (e) { e->clickLevel = click.getToggleState() ? 0.5f : 0.0f; e->clickToMain = clickMain.getToggleState(); }
+    }
+    // a command from the visuals page
+    void command(const juce::String& c)
+    {
+        const bool playing = engine && engine->isPlaying();
+        if (c == "play") { if (!playing) togglePlay(); }
+        else if (c == "stop") { if (playing) togglePlay(); }
+        else if (c.startsWith("scene/"))
+        {
+            const auto id = c.fromFirstOccurrenceOf("scene/", false, false);
+            int sel = id == "improv" ? kImprovId : 0;
+            for (int i = 0; i < int(std::size(kScenes)); ++i) if (id == kScenes[i]) sel = i + 1;
+            if (sel && sel != sceneBox.getSelectedId()) sceneBox.setSelectedId(sel, juce::sendNotificationSync);
+        }
+        else if (c.startsWith("click/")) { click.setToggleState(c.endsWith("1"), juce::dontSendNotification); applyClick(); }
+        else if (c.startsWith("clickmain/"))
+        {
+            clickMain.setToggleState(c.endsWith("1"), juce::dontSendNotification);
+            props.getUserSettings()->setValue("clickMain", clickMain.getToggleState());
+            applyClick();
+        }
+        sendState();
+    }
+    // the app's controls for the page: what plays, which song, the click (sent only when something changed)
+    void sendState()
+    {
+        juce::String j = "{\"playing\":" + juce::String(engine && engine->isPlaying() ? "true" : "false") + ",\"scene\":\"" + juce::String(scene)
+                       + "\",\"click\":" + (click.getToggleState() ? "true" : "false") + ",\"clickMain\":" + (clickMain.getToggleState() ? "true" : "false")
+                       + ",\"error\":" + juce::JSON::toString(error) + ",\"scenes\":[";
+        for (int i = 0; i < int(std::size(kScenes)); ++i) j << "[\"" << kScenes[i] << "\"," << juce::JSON::toString(juce::String::fromUTF8(kSceneTitles[i])) << "],";
+        j << "[\"improv\",\"Improvisation\"]]}";
+        live.state(j);
+    }
+
     // ---- the live link to the visuals page (LiveLink.h)
     LiveLink live;
     double outLatency() const
@@ -685,9 +764,11 @@ private:
     juce::TextButton play { "Play" }, fresh { "New concert" }, audio { "Audio..." };
     juce::TextEditor seedBox;
     juce::ComboBox sceneBox;
-    juce::ToggleButton click { "Click on out 3/4" };
+    juce::ToggleButton click { "Click on out 3/4" }, clickMain { "Click on 1/2" };
     juce::Slider feedback;
-    juce::Label feedbackLabel { {}, "Song feedback" };
+    juce::Label feedbackLabel { {}, "Song feedback" }, outputLabel { {}, "Output" };
+    juce::Slider output;
+    std::atomic<float> outGain { 0.5f };
     juce::ToggleButton fxOn[3];
     juce::Slider fxKnob[std::size(kFxKnobs)];
     juce::Label fxLabel[std::size(kFxKnobs)];
