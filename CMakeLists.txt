@@ -20,6 +20,11 @@ set(SFIZZ_RENDER OFF CACHE BOOL "" FORCE)
 set(SFIZZ_JACK OFF CACHE BOOL "" FORCE)
 set(ENABLE_LTO OFF CACHE BOOL "" FORCE)
 set(SFIZZ_GIT_SUBMODULE_CHECK OFF CACHE BOOL "" FORCE)
+# On Apple silicon sfizz names the processor after CMAKE_OSX_ARCHITECTURES ("arm64"), takes it for 32-bit ARM and adds
+# -mfpu=neon -mfloat-abi=hard, which Apple clang rejects (Kerem's Mac, 2026-11-14). Named aarch64, it adds nothing.
+if(APPLE AND CMAKE_OSX_ARCHITECTURES STREQUAL "arm64")
+    set(PROJECT_SYSTEM_PROCESSOR "aarch64" CACHE STRING "" FORCE)
+endif()
 FetchContent_Declare(sfizz
     URL https://github.com/sfztools/sfizz/releases/download/1.2.3/sfizz-1.2.3.tar.gz
     URL_HASH SHA256=a9339eac7620d7f0f6b44bdfe860680fab73e66efad4b5f15b21198dd9436822)
