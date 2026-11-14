@@ -274,7 +274,17 @@ function liveLink(waiting) {
       main = document.createElement('button'), note = document.createElement('span');
     sel.setAttribute('aria-label', 'Song'); play.className = 'play'; play.textContent = 'Play';
     click.title = 'The click on the app\'s outputs 3/4 (in-ears)'; main.title = 'The click on the main outputs too (rehearsing without in-ears)';
-    bar.append(sel, play, click, main, note);
+    // the in-ear mix on the app's outputs 3/4: the music and the click, each its own level (the app keeps them)
+    const ear = (label, cmdName, lo, hi) => {
+      const box = Object.assign(document.createElement('label'), { className: 'amt' }), r = document.createElement('input'), v = document.createElement('span');
+      Object.assign(r, { type: 'range', min: lo, max: hi, step: 0.5 });
+      box.append(label + ' ', r, ' ', v);
+      r.oninput = () => { v.textContent = +r.value <= lo ? 'off' : r.value + ' dB'; };
+      r.onchange = () => cmd(cmdName + '/' + r.value);
+      return { box, set: x => { if (document.activeElement !== r) { r.value = x; r.oninput(); } } };
+    };
+    const earMusic = ear('In-ear music', 'earmusic', -60, 0), earClick = ear('In-ear click', 'earclick', -30, 12);
+    bar.append(sel, play, click, main, earMusic.box, earClick.box, note);
     sel.onchange = () => cmd('scene/' + sel.value);
     play.onclick = () => cmd(L.app?.playing ? 'stop' : 'play');
     click.onclick = () => cmd('click/' + (L.app?.click ? 0 : 1));
@@ -288,6 +298,7 @@ function liveLink(waiting) {
       click.textContent = 'Metronome ' + (a.click ? 'on' : 'off'); click.setAttribute('aria-pressed', a.click);
       main.textContent = 'On speakers ' + (a.clickMain ? 'on' : 'off'); main.setAttribute('aria-pressed', a.clickMain);
       note.textContent = a.error ? 'App: ' + a.error : '';
+      if (a.earMusic != null) { earMusic.set(a.earMusic); earClick.set(a.earClick); }
       if (!L.show) waiting(false, true);
     });
     let shown = false;

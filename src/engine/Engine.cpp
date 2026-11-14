@@ -1636,7 +1636,7 @@ void Engine::renderChunk(float* const* out, int numChannels, int offset, int len
         post = juce::jmax(post, juce::FloatVectorOperations::findMaximum(pa[c], len), -juce::FloatVectorOperations::findMinimum(pa[c], len));
     peakPost = juce::jmax(peakPost.load(), post);
 
-    if (playing && (numChannels >= 4 || clickToMain.load())) renderClick(out, numChannels, offset, len);
+    if (playing && (numChannels >= 3 || clickToMain.load())) renderClick(out, numChannels, offset, len);
 
     if (playing) { pos_ = end; seconds = double(pos_) / sampleRate_; }
     // 2026-11-04 (Kerem: "you cut the end of Working Class Curse abrupt; wait for total silence"): the
@@ -1683,7 +1683,8 @@ void Engine::renderClick(float* const* out, int numChannels, int offset, int len
         float x = float(clickEnv_ * std::sin(clickPhase_));
         clickPhase_ += juce::MathConstants<double>::twoPi * clickFreq_ / sampleRate_;
         clickEnv_ *= decay;
-        if (numChannels >= 4) { out[2][offset + n] = x; out[3][offset + n] = x; }
+        if (numChannels >= 3) out[2][offset + n] = x;
+        if (numChannels >= 4) out[3][offset + n] = x;
         if (main) for (int c = 0; c < juce::jmin(2, numChannels); ++c) out[c][offset + n] += 0.6f * x;
     }
 }

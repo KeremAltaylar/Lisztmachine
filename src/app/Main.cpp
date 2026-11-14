@@ -137,6 +137,34 @@ public:
         outputLabel.setFont(juce::FontOptions(13.0f));
         addAndMakeVisible(output);
         addAndMakeVisible(outputLabel);
+        // the in-ear mix (Kerem, 2026-11-14: "an in-ear monitor channel with its own metronome volume, for out 3 of the
+        // Apollo"): outputs 3/4 carry the music (in mono) and the click, each at its own level, apart from the PA on 1/2
+        auto ear = [this](juce::Slider& sl, juce::Label& lb, const char* key, double lo, double hi, double def, std::atomic<float>& gain) {
+            sl.setSliderStyle(juce::Slider::LinearHorizontal);
+            sl.setRange(lo, hi, 0.5);
+            sl.setTextValueSuffix(" dB");
+            sl.setTextBoxStyle(juce::Slider::TextBoxRight, false, 64, 24);
+            sl.setDoubleClickReturnValue(true, def);
+            sl.setValue(props.getUserSettings()->getDoubleValue(key, def), juce::dontSendNotification);
+            auto apply = [this, &sl, &gain, key, lo] {
+                props.getUserSettings()->setValue(key, sl.getValue());
+                gain = sl.getValue() <= lo ? 0.0f : juce::Decibels::decibelsToGain(float(sl.getValue())); // all the way down: off
+            };
+            apply();
+            sl.onValueChange = apply;
+            sl.setColour(juce::Slider::trackColourId, tok::accent);
+            sl.setColour(juce::Slider::thumbColourId, tok::lamp);
+            sl.setColour(juce::Slider::backgroundColourId, tok::sunk);
+            sl.setColour(juce::Slider::textBoxTextColourId, tok::ink);
+            sl.setColour(juce::Slider::textBoxOutlineColourId, tok::hairline);
+            sl.setColour(juce::Slider::textBoxBackgroundColourId, tok::sunk);
+            lb.setColour(juce::Label::textColourId, tok::dim);
+            lb.setFont(juce::FontOptions(13.0f));
+            addAndMakeVisible(sl);
+            addAndMakeVisible(lb);
+        };
+        ear(earMusic, earMusicLabel, "earMusic", -60, 0, -12, earMusicGain);
+        ear(earClick, earClickLabel, "earClick", -30, 12, 0, earClickGain);
         // the master FX panel (Kerem, 2026-11-11): everything through it, every knob remembered, every unit off at first
         for (int u = 0; u < 3; ++u)
         {
@@ -353,6 +381,12 @@ public:
         auto area = getLocalBounds().reduced(tok::s5);
         auto row = area.removeFromBottom(36);
         auto fbRow = area.removeFromBottom(tok::s3 + 28).removeFromTop(28);
+        auto earRow = area.removeFromBottom(tok::s3 + 28).removeFromTop(28);
+        earMusicLabel.setBounds(earRow.removeFromLeft(190));
+        earMusic.setBounds(earRow.removeFromLeft(360));
+        earRow.removeFromLeft(tok::s5);
+        earClickLabel.setBounds(earRow.removeFromLeft(110));
+        earClick.setBounds(earRow.removeFromLeft(juce::jmin(300, earRow.getWidth())));
         // the FX panel above it: the three units side by side, each as wide as its controls
         auto fx = area.removeFromBottom(tok::s3 + 140).removeFromTop(140);
         const int cells[3] = { 5, 3, 4 }; // knobs per unit
@@ -504,6 +538,17 @@ private:
         }
         // the output level, then a ceiling under 0 dBFS: two songs at a changeover, or the click on the main outputs,
         // add to a limited mix
+        // the in-ear mix on 3 (and 4): the click the engine wrote there at its level, and the music in mono, each its own
+        if (numOut >= 3)
+        {
+            const float mg = earMusicGain.load(), cg = earClickGain.load();
+            for (int i = 0; i < n; ++i)
+            {
+                const float x = ceilingClip(cg * out[2][i] + mg * 0.5f * (out[0][i] + out[1][i]));
+                out[2][i] = x;
+                if (numOut >= 4) out[3][i] = x;
+            }
+        }
         const float g = outGain.load();
         for (int c = 0; c < juce::jmin(2, numOut); ++c) for (int i = 0; i < n; ++i) out[c][i] = ceilingClip(g * out[c][i]);
         double sq = 0;
@@ -663,6 +708,8 @@ private:
             for (int i = 0; i < int(std::size(kScenes)); ++i) if (id == kScenes[i]) sel = i + 1;
             if (sel && sel != sceneBox.getSelectedId()) sceneBox.setSelectedId(sel, juce::sendNotificationSync);
         }
+        else if (c.startsWith("earmusic/")) earMusic.setValue(c.fromFirstOccurrenceOf("earmusic/", false, false).getDoubleValue(), juce::sendNotificationSync);
+        else if (c.startsWith("earclick/")) earClick.setValue(c.fromFirstOccurrenceOf("earclick/", false, false).getDoubleValue(), juce::sendNotificationSync);
         else if (c.startsWith("click/")) { click.setToggleState(c.endsWith("1"), juce::dontSendNotification); applyClick(); }
         else if (c.startsWith("clickmain/"))
         {
@@ -677,6 +724,7 @@ private:
     {
         juce::String j = "{\"playing\":" + juce::String(engine && engine->isPlaying() ? "true" : "false") + ",\"scene\":\"" + juce::String(scene)
                        + "\",\"click\":" + (click.getToggleState() ? "true" : "false") + ",\"clickMain\":" + (clickMain.getToggleState() ? "true" : "false")
+                       + ",\"earMusic\":" + juce::String(earMusic.getValue(), 1) + ",\"earClick\":" + juce::String(earClick.getValue(), 1)
                        + ",\"error\":" + juce::JSON::toString(error) + ",\"scenes\":[";
         for (int i = 0; i < int(std::size(kScenes)); ++i) j << "[\"" << kScenes[i] << "\"," << juce::JSON::toString(juce::String::fromUTF8(kSceneTitles[i])) << "],";
         j << "[\"improv\",\"Improvisation\"],[\"concert\",\"The whole concert\"]]}";
@@ -785,7 +833,9 @@ private:
     juce::Slider feedback;
     juce::Label feedbackLabel { {}, "Song feedback" }, outputLabel { {}, "Output" };
     juce::Slider output;
-    std::atomic<float> outGain { 0.5f };
+    std::atomic<float> outGain { 0.5f }, earMusicGain { 0.25f }, earClickGain { 1.0f };
+    juce::Slider earMusic, earClick;
+    juce::Label earMusicLabel { {}, "In-ear music (out 3/4)" }, earClickLabel { {}, "In-ear click" };
     juce::ToggleButton fxOn[3];
     juce::Slider fxKnob[std::size(kFxKnobs)];
     juce::Label fxLabel[std::size(kFxKnobs)];
