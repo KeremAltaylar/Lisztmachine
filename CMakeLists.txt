@@ -25,6 +25,11 @@ set(SFIZZ_GIT_SUBMODULE_CHECK OFF CACHE BOOL "" FORCE)
 if(APPLE AND CMAKE_OSX_ARCHITECTURES STREQUAL "arm64")
     set(PROJECT_SYSTEM_PROCESSOR "aarch64" CACHE STRING "" FORCE)
 endif()
+# Apple clang 17 makes sfizz's atomic_queue (`Base::template do_pop_any(...)` without <>) an error by default; the
+# code is right, only the style check is new. Off for the third-party code built below (sfizz and its parts).
+if(APPLE)
+    add_compile_options(-Wno-missing-template-arg-list-after-template-kw -Wno-nan-infinity-disabled)
+endif()
 FetchContent_Declare(sfizz
     URL https://github.com/sfztools/sfizz/releases/download/1.2.3/sfizz-1.2.3.tar.gz
     URL_HASH SHA256=a9339eac7620d7f0f6b44bdfe860680fab73e66efad4b5f15b21198dd9436822)
