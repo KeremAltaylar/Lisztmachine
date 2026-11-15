@@ -44,6 +44,9 @@ say "5/6 Building the app (10-20 minutes the first time)"
 cmake -S "$DIR" -B "$DIR/build" -DCMAKE_BUILD_TYPE=Release -DCMAKE_POLICY_VERSION_MINIMUM=3.5 >/dev/null || die "Could not prepare the build."
 cmake --build "$DIR/build" --target Lisztmachine --parallel 8 2>&1 | grep -E " error |error:|Built target Lisztmachine" | tail -5
 [ -d "$DIR/build/Lisztmachine_artefacts/Release/Lisztmachine.app" ] || die "The build did not finish: send the lines above to Claude."
+# each build is a new ad-hoc signature, and macOS then silently hands the app silence for its inputs (both at -120 dB,
+# 2026-11-15): the old answer is forgotten so the app asks again ("Allow") when it opens
+tccutil reset Microphone com.keremaltaylar.lisztmachine >/dev/null 2>&1 || true
 
 say "6/6 A launcher on the Desktop"
 L="$HOME/Desktop/Start Lisztmachine.command"
