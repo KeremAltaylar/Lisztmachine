@@ -340,7 +340,7 @@ function liveLink(waiting) {
       while (lv.length < i) lv.push(lv[lv.length - 1]);
       lv[i] = m.v;
       L.levels++;
-      if (m.in != null) L.onMeter?.(m.in);
+      if (m.in != null) L.onMeter?.(m.in, m);
     });
     es.addEventListener('stop', () => { L.stopped = true; });
     // the kick on the interface's input 1, detected by the app (2026-11-15): the drum-pad effect without a browser input
@@ -3162,7 +3162,9 @@ registerProcessor('master-fx', MasterFx);`;
   function padStatus() {
     const el = $('pad-state');
     if (!pad.on) return;
-    el.textContent = (LIVE ? 'Kick on input 1 · ' : 'On · input ') + dB(pad.meter).toFixed(0) + ' dB · threshold ' + dB(pad.thr).toFixed(0) + ' dB ( [ ] )' + (pad.lit > 0 ? '  ●' : '');
+    el.textContent = (LIVE ? 'Kick on input 1 · ' : 'On · input ') + dB(pad.meter).toFixed(0) + ' dB · threshold ' + dB(pad.thr).toFixed(0) + ' dB ( [ ] )' + (pad.lit > 0 ? '  ●' : '')
+      + (LIVE && pad.in2 != null ? '   |   Drum pad on input 2 · ' + dB(pad.in2).toFixed(0) + ' dB · threshold ' + dB(LIVE.app?.pad2Thr ?? 0.02).toFixed(0) + ' dB ( { } )' + (pad.lit2 > 0 ? '  ●' : '') : '');
+    if (pad.lit2 > 0) pad.lit2--;
     if (pad.lit > 0) pad.lit--;
   }
   async function padStart() {
@@ -3209,7 +3211,7 @@ registerProcessor('master-fx', MasterFx);`;
     for (const id of ['pad-go', 'pad-device', 'pad-ch']) $(id).hidden = true;
     pad.on = true;
     LIVE.onHit = m => padHit(Math.max(0.15, Math.min(1, (dB(m.peak) - dB(pad.thr)) / 30)), Math.max(0, Math.min(1, (Math.log10(m.ratio + 1e-9) + 2.2) / 2)));
-    LIVE.onMeter = x => { pad.meter = x; };
+    LIVE.onMeter = (x, m) => { pad.meter = x; if (m.in2 != null) pad.in2 = m.in2; if (m.hits2 != null && m.hits2 !== pad.hits2) { if (pad.hits2 != null) pad.lit2 = 6; pad.hits2 = m.hits2; } };
     LIVE.onThr = x => { pad.thr = x; };
     if (LIVE.app?.padThr != null) pad.thr = LIVE.app.padThr;
   }

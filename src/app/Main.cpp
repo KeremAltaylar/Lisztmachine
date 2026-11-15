@@ -860,7 +860,8 @@ private:
                        + ",\"song\":" + juce::String(songAt.load(), 4) + ",\"pos\":" + juce::String(pos, 4) + ",\"v\":[";
         for (int r = 0; r < 4; ++r) j << juce::String(std::sqrt(role[r]), 5) << ",";
         j << juce::String(std::sqrt(bus[0]), 5) << "," << juce::String(std::sqrt(bus[1]), 5) << "," << juce::String(master, 5)
-          << "],\"in\":" << juce::String(onset.meterOut.load(), 5) << "}";
+          << "],\"in\":" << juce::String(onset.meterOut.load(), 5) << ",\"in2\":" << juce::String(pad2.meterOut.load(), 5)
+          << ",\"hits2\":" << pad2.hits.load() << "}";
         live.post("lv", j);
     }
 
