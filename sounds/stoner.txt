@@ -138,4 +138,4 @@ lead     0.0       0  internal/none
 boom    -4.0    1000  internal/boom  # about 4 dB under the 808 (measured in Doom and Liquid)
 
 # the drum pad on input 2 (2026-11-15): its sound, gain dB
-drumpad -7.1 3rd/Emu/Synths/Disto Brass Pass
+drumpad 6.1 3rd/Emu/Synths/Disto Brass Pass

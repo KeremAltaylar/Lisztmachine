@@ -287,7 +287,22 @@ function liveLink(waiting) {
     // the drum pad on input 2 (2026-11-15): a note of the chord on the song's own synth; its level here, its sensitivity { }
     const padVol = ear('Drum pad', 'padvol', -60, 12);
     padVol.box.title = 'The drum pad on input 2: { } sets how hard a hit must be';
-    bar.append(sel, play, click, main, earMusic.box, earClick.box, padVol.box, note);
+    // which input is the kick (lights the visuals) and which the drum pad (plays the synth), each its own choice
+    const pick = (label, cmdName) => {
+      const box = Object.assign(document.createElement('label'), { className: 'amt' }), s = document.createElement('select');
+      box.append(label + ' ', s);
+      s.onchange = () => cmd(cmdName + '/' + s.value);
+      return { box, set: (v, n) => {
+        n = Math.max(n || 2, v + 1);
+        if (s.options.length !== n + 1) { s.length = 0; s.add(new Option('Off', -1)); for (let i = 0; i < n; i++) s.add(new Option('Input ' + (i + 1), i)); }
+        if (document.activeElement !== s) s.value = v;
+      } };
+    };
+    const kickIn = pick('Kick → visuals', 'kickin'), padIn = pick('Drum pad → synth', 'padin');
+    const test = Object.assign(document.createElement('button'), { textContent: 'Test pad sound', title: 'One note on the pad synth of this song, as a hit plays it' });
+    test.onclick = () => cmd('padtest');
+    const padName = Object.assign(document.createElement('span'), { className: 'padname' });
+    bar.append(sel, play, click, main, earMusic.box, earClick.box, kickIn.box, padIn.box, padVol.box, test, padName, note);
     L.pad2 = k => { if (L.app?.pad2Thr != null) cmd('pad2thr/' + Math.max(0.001, Math.min(0.5, L.app.pad2Thr * k)).toFixed(5)); };
     sel.onchange = () => cmd('scene/' + sel.value);
     play.onclick = () => cmd(L.app?.playing ? 'stop' : 'play');
@@ -304,6 +319,9 @@ function liveLink(waiting) {
       note.textContent = a.error ? 'App: ' + a.error : '';
       if (a.earMusic != null) { earMusic.set(a.earMusic); earClick.set(a.earClick); }
       if (a.padVol != null) padVol.set(a.padVol);
+      if (a.kickIn != null) { kickIn.set(a.kickIn, a.inputs); padIn.set(a.padIn, a.inputs); }
+      padName.textContent = a.padSound ? 'Pad: ' + a.padSound.split('/').pop() : '';
+      padName.title = a.padSound || '';
       if (a.padThr != null) L.onThr?.(a.padThr);
       if (!L.show) waiting(false, true);
     });
@@ -3162,8 +3180,9 @@ registerProcessor('master-fx', MasterFx);`;
   function padStatus() {
     const el = $('pad-state');
     if (!pad.on) return;
-    el.textContent = (LIVE ? 'Kick on input 1 · ' : 'On · input ') + dB(pad.meter).toFixed(0) + ' dB · threshold ' + dB(pad.thr).toFixed(0) + ' dB ( [ ] )' + (pad.lit > 0 ? '  ●' : '')
-      + (LIVE && pad.in2 != null ? '   |   Drum pad on input 2 · ' + dB(pad.in2).toFixed(0) + ' dB · threshold ' + dB(LIVE.app?.pad2Thr ?? 0.02).toFixed(0) + ' dB ( { } )' + (pad.lit2 > 0 ? '  ●' : '') : '');
+    const kin = LIVE?.app?.kickIn ?? 0, pin = LIVE?.app?.padIn ?? 1;
+    el.textContent = (LIVE ? (kin < 0 ? 'Kick off' : 'Kick on input ' + (kin + 1)) + ' · ' : 'On · input ') + dB(pad.meter).toFixed(0) + ' dB · threshold ' + dB(pad.thr).toFixed(0) + ' dB ( [ ] )' + (pad.lit > 0 ? '  ●' : '')
+      + (LIVE && pad.in2 != null ? '   |   ' + (pin < 0 ? 'Drum pad off' : 'Drum pad on input ' + (pin + 1)) + ' · ' + dB(pad.in2).toFixed(0) + ' dB · threshold ' + dB(LIVE.app?.pad2Thr ?? 0.02).toFixed(0) + ' dB ( { } )' + (pad.lit2 > 0 ? '  ●' : '') : '');
     if (pad.lit2 > 0) pad.lit2--;
     if (pad.lit > 0) pad.lit--;
   }

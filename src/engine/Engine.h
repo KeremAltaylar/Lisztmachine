@@ -403,7 +403,7 @@ public:
     // The drum pad on input 2 (Kerem, 2026-11-15): each hit plays one note of the chord sounding now on the song's own
     // synth, fast attack, a medium sustain for two beats, a long release; successive hits climb the chord. Any thread.
     void padHit(float velocity) { padHit_ = juce::jlimit(0.05f, 1.0f, velocity); }
-    juce::String padInfo() const { return pad_.patch + pad_.info; } // which sound, and anything its envelope refused
+    juce::String padInfo() const { return pad_.patch.isEmpty() ? juce::String("no sound") : pad_.patch + pad_.info + (pad_.plugin ? "" : " (not loaded)"); } // which sound, and anything its envelope refused
     std::atomic<float> padLevel { 1.0f }; // the app's pad volume (gain)
     std::atomic<double> padSq { 0 };      // the pad's sum of squares, both channels, for measuring its level
     std::atomic<int64_t> padN { 0 };

@@ -83,14 +83,9 @@ public:
         levelThread.startThread();
         auto saved = props.getUserSettings()->getXmlValue("audio");
         deviceManager.initialise(2, 4, saved.get(), true);
-        // inputs 1 and 2 on, for the kick and the drum pad (a setup saved before 0.13 had no inputs)
-        if (auto setup = deviceManager.getAudioDeviceSetup(); !setup.inputChannels[0] || !setup.inputChannels[1])
-        {
-            setup.inputChannels.setBit(0);
-            setup.inputChannels.setBit(1);
-            setup.useDefaultInputChannels = false;
-            deviceManager.setAudioDeviceSetup(setup, true);
-        }
+        kickIn = props.getUserSettings()->getIntValue("kickIn", 0);
+        padIn = props.getUserSettings()->getIntValue("padIn", 1);
+        allInputs();
         deviceManager.addChangeListener(this);
         reload();
 
@@ -502,8 +497,21 @@ private:
         for (auto* e : { engine.get(), nextEngine.get(), oldEngine.get(), starting.get() }) if (e) e->masterFx.p[p] = v;
     }
 
+    // every input of the interface on, so the kick and the drum pad can be any of them (their numbers are then the channels)
+    void allInputs()
+    {
+        auto* d = deviceManager.getCurrentAudioDevice();
+        if (!d) return;
+        auto setup = deviceManager.getAudioDeviceSetup();
+        bool more = false;
+        for (int i = 0; i < d->getInputChannelNames().size(); ++i) if (!setup.inputChannels[i]) { setup.inputChannels.setBit(i); more = true; }
+        if (!more) return;
+        setup.useDefaultInputChannels = false;
+        deviceManager.setAudioDeviceSetup(setup, true);
+    }
     void changeListenerCallback(juce::ChangeBroadcaster*) override
     {
+        allInputs();
         auto* dev = deviceManager.getCurrentAudioDevice();
         if (!dev || dev->getCurrentSampleRate() != loadedRate || dev->getCurrentBufferSizeSamples() != loadedBlock)
             reload();
@@ -539,8 +547,12 @@ private:
     void audioDeviceIOCallbackWithContext(const float* const* in, int numIn, float* const* out, int numOut, int n,
                                           const juce::AudioIODeviceCallbackContext&) override
     {
-        if (numIn > 0 && in[0] != nullptr) onset.process(in[0], n, loadedRate > 0 ? loadedRate : 48000.0);
-        if (numIn > 1 && in[1] != nullptr) pad2.process(in[1], n, loadedRate > 0 ? loadedRate : 48000.0);
+        // the kick (the visuals) and the drum pad (a note), each on the input chosen for it (-1: off)
+        const int ki = kickIn.load(), pi = padIn.load();
+        if (ki >= 0 && ki < numIn && in[ki] != nullptr) onset.process(in[ki], n, loadedRate > 0 ? loadedRate : 48000.0);
+        if (pi >= 0 && pi < numIn && in[pi] != nullptr) pad2.process(in[pi], n, loadedRate > 0 ? loadedRate : 48000.0);
+        numInputs = numIn;
+        if (padTest.exchange(false) && engine) engine->padHit(0.8f);
         const juce::SpinLock::ScopedLockType sl(audioLock); // held by the message thread only to swap the engines
         // the drum pad on input 2: a note on the playing song's pad synth, as hard as the hit (the page's mapping, 30 dB of range)
         if (const int h = pad2.hits.load(); h != pad2Seen)
@@ -752,6 +764,14 @@ private:
             if (sel && sel != sceneBox.getSelectedId()) sceneBox.setSelectedId(sel, juce::sendNotificationSync);
         }
         else if (c.startsWith("earmusic/")) earMusic.setValue(c.fromFirstOccurrenceOf("earmusic/", false, false).getDoubleValue(), juce::sendNotificationSync);
+        else if (c.startsWith("kickin/") || c.startsWith("padin/")) // which input is the kick, which the drum pad (-1: none)
+        {
+            const bool kick = c.startsWith("kickin/");
+            const int v = juce::jlimit(-1, 63, c.fromLastOccurrenceOf("/", false, false).getIntValue());
+            (kick ? kickIn : padIn) = v;
+            props.getUserSettings()->setValue(kick ? "kickIn" : "padIn", v);
+        }
+        else if (c == "padtest") padTest = true; // one note on the drum pad's synth, as a hit would play it
         else if (c.startsWith("pad2thr/")) // the drum pad's threshold (the page's { } keys)
         {
             pad2.thr = juce::jlimit(0.001f, 0.5f, c.fromFirstOccurrenceOf("pad2thr/", false, false).getFloatValue());
@@ -786,7 +806,8 @@ private:
                        + "\",\"click\":" + (click.getToggleState() ? "true" : "false") + ",\"clickMain\":" + (clickMain.getToggleState() ? "true" : "false")
                        + ",\"earMusic\":" + juce::String(earMusic.getValue(), 1) + ",\"earClick\":" + juce::String(earClick.getValue(), 1)
                        + ",\"padThr\":" + juce::String(onset.thr.load(), 5) + ",\"pad2Thr\":" + juce::String(pad2.thr.load(), 5)
-                       + ",\"padVol\":" + juce::String(padDb, 1)
+                       + ",\"padVol\":" + juce::String(padDb, 1) + ",\"kickIn\":" + juce::String(kickIn.load()) + ",\"padIn\":" + juce::String(padIn.load())
+                       + ",\"inputs\":" + juce::String(numInputs.load()) + ",\"padSound\":" + juce::JSON::toString(engine ? engine->padInfo() : juce::String())
                        + ",\"error\":" + juce::JSON::toString(error) + ",\"scenes\":[";
         for (int i = 0; i < int(std::size(kScenes)); ++i) j << "[\"" << kScenes[i] << "\"," << juce::JSON::toString(juce::String::fromUTF8(kSceneTitles[i])) << "],";
         j << "[\"improv\",\"Improvisation\"],[\"concert\",\"The whole concert\"]]}";
@@ -812,6 +833,7 @@ private:
         j << "}";
         songAt = at;
         live.song(j.toString());
+        sendState(); // the page shows the new song's pad sound
     }
     // the seven levels of a show.json block (roles, delay, reverb, master), from the engines' meters since the last tick
     struct MeterMark { double sq[kMaxTracks + 2] = {}; int64_t n[kMaxTracks + 2] = {}; };
@@ -909,6 +931,8 @@ private:
     } onset, pad2; // input 1 the kick (the visuals), input 2 the drum pad (a note)
     int hitsSent = 0, pad2Seen = 0;
     double padDb = 0; // the drum pad's level, dB (-60: off)
+    std::atomic<int> kickIn { 0 }, padIn { 1 }, numInputs { 0 }; // the kick's and the drum pad's input (0 = input 1), how many there are
+    std::atomic<bool> padTest { false };
     void sendHits() // the level thread, every 10 ms
     {
         const int h = onset.hits.load();

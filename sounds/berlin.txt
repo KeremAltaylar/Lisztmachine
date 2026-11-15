@@ -66,4 +66,4 @@ drive sub  0.55 2500
 boom    -4.0    1000  internal/boom  # about 4 dB under the sub (measured in the Haze-Theme bars)
 
 # the drum pad on input 2 (2026-11-15): its sound, gain dB
-drumpad 0 Plucks/Fog
+drumpad 8.3 Plucks/Fog

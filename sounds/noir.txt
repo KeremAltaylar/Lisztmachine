@@ -106,4 +106,4 @@ lead     0.0       0  internal/none
 boom    -2.0    1000  internal/boom  # +2: level with the other songs (rms -25)
 
 # the drum pad on input 2 (2026-11-15): its sound, gain dB
-drumpad -6.0 3rd/Giana Brotherz/Keys/Glassy E-Piano
+drumpad 2.7 3rd/Giana Brotherz/Keys/Glassy E-Piano

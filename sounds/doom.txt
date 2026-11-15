@@ -130,4 +130,4 @@ delay lead 0.75 0.35 0.22
 boom    -1.0    1000  internal/boom  # about 4 dB under the 808, +3 under the guitars
 
 # the drum pad on input 2 (2026-11-15): its sound, gain dB
-drumpad 2.0 3rd/Rozzer/Leads/Dark Heart
+drumpad 2.7 3rd/Rozzer/Leads/Dark Heart
