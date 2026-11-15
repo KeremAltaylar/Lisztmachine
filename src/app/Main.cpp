@@ -497,18 +497,31 @@ private:
         for (auto* e : { engine.get(), nextEngine.get(), oldEngine.get(), starting.get() }) if (e) e->masterFx.p[p] = v;
     }
 
-    // every input of the interface on, so the kick and the drum pad can be any of them (their numbers are then the channels)
+    // inputs 1 and 2 on, and whichever the kick and the drum pad are set to (opening every input broke the hits on
+    // Kerem's Apollo, 2026-11-15); then where each chosen input sits among the open ones, which is what the callback gets
     void allInputs()
     {
         auto* d = deviceManager.getCurrentAudioDevice();
-        if (!d) return;
+        if (!d) { kickSlot = padSlot = -1; return; }
+        numInputs = d->getInputChannelNames().size();
         auto setup = deviceManager.getAudioDeviceSetup();
-        bool more = false;
-        for (int i = 0; i < d->getInputChannelNames().size(); ++i) if (!setup.inputChannels[i]) { setup.inputChannels.setBit(i); more = true; }
-        if (!more) return;
-        setup.useDefaultInputChannels = false;
-        deviceManager.setAudioDeviceSetup(setup, true);
+        juce::BigInteger want; // only these (0.13's saved setup had every input on)
+        for (int ch : { 0, 1, kickIn.load(), padIn.load() }) if (ch >= 0 && ch < numInputs.load()) want.setBit(ch);
+        const auto tried = d->getName() + want.toString(2);
+        if (want != setup.inputChannels && tried != inputsTried) // once per device and set: a device that refuses one would loop
+        {
+            inputsTried = tried;
+            setup.inputChannels = want;
+            setup.useDefaultInputChannels = false;
+            deviceManager.setAudioDeviceSetup(setup, true);
+        }
+        const auto open = d->getActiveInputChannels();
+        const auto slot = [&](int ch) { return ch >= 0 && open[ch] ? open.getBitRange(0, ch).countNumberOfSetBits() : -1; };
+        kickSlot = slot(kickIn.load());
+        padSlot = slot(padIn.load());
     }
+    juce::String inputsTried;
+    std::atomic<int> kickSlot { 0 }, padSlot { 1 };
     void changeListenerCallback(juce::ChangeBroadcaster*) override
     {
         allInputs();
@@ -548,10 +561,9 @@ private:
                                           const juce::AudioIODeviceCallbackContext&) override
     {
         // the kick (the visuals) and the drum pad (a note), each on the input chosen for it (-1: off)
-        const int ki = kickIn.load(), pi = padIn.load();
+        const int ki = kickSlot.load(), pi = padSlot.load();
         if (ki >= 0 && ki < numIn && in[ki] != nullptr) onset.process(in[ki], n, loadedRate > 0 ? loadedRate : 48000.0);
         if (pi >= 0 && pi < numIn && in[pi] != nullptr) pad2.process(in[pi], n, loadedRate > 0 ? loadedRate : 48000.0);
-        numInputs = numIn;
         if (padTest.exchange(false) && engine) engine->padHit(0.8f);
         const juce::SpinLock::ScopedLockType sl(audioLock); // held by the message thread only to swap the engines
         // the drum pad on input 2: a note on the playing song's pad synth, as hard as the hit (the page's mapping, 30 dB of range)
@@ -770,6 +782,7 @@ private:
             const int v = juce::jlimit(-1, 63, c.fromLastOccurrenceOf("/", false, false).getIntValue());
             (kick ? kickIn : padIn) = v;
             props.getUserSettings()->setValue(kick ? "kickIn" : "padIn", v);
+            allInputs();
         }
         else if (c == "padtest") padTest = true; // one note on the drum pad's synth, as a hit would play it
         else if (c.startsWith("pad2thr/")) // the drum pad's threshold (the page's { } keys)
@@ -909,7 +922,8 @@ private:
             const float t = thr.load();
             for (int i = 0; i < n; ++i)
             {
-                hp = 0.996f * (hp + x[i] - px); px = x[i]; // rumble out
+                const float xi = std::isfinite(x[i]) ? x[i] : 0.0f; // one bad sample would leave slow NaN and no hit ever again
+                hp = 0.996f * (hp + xi - px); px = xi; // rumble out
                 const float a = std::abs(hp), d = hp - lp;
                 lp = hp;
                 fast = juce::jmax(a, fast * 0.9985f);
