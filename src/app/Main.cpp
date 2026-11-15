@@ -501,26 +501,31 @@ private:
     // Kerem's Apollo, 2026-11-15); then where each chosen input sits among the open ones, which is what the callback gets
     void allInputs()
     {
-        auto* d = deviceManager.getCurrentAudioDevice();
-        if (!d) { kickSlot = padSlot = -1; return; }
-        numInputs = d->getInputChannelNames().size();
         auto setup = deviceManager.getAudioDeviceSetup();
+        // a setup saved before the app listened (0.12) has no input device at all, so every input read -120 dB on Kerem's
+        // Mac (2026-11-15): the output device (the Apollo) is the input device too
+        if (setup.inputDeviceName.isEmpty()) setup.inputDeviceName = setup.outputDeviceName;
         juce::BigInteger want; // only these (0.13's saved setup had every input on)
-        for (int ch : { 0, 1, kickIn.load(), padIn.load() }) if (ch >= 0 && ch < numInputs.load()) want.setBit(ch);
-        const auto tried = d->getName() + want.toString(2);
-        if (want != setup.inputChannels && tried != inputsTried) // once per device and set: a device that refuses one would loop
-        {
+        for (int ch : { 0, 1, kickIn.load(), padIn.load() }) if (ch >= 0) want.setBit(ch);
+        const auto tried = setup.inputDeviceName + want.toString(2);
+        const auto now = deviceManager.getAudioDeviceSetup();
+        if ((want != now.inputChannels || setup.inputDeviceName != now.inputDeviceName) && tried != inputsTried) // once per
+        {                                                                    // device and set: a device that refuses one would loop
             inputsTried = tried;
             setup.inputChannels = want;
             setup.useDefaultInputChannels = false;
             deviceManager.setAudioDeviceSetup(setup, true);
         }
+        auto* d = deviceManager.getCurrentAudioDevice(); // after the change: it may be a new device
+        if (!d) { kickSlot = padSlot = -1; numInputs = 0; return; }
+        numInputs = d->getInputChannelNames().size();
+        inputName = deviceManager.getAudioDeviceSetup().inputDeviceName;
         const auto open = d->getActiveInputChannels();
         const auto slot = [&](int ch) { return ch >= 0 && open[ch] ? open.getBitRange(0, ch).countNumberOfSetBits() : -1; };
         kickSlot = slot(kickIn.load());
         padSlot = slot(padIn.load());
     }
-    juce::String inputsTried;
+    juce::String inputsTried, inputName;
     std::atomic<int> kickSlot { 0 }, padSlot { 1 };
     void changeListenerCallback(juce::ChangeBroadcaster*) override
     {
@@ -820,7 +825,7 @@ private:
                        + ",\"earMusic\":" + juce::String(earMusic.getValue(), 1) + ",\"earClick\":" + juce::String(earClick.getValue(), 1)
                        + ",\"padThr\":" + juce::String(onset.thr.load(), 5) + ",\"pad2Thr\":" + juce::String(pad2.thr.load(), 5)
                        + ",\"padVol\":" + juce::String(padDb, 1) + ",\"kickIn\":" + juce::String(kickIn.load()) + ",\"padIn\":" + juce::String(padIn.load())
-                       + ",\"inputs\":" + juce::String(numInputs.load()) + ",\"padSound\":" + juce::JSON::toString(engine ? engine->padInfo() : juce::String())
+                       + ",\"inputs\":" + juce::String(numInputs.load()) + ",\"inDev\":" + juce::JSON::toString(inputName) + ",\"padSound\":" + juce::JSON::toString(engine ? engine->padInfo() : juce::String())
                        + ",\"error\":" + juce::JSON::toString(error) + ",\"scenes\":[";
         for (int i = 0; i < int(std::size(kScenes)); ++i) j << "[\"" << kScenes[i] << "\"," << juce::JSON::toString(juce::String::fromUTF8(kSceneTitles[i])) << "],";
         j << "[\"improv\",\"Improvisation\"],[\"concert\",\"The whole concert\"]]}";
