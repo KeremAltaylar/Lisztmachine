@@ -108,7 +108,7 @@ nav button[aria-pressed="true"] { color: var(--ember); }
       <button class="go" id="piece-live" data-piece="live" disabled>Live from the app</button>
     </div>
     <button class="go" id="go" hidden disabled>Loading…</button>
-    <p class="keys"><kbd>1</kbd>–<kbd>9</kbd> study · <kbd>G</kbd> new look · <kbd>Space</kbd> pause · <kbd>←</kbd><kbd>→</kbd> 10 s · <kbd>↑</kbd><kbd>↓</kbd> section · <kbd>S</kbd> strobe on/off · <kbd>B</kbd> feedback on/off · <kbd>K</kbd> test drum hit · <kbd>[</kbd><kbd>]</kbd> pad sensitivity · <kbd>,</kbd><kbd>.</kbd> pad effect · <kbd>P</kbd> hits: affect / layer / off · <kbd>M</kbd> metronome on/off · <kbd>C</kbd> code in the picture on/off · <kbd>V</kbd> the machine's voice: bottom, top, off · <kbd>H</kbd> hide controls · <kbd>F</kbd> full screen</p>
+    <p class="keys"><kbd>1</kbd>–<kbd>9</kbd> study · <kbd>G</kbd> new look · <kbd>Space</kbd> pause · <kbd>←</kbd><kbd>→</kbd> 10 s · <kbd>↑</kbd><kbd>↓</kbd> section · <kbd>S</kbd> strobe on/off · <kbd>B</kbd> feedback on/off · <kbd>K</kbd> test drum hit · <kbd>[</kbd><kbd>]</kbd> kick sensitivity · <kbd>{</kbd><kbd>}</kbd> drum pad sensitivity (input 2) · <kbd>,</kbd><kbd>.</kbd> pad effect · <kbd>P</kbd> hits: affect / layer / off · <kbd>M</kbd> metronome on/off · <kbd>C</kbd> code in the picture on/off · <kbd>V</kbd> the machine's voice: bottom, top, off · <kbd>H</kbd> hide controls · <kbd>F</kbd> full screen</p>
     <p class="err" id="err" hidden></p>
   </div>
 </div>
@@ -284,7 +284,11 @@ function liveLink(waiting) {
       return { box, set: x => { if (document.activeElement !== r) { r.value = x; r.oninput(); } } };
     };
     const earMusic = ear('In-ear music', 'earmusic', -60, 0), earClick = ear('In-ear click', 'earclick', -30, 12);
-    bar.append(sel, play, click, main, earMusic.box, earClick.box, note);
+    // the drum pad on input 2 (2026-11-15): a note of the chord on the song's own synth; its level here, its sensitivity { }
+    const padVol = ear('Drum pad', 'padvol', -60, 12);
+    padVol.box.title = 'The drum pad on input 2: { } sets how hard a hit must be';
+    bar.append(sel, play, click, main, earMusic.box, earClick.box, padVol.box, note);
+    L.pad2 = k => { if (L.app?.pad2Thr != null) cmd('pad2thr/' + Math.max(0.001, Math.min(0.5, L.app.pad2Thr * k)).toFixed(5)); };
     sel.onchange = () => cmd('scene/' + sel.value);
     play.onclick = () => cmd(L.app?.playing ? 'stop' : 'play');
     click.onclick = () => cmd('click/' + (L.app?.click ? 0 : 1));
@@ -299,6 +303,7 @@ function liveLink(waiting) {
       main.textContent = 'On speakers ' + (a.clickMain ? 'on' : 'off'); main.setAttribute('aria-pressed', a.clickMain);
       note.textContent = a.error ? 'App: ' + a.error : '';
       if (a.earMusic != null) { earMusic.set(a.earMusic); earClick.set(a.earClick); }
+      if (a.padVol != null) padVol.set(a.padVol);
       if (a.padThr != null) L.onThr?.(a.padThr);
       if (!L.show) waiting(false, true);
     });
@@ -2942,6 +2947,8 @@ registerProcessor('master-fx', MasterFx);`;
     else if (e.key === 'm' || e.key === 'M') { if (LIVE) LIVE.bar.children[2].click(); else setMetro(!metro.on); }
     else if (e.key === '[') { setThr(1.25); }
     else if (e.key === ']') { setThr(0.8); }
+    else if (e.key === '{') LIVE?.pad2(1.25);   // the drum pad (input 2): harder hits only
+    else if (e.key === '}') LIVE?.pad2(0.8);
     else if (e.key === 'g' || e.key === 'G') { roll(); }
     else if (e.key === 'c' || e.key === 'C') $('code').click();
     else if (e.key === 'v' || e.key === 'V') $('voice-go').click();

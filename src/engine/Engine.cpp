@@ -672,6 +672,8 @@ juce::String Palette::load(const juce::File& file, const std::string& sceneName)
     for (auto& r : releaseS) r = 0;
     for (auto& t : sends) t[0] = t[1] = -1;
     shimmer = 0;
+    padPatch = {};
+    padGainDb = 0;
     if (!file.existsAsFile()) return "no palette at " + file.getFullPathName();
 
     juce::StringArray lines;
@@ -684,6 +686,12 @@ juce::String Palette::load(const juce::File& file, const std::string& sceneName)
         tokens.removeEmptyStrings();
         const auto where = file.getFileName() + " line " + juce::String(n + 1) + ": ";
         if (tokens[0] == "master" && tokens.size() >= 2) { masterDb = tokens[1].getFloatValue(); continue; }
+        if (tokens[0] == "drumpad" && tokens.size() >= 3)
+        {
+            padGainDb = tokens[1].getFloatValue();
+            padPatch = line.trim().fromFirstOccurrenceOf(" ", false, false).trim().fromFirstOccurrenceOf(" ", false, false).trim();
+            continue;
+        }
         if (tokens[0] == "shimmer" && tokens.size() >= 2) { shimmer = juce::jlimit(0.0f, 0.9f, tokens[1].getFloatValue()); continue; }
         if (tokens[0] == "send" && tokens.size() >= 4 && (tokens[2] == "delay" || tokens[2] == "reverb"))
         {
@@ -959,6 +967,45 @@ juce::String Engine::load(double sampleRate, int maxBlock, const Palette& palett
     fbBus_.prepare(sampleRate);
     reverbBus_.setSize(busChannels(*reverb_), maxBlock);
 
+    // The drum pad's sound: the palette's, else one of the song's own Surge sounds, keys, bells, plucks or mallets
+    // first (a struck sound), from its melody, then its harmony, then any part
+    pad_ = {};
+    pad_.patch = palette.padPatch;
+    float padDb = palette.padGainDb;
+    const auto plainSurge = [](const juce::String& p) {
+        return !isEngineSound(p) && !isDexedSound(p) && !isSfzSound(p) && !isVstSound(p) && findSurgePatch(p).existsAsFile();
+    };
+    for (int pass = 0; pass < 2 && pad_.patch.isEmpty(); ++pass)
+        for (int role : { 3, 0, 2, 1 })
+            for (int i = 0; i < numTracks_ && pad_.patch.isEmpty(); ++i)
+                if (palette.info->role[i] == role)
+                    for (auto& e : palette.parts[i])
+                        if (plainSurge(e.patch) && (pass == 1 || e.patch.containsIgnoreCase("Keys") || e.patch.containsIgnoreCase("Bell")
+                                                    || e.patch.containsIgnoreCase("Pluck") || e.patch.containsIgnoreCase("Mallet")))
+                        { pad_.patch = e.patch; padDb = e.gainDb; break; }
+    if (pad_.patch.isNotEmpty())
+    {
+        guarded([&] {
+            juce::String e;
+            auto p = createSurge(sampleRate, maxBlock, e);
+            if (!p) { pad_.info = " · " + e; return; }
+            p->prepareToPlay(sampleRate, maxBlock);
+            if (e = loadSurgePatch(*p, findSurgePatch(pad_.patch)); e.isNotEmpty()) { pad_.info = " · " + e; return; }
+            purify(*p, true); // in tune with the song: no detune
+            // fast attack, a medium sustain, a long release (Kerem: "short attack long release medium sustain")
+            for (auto sc : { "A", "B" })
+                for (auto [name, value] : { std::pair<const char*, const char*> { "Attack", "3.00 ms" }, { "Decay", "1.20 s" },
+                                            { "Sustain", "45.00 %" }, { "Release", "4.50 s" } })
+                    if (auto err = setParameterText(*p, juce::String(sc) + " Amp EG " + name, value); err.isNotEmpty())
+                        pad_.info << " · " << err.substring(0, 100);
+            p->reset();
+            pad_.buf.setSize(juce::jmax(2, p->getTotalNumInputChannels(), p->getTotalNumOutputChannels()), maxBlock);
+            pad_.plugin = std::move(p);
+        });
+        pad_.gain = juce::Decibels::decibelsToGain(padDb);
+        pad_.midi.ensureSize(1024);
+    }
+
     limiter.prepare(sampleRate, -1.0f, 150.0f);
     glue.prepare(sampleRate);
     masterFx.prepare(sampleRate, maxBlock);
@@ -1165,6 +1212,13 @@ void Engine::start(uint64_t seed, int startBar, bool play)
     clickEnv_ = 0;
     glideN_ = 0;
     holdUntil_ = 0;
+    {   // the drum pad before any chord is heard: the key's tonic and fifth, from "<title> · <tonic> <mode> · ..."
+        static const char* names[] = { "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B" };
+        const auto words = juce::StringArray::fromTokens(juce::String::fromUTF8(composer_->describe().c_str()), " ", "");
+        int tonic = -1;
+        for (auto& w : words) for (int pc = 0; pc < 12 && tonic < 0; ++pc) if (w == names[pc]) tonic = pc;
+        padMask_ = tonic >= 0 ? (1 << tonic) | (1 << ((tonic + 7) % 12)) : 0;
+    }
     const double barSeconds = 4 * 60.0 / composer_->bpm();
     for (int i = 0; i < numTracks_; ++i)
     {
@@ -1569,6 +1623,51 @@ void Engine::renderChunk(float* const* out, int numChannels, int offset, int len
         // sound's slot then carried the echo, never fell quiet, and the track sat 11 dB hot for 20 s).
         if (t.hasEcho) echo(t.mix.getWritePointer(0), t.mix.getWritePointer(1));
         mixTrack(i, t.mix.getReadPointer(0), t.mix.getReadPointer(1));
+    }
+
+    // The drum pad (input 2): a note of the chord sounding now, played live, so the song's silences do not touch it
+    if (pad_.plugin)
+    {
+        int mask = 0; // the chord heard now: the harmony's held notes, else the melody's, the rhythm's, the bass's
+        for (int role : { 0, 3, 2, 1 })
+        {
+            for (int i = 0; i < numTracks_; ++i)
+                if (palette_.info->role[i] == role && !tracks_[i].internal)
+                    for (int p = 0; p < 128; ++p) if (tracks_[i].held[p] > 0) mask |= 1 << (p % 12);
+            if (mask) break;
+        }
+        if (mask) padMask_ = mask;
+        if (const float v = padHit_.exchange(0); v > 0 && padMask_)
+        {
+            if (pad_.note >= 0) pad_.midi.addEvent(juce::MidiMessage::noteOff(1, pad_.note), 0);
+            int pcs[12], n = 0;
+            for (int pc = 0; pc < 12; ++pc) if (padMask_ & (1 << pc)) pcs[n++] = pc;
+            const int k = pad_.count++ % (2 * n); // up the chord over two octaves from middle C, then again
+            pad_.note = 60 + pcs[k % n] + 12 * (k / n);
+            pad_.midi.addEvent(juce::MidiMessage::noteOn(1, pad_.note, v), 0);
+            pad_.left = int64_t(2 * kPPQ * samplesPerTick_); // held two beats, then the long release
+        }
+        else if (pad_.note >= 0 && (pad_.left -= len) <= 0)
+        {
+            pad_.midi.addEvent(juce::MidiMessage::noteOff(1, pad_.note), 0);
+            pad_.note = -1;
+        }
+        pad_.buf.clear();
+        juce::AudioBuffer<float> view(pad_.buf.getArrayOfWritePointers(), pad_.buf.getNumChannels(), len);
+        pad_.plugin->processBlock(view, pad_.midi);
+        pad_.midi.clear();
+        const float g = pad_.gain * padLevel.load();
+        double sq = 0;
+        for (int c = 0; c < 2; ++c)
+        {
+            const float* x = view.getReadPointer(juce::jmin(c, view.getNumChannels() - 1));
+            for (int n = 0; n < len; ++n) sq += double(x[n] * g) * double(x[n] * g);
+            juce::FloatVectorOperations::addWithMultiply(pa[c], x, g, len);
+            juce::FloatVectorOperations::addWithMultiply(delayIn.getWritePointer(c), x, 0.25f * g, len);
+            juce::FloatVectorOperations::addWithMultiply(reverbIn.getWritePointer(c), x, 0.5f * g, len);
+        }
+        padSq = padSq.load() + sq;
+        padN = padN.load() + 2 * len;
     }
 
     // The shared buses: the delay returns to the mix and also feeds the reverb.

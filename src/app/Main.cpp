@@ -78,13 +78,16 @@ public:
         levelThread.tick = [this] { sendLevels(); };
         levelThread.hit = [this] { sendHits(); };
         onset.thr = float(props.getUserSettings()->getDoubleValue("padThr", 0.02));
+        pad2.thr = float(props.getUserSettings()->getDoubleValue("pad2Thr", 0.02));
+        padDb = props.getUserSettings()->getDoubleValue("padVol", 0.0);
         levelThread.startThread();
         auto saved = props.getUserSettings()->getXmlValue("audio");
-        deviceManager.initialise(1, 4, saved.get(), true);
-        // input 1 on, for the kick (a setup saved before 0.13 had no inputs)
-        if (auto setup = deviceManager.getAudioDeviceSetup(); !setup.inputChannels[0])
+        deviceManager.initialise(2, 4, saved.get(), true);
+        // inputs 1 and 2 on, for the kick and the drum pad (a setup saved before 0.13 had no inputs)
+        if (auto setup = deviceManager.getAudioDeviceSetup(); !setup.inputChannels[0] || !setup.inputChannels[1])
         {
             setup.inputChannels.setBit(0);
+            setup.inputChannels.setBit(1);
             setup.useDefaultInputChannels = false;
             deviceManager.setAudioDeviceSetup(setup, true);
         }
@@ -537,7 +540,15 @@ private:
                                           const juce::AudioIODeviceCallbackContext&) override
     {
         if (numIn > 0 && in[0] != nullptr) onset.process(in[0], n, loadedRate > 0 ? loadedRate : 48000.0);
+        if (numIn > 1 && in[1] != nullptr) pad2.process(in[1], n, loadedRate > 0 ? loadedRate : 48000.0);
         const juce::SpinLock::ScopedLockType sl(audioLock); // held by the message thread only to swap the engines
+        // the drum pad on input 2: a note on the playing song's pad synth, as hard as the hit (the page's mapping, 30 dB of range)
+        if (const int h = pad2.hits.load(); h != pad2Seen)
+        {
+            pad2Seen = h;
+            const float db = juce::Decibels::gainToDecibels(pad2.lastPeak.load(), -120.0f) - juce::Decibels::gainToDecibels(pad2.thr.load(), -120.0f);
+            if (engine) engine->padHit(juce::jlimit(0.15f, 1.0f, db / 30.0f));
+        }
         // the whole concert's next song starts on the sample its first beat is due (where the click's glide lands); read
         // before this block moves the playing song on
         if (starting && !starting->isPlaying())
@@ -628,6 +639,7 @@ private:
         for (int k = 0; k < MasterFx::NumParams; ++k) e.masterFx.p[k] = fxValue(MasterFx::Param(k));
         e.clickLevel = click.getToggleState() ? 0.5f : 0.0f;
         e.clickToMain = clickMain.getToggleState();
+        e.padLevel = juce::Decibels::decibelsToGain(float(padDb));
         if (e.hasFeedbackBus()) e.feedbackBus = float(feedback.getValue() / 100.0);
     }
     struct Loader : juce::Thread
@@ -740,6 +752,18 @@ private:
             if (sel && sel != sceneBox.getSelectedId()) sceneBox.setSelectedId(sel, juce::sendNotificationSync);
         }
         else if (c.startsWith("earmusic/")) earMusic.setValue(c.fromFirstOccurrenceOf("earmusic/", false, false).getDoubleValue(), juce::sendNotificationSync);
+        else if (c.startsWith("pad2thr/")) // the drum pad's threshold (the page's { } keys)
+        {
+            pad2.thr = juce::jlimit(0.001f, 0.5f, c.fromFirstOccurrenceOf("pad2thr/", false, false).getFloatValue());
+            props.getUserSettings()->setValue("pad2Thr", double(pad2.thr.load()));
+        }
+        else if (c.startsWith("padvol/")) // the drum pad's level, dB
+        {
+            padDb = juce::jlimit(-60.0, 12.0, c.fromFirstOccurrenceOf("padvol/", false, false).getDoubleValue());
+            props.getUserSettings()->setValue("padVol", padDb);
+            for (auto* e : { engine.get(), nextEngine.get(), oldEngine.get(), starting.get() })
+                if (e) e->padLevel = padDb <= -60 ? 0.0f : juce::Decibels::decibelsToGain(float(padDb));
+        }
         else if (c.startsWith("padthr/")) // the kick detector's threshold (the page's [ ] keys)
         {
             onset.thr = juce::jlimit(0.001f, 0.5f, c.fromFirstOccurrenceOf("padthr/", false, false).getFloatValue());
@@ -761,7 +785,8 @@ private:
         juce::String j = "{\"playing\":" + juce::String(engine && engine->isPlaying() ? "true" : "false") + ",\"scene\":\"" + juce::String(scene)
                        + "\",\"click\":" + (click.getToggleState() ? "true" : "false") + ",\"clickMain\":" + (clickMain.getToggleState() ? "true" : "false")
                        + ",\"earMusic\":" + juce::String(earMusic.getValue(), 1) + ",\"earClick\":" + juce::String(earClick.getValue(), 1)
-                       + ",\"padThr\":" + juce::String(onset.thr.load(), 5)
+                       + ",\"padThr\":" + juce::String(onset.thr.load(), 5) + ",\"pad2Thr\":" + juce::String(pad2.thr.load(), 5)
+                       + ",\"padVol\":" + juce::String(padDb, 1)
                        + ",\"error\":" + juce::JSON::toString(error) + ",\"scenes\":[";
         for (int i = 0; i < int(std::size(kScenes)); ++i) j << "[\"" << kScenes[i] << "\"," << juce::JSON::toString(juce::String::fromUTF8(kSceneTitles[i])) << "],";
         j << "[\"improv\",\"Improvisation\"],[\"concert\",\"The whole concert\"]]}";
@@ -880,8 +905,9 @@ private:
             }
             meterOut = meter;
         }
-    } onset;
-    int hitsSent = 0;
+    } onset, pad2; // input 1 the kick (the visuals), input 2 the drum pad (a note)
+    int hitsSent = 0, pad2Seen = 0;
+    double padDb = 0; // the drum pad's level, dB (-60: off)
     void sendHits() // the level thread, every 10 ms
     {
         const int h = onset.hits.load();

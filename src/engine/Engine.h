@@ -61,6 +61,8 @@ struct Palette
     float releaseS[kMaxTracks] = {};    // "release <track> seconds": a Surge sound's amp envelope lets go at least this slowly
     float sends[kMaxTracks][2];         // "send <track>|all delay|reverb amount": over the scene's sends; -1 keeps them
     float shimmer = 0;                  // "shimmer amount": the reverb also fed an octave up
+    juce::String padPatch;              // "drumpad gainDb Category/Patch": the Surge sound the drum pad (input 2) plays;
+    float padGainDb = 0;                // none: one of the song's own keys, bells or plucks (Engine::load)
     // Lines: "part gain bright Category/Patch" (a Surge patch, or internal/click|blip|sub),
     // "voices ..." for every track of the voice group, "gain ...", "delay ...".
     juce::String load(const juce::File& file, const std::string& scene = "berlin"); // returns an error or empty
@@ -398,6 +400,13 @@ public:
     // thread, once, while it plays.
     void glideClick(double nextBpm, double landSec);
     int64_t landing() const { return holdUntil_.load(); } // the sample the next song's beat 0 falls on
+    // The drum pad on input 2 (Kerem, 2026-11-15): each hit plays one note of the chord sounding now on the song's own
+    // synth, fast attack, a medium sustain for two beats, a long release; successive hits climb the chord. Any thread.
+    void padHit(float velocity) { padHit_ = juce::jlimit(0.05f, 1.0f, velocity); }
+    juce::String padInfo() const { return pad_.patch + pad_.info; } // which sound, and anything its envelope refused
+    std::atomic<float> padLevel { 1.0f }; // the app's pad volume (gain)
+    std::atomic<double> padSq { 0 };      // the pad's sum of squares, both channels, for measuring its level
+    std::atomic<int64_t> padN { 0 };
     // Set by a caller that loads off the message thread (the app's next Improvisation song): every plugin is made and
     // given its sound inside it, so it can take the message manager's lock for just that long.
     std::function<void(const std::function<void()>&)> onMessageThread;
@@ -535,6 +544,18 @@ private:
     int glideJ_ = 0, glideI_ = 0;
     std::atomic<int> glideN_ { 0 };
     std::atomic<int64_t> holdUntil_ { 0 };
+    struct PadVoice
+    {
+        std::unique_ptr<juce::AudioPluginInstance> plugin;
+        juce::MidiBuffer midi;
+        juce::AudioBuffer<float> buf;
+        float gain = 1;
+        int note = -1, count = 0;
+        int64_t left = 0; // samples until the note lets go
+        juce::String patch, info;
+    } pad_;
+    std::atomic<float> padHit_ { 0 };
+    int padMask_ = 0; // the chord's pitch classes, bit per class: the last one heard (the key's tonic and fifth before any)
 
     int kickTrack_ = -1;           // its notes duck the others
     float duckEnv_ = 0, duckTarget_ = 0, duckDecay_ = 1;

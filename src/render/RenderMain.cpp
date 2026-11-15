@@ -285,7 +285,8 @@ static float feedbackOverride = -1;            // --feedback 0..0.95: every trac
 static juce::String masterFx;                  // --master-fx Name=value,...: the app's master FX panel
 static float feedbackBus = -1;                 // --feedback-bus 0..0.8: the feedback bus's amount (the app's slider)
 static bool gRaw = false;                      // --raw: without the mix stage (ducking, low cuts, width, glue)
-static bool gStems = false;                    // --stems: also <out>.<track>.wav per track and <out>.delay/.reverb.wav, before the glue
+static double gPadEvery = 0;                   // --pad-every <beats>: a drum-pad hit that often (testing the pad's sound)
+static bool gStems = false;                  // --stems: also <out>.<track>.wav per track and <out>.delay/.reverb.wav, before the glue
 
 // Improvisation as the app plays it (src/app/Main.cpp): song k in one engine, song k+1 made ready silent beside it and
 // started a quarter of the way into k's Release, k ringing out under it in a second engine until it finishes. Writes
@@ -400,6 +401,7 @@ static int renderConcert(uint64_t seed, double seconds, const juce::File& out, i
     }
     sections << c->totalBars() * 4 * 60.0 / c->bpm() << " 0 end\n";
     out.withFileExtension("sections.txt").replaceWithText(sections);
+    std::cout << "drum pad: " << engine.padInfo() << "\n";
     std::cout << "sounds:\n";
     for (auto& ch : engine.soundPlan())
     {
@@ -439,11 +441,13 @@ static int renderConcert(uint64_t seed, double seconds, const juce::File& out, i
     const auto t0 = juce::Time::getMillisecondCounterHiRes();
     int64_t done = 0;
     std::vector<std::array<float, 7>> levels;
-    double lastSq[kMaxTracks + 2] = {};
+    double lastSq[kMaxTracks + 2] = {}, mixSq = 0;
     while (done < total && !engine.isFinished())
     {
         engine.service(); // what the app's timer does: load each part's next sound ahead
         stemBuf.clear();
+        if (gPadEvery > 0 && int64_t(double(done + block) * c->bpm() / 60.0 / sr / gPadEvery) > int64_t(double(done) * c->bpm() / 60.0 / sr / gPadEvery))
+            engine.padHit(0.8f);
         engine.render(buf.getArrayOfWritePointers(), 2, block);
         writer->writeFromAudioSampleBuffer(buf, 0, block);
         for (size_t k = 0; k < stemWriters.size(); ++k)
@@ -467,6 +471,7 @@ static int renderConcert(uint64_t seed, double seconds, const juce::File& out, i
         const float l = buf.getRMSLevel(0, 0, block), r = buf.getRMSLevel(1, 0, block);
         lv[6] = std::sqrt(0.5f * (l * l + r * r));
         levels.push_back(lv);
+        mixSq += double(l * l + r * r) * block;
         done += block;
     }
     writer.reset();
@@ -487,6 +492,9 @@ static int renderConcert(uint64_t seed, double seconds, const juce::File& out, i
     show("delay return", engine.delayMeter);
     show("reverb return", engine.reverbMeter);
     std::cout << "  delay " << engine.delayDescription() << "\n";
+    if (engine.padN.load() > 0 && done > 0)
+        std::cout << "drum pad rms " << juce::String(juce::Decibels::gainToDecibels(std::sqrt(engine.padSq.load() / double(engine.padN.load())), -120.0), 1)
+                  << " dBFS, the mix " << juce::String(juce::Decibels::gainToDecibels(std::sqrt(mixSq / (2.0 * double(done))), -120.0), 1) << " dBFS\n";
     std::cout << "sound changes made " << engine.changesMade << ", missed " << engine.missedChanges << "\n";
     return 0;
 }
@@ -498,6 +506,7 @@ int main(int argc, char** argv)
     juce::StringArray args(argv + 1, argc - 1);
     gRaw = args.contains("--raw");
     gStems = args.contains("--stems");
+    if (int i = args.indexOf("--pad-every"); i >= 0) gPadEvery = args[i + 1].getDoubleValue();
     if (args[0] == "--probe") return probe(args[1], args[2], args[3]); // --probe <vst3> [names,to,match] [Category/Patch]
     if (args[0] == "--test-echo") // one impulse through a track's echo: where each repeat lands and how loud
     {
