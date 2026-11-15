@@ -268,7 +268,7 @@ function liveLink(waiting) {
     const es = new EventSource('http://127.0.0.1:8737/live');
     // the app's controls on the page: one place to play, choose the song and switch the click, which comes from the
     // app's engine on the music's own clock (the page's metronome cannot keep the app's time)
-    const cmd = c => fetch('http://127.0.0.1:8737/cmd/' + c, { mode: 'no-cors' }).catch(() => {});
+    const cmd = L.cmd = c => fetch('http://127.0.0.1:8737/cmd/' + c, { mode: 'no-cors' }).catch(() => {});
     const bar = L.bar = Object.assign(document.createElement('div'), { className: 'appbar' });
     const sel = document.createElement('select'), play = document.createElement('button'), click = document.createElement('button'),
       main = document.createElement('button'), note = document.createElement('span');
@@ -299,6 +299,7 @@ function liveLink(waiting) {
       main.textContent = 'On speakers ' + (a.clickMain ? 'on' : 'off'); main.setAttribute('aria-pressed', a.clickMain);
       note.textContent = a.error ? 'App: ' + a.error : '';
       if (a.earMusic != null) { earMusic.set(a.earMusic); earClick.set(a.earClick); }
+      if (a.padThr != null) L.onThr?.(a.padThr);
       if (!L.show) waiting(false, true);
     });
     let shown = false;
@@ -334,8 +335,11 @@ function liveLink(waiting) {
       while (lv.length < i) lv.push(lv[lv.length - 1]);
       lv[i] = m.v;
       L.levels++;
+      if (m.in != null) L.onMeter?.(m.in);
     });
     es.addEventListener('stop', () => { L.stopped = true; });
+    // the kick on the interface's input 1, detected by the app (2026-11-15): the drum-pad effect without a browser input
+    es.addEventListener('hit', e => L.onHit?.(JSON.parse(e.data)));
     // a song: its notes, parts and look join the show where it is heard
     L.add = m => {
       const sh = L.show, t = m.at - L.T0;
@@ -3151,7 +3155,7 @@ registerProcessor('master-fx', MasterFx);`;
   function padStatus() {
     const el = $('pad-state');
     if (!pad.on) return;
-    el.textContent = 'On · input ' + dB(pad.meter).toFixed(0) + ' dB · threshold ' + dB(pad.thr).toFixed(0) + ' dB ( [ ] )' + (pad.lit > 0 ? '  ●' : '');
+    el.textContent = (LIVE ? 'Kick on input 1 · ' : 'On · input ') + dB(pad.meter).toFixed(0) + ' dB · threshold ' + dB(pad.thr).toFixed(0) + ' dB ( [ ] )' + (pad.lit > 0 ? '  ●' : '');
     if (pad.lit > 0) pad.lit--;
   }
   async function padStart() {
@@ -3194,6 +3198,14 @@ registerProcessor('master-fx', MasterFx);`;
   }
   try { const d = localStorage.getItem('lisztmachine-pad-device'); if (d) $('pad-device').append(Object.assign(document.createElement('option'), { value: d, textContent: 'Last used input', selected: true })); } catch {}
   $('pad-go').onclick = padStart;
+  if (LIVE) {   // the app listens to input 1 (the kick) and sends each hit: no browser input to choose
+    for (const id of ['pad-go', 'pad-device', 'pad-ch']) $(id).hidden = true;
+    pad.on = true;
+    LIVE.onHit = m => padHit(Math.max(0.15, Math.min(1, (dB(m.peak) - dB(pad.thr)) / 30)), Math.max(0, Math.min(1, (Math.log10(m.ratio + 1e-9) + 2.2) / 2)));
+    LIVE.onMeter = x => { pad.meter = x; };
+    LIVE.onThr = x => { pad.thr = x; };
+    if (LIVE.app?.padThr != null) pad.thr = LIVE.app.padThr;
+  }
   setAmt(pad.amt);
   $('pad-amt').oninput = e => setAmt(+e.target.value);
   $('pad-device').onchange = () => { if (pad.on) padStart(); };
@@ -3201,6 +3213,7 @@ registerProcessor('master-fx', MasterFx);`;
   const setThr = k => {
     pad.thr = Math.max(0.001, Math.min(0.5, pad.thr * k));
     pad.node?.port.postMessage({ thr: pad.thr });
+    LIVE?.cmd('padthr/' + pad.thr.toFixed(5));
     try { localStorage.setItem('lisztmachine-pad-thr', pad.thr); } catch {}
   };
 

@@ -117,7 +117,9 @@ target_compile_definitions(liszt_engine PUBLIC
 juce_add_gui_app(Lisztmachine
     PRODUCT_NAME "Lisztmachine"
     COMPANY_NAME "Kerem Altaylar"
-    BUNDLE_ID "com.keremaltaylar.lisztmachine")
+    BUNDLE_ID "com.keremaltaylar.lisztmachine"
+    MICROPHONE_PERMISSION_ENABLED TRUE # input 1: the kick that drives the visuals' drum-pad effect
+    MICROPHONE_PERMISSION_TEXT "Lisztmachine listens to input 1 (the kick drum) to drive the visuals.")
 target_sources(Lisztmachine PRIVATE src/app/Main.cpp)
 target_link_libraries(Lisztmachine PRIVATE liszt_engine)
 if(APPLE) # the palette travels inside the .app

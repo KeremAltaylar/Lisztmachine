@@ -388,6 +388,16 @@ public:
     // play = false: everything made ready (the composer, the first sounds loaded) but silent until go()
     void start(uint64_t seed, int startBar = 0, bool play = true);
     void go() { panic_ = true; playing_ = true; }
+    // Audio thread: go(), `delay` samples into the coming block (the whole concert starts each song on the sample its
+    // click lands on)
+    void goIn(int64_t delay) { pos_ -= delay; go(); }
+    int64_t position() const { return pos_; } // audio thread
+    // The whole concert's click (Kerem, 2026-11-04: "so abrupt ... I adapt to the tempo shift before the next song starts";
+    // in the app 2026-11-15): over this song's last 12-24 s the click glides to the next song's tempo, a whole number of
+    // bars, landing on its first beat at `landSec` (this song's time). The song does not finish before then. Message
+    // thread, once, while it plays.
+    void glideClick(double nextBpm, double landSec);
+    int64_t landing() const { return holdUntil_.load(); } // the sample the next song's beat 0 falls on
     // Set by a caller that loads off the message thread (the app's next Improvisation song): every plugin is made and
     // given its sound inside it, so it can take the message manager's lock for just that long.
     std::function<void(const std::function<void()>&)> onMessageThread;
@@ -520,6 +530,11 @@ private:
     int64_t pos_ = 0, endSample_ = 0, quiet_ = 0; // quiet_: samples of silence after the last bar
     double samplesPerTick_ = 1;
     std::atomic<bool> playing_ { false }, finished_ { false }, panic_ { false };
+    static constexpr int kMaxGlide = 256;
+    int64_t glideAt_[kMaxGlide] = {}; // the glide's clicks (samples), beat glideJ_ on
+    int glideJ_ = 0, glideI_ = 0;
+    std::atomic<int> glideN_ { 0 };
+    std::atomic<int64_t> holdUntil_ { 0 };
 
     int kickTrack_ = -1;           // its notes duck the others
     float duckEnv_ = 0, duckTarget_ = 0, duckDecay_ = 1;

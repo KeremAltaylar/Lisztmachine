@@ -1163,6 +1163,8 @@ void Engine::start(uint64_t seed, int startBar, bool play)
     nextBar_ = startBar + 1;
     pos_ = sampleOf(startTick) - preRollSamples(); // 50 ms pre-roll: the all-notes-off sent on start must reach the plugins before bar 0. Sent in the same block, Surge applied it after the first notes and the opening pad was silent for 8 bars.
     clickEnv_ = 0;
+    glideN_ = 0;
+    holdUntil_ = 0;
     const double barSeconds = 4 * 60.0 / composer_->bpm();
     for (int i = 0; i < numTracks_; ++i)
     {
@@ -1656,7 +1658,7 @@ void Engine::renderChunk(float* const* out, int numChannels, int offset, int len
             for (auto& t : tracks_) for (auto& slot : t.slots) slot.midi.addEvent(juce::MidiMessage::allNotesOff(1), 0);
         quiet_ = post < 3.2e-4f ? quiet_ + len : 0;
     }
-    if (playing && nextBar_ >= composer_->totalBars() && head_ >= events_.size()
+    if (playing && nextBar_ >= composer_->totalBars() && head_ >= events_.size() && pos_ >= holdUntil_.load()
         && (quiet_ > int64_t(sampleRate_ / 2) || pos_ > endSample_ + int64_t(60 * sampleRate_))) // the reverb and delay tails
     {
         finished_ = true;
@@ -1671,14 +1673,23 @@ void Engine::renderClick(float* const* out, int numChannels, int offset, int len
     const int64_t beatTicks = kPPQ;
     const double decay = std::exp(-1.0 / (0.025 * sampleRate_));
     const bool main = clickToMain.load();
+    const int gn = glideN_.load(std::memory_order_acquire);
     for (int n = 0; n < len; ++n)
     {
         const int64_t s = pos_ + n;
+        int64_t beat = -1;
+        if (gn > 0 && s >= glideAt_[0]) // the glide into the next song
+        {
+            while (glideI_ < gn && glideAt_[glideI_] < s) ++glideI_;
+            if (glideI_ < gn && glideAt_[glideI_] == s) beat = glideJ_ + glideI_;
+        }
         // the nearest beat, then whether this is its sample: ceil() overshot to the next beat whenever the beat's sample was
         // rounded up, and at most tempos about half the clicks never sounded (Kerem, 2026-11-14: "some of the metronome
         // hits disappear"; at 106 bpm 981 of 2000 missed, measured)
-        const int64_t beat = int64_t(std::llround(double(s) / samplesPerTick_ / beatTicks));
-        if (sampleOf(beat * beatTicks) == s && s < endSample_)
+        else if (const int64_t b = int64_t(std::llround(double(s) / samplesPerTick_ / beatTicks));
+                 sampleOf(b * beatTicks) == s && s < endSample_)
+            beat = b;
+        if (beat >= 0)
         {
             clickFreq_ = beat % 4 == 0 ? 1760.0 : 1320.0;
             clickEnv_ = clickLevel;
@@ -1691,6 +1702,36 @@ void Engine::renderClick(float* const* out, int numChannels, int offset, int len
         if (numChannels >= 4) out[3][offset + n] = x;
         if (main) for (int c = 0; c < juce::jmin(2, numChannels); ++c) out[c][offset + n] += 0.6f * x;
     }
+}
+
+// The glide (the visuals page's, 2026-11-04): tempo over the ramp b0 + (b1 - b0) u + c u (1 - u), c chosen so the bars come
+// out whole; the start bar is the one that keeps c, the bend, smallest.
+void Engine::glideClick(double b1, double land)
+{
+    holdUntil_ = std::llround(land * sampleRate_);
+    if (!composer_ || b1 <= 0) return;
+    const double b0 = composer_->bpm(), spb = 60 / b0, mean = (b0 + b1) / 2;
+    int j = 0, N = 0;
+    double D = 0, c = 0;
+    for (int jj = int(std::floor((land - 12) / spb / 4)) * 4; jj > 0 && land - jj * spb <= 24; jj -= 4)
+    {
+        const double d = land - jj * spb;
+        const int n = std::max(4, int(std::lround(mean * d / 240)) * 4);
+        const double cc = 6 * (n * 60 / d - mean);
+        if (N == 0 || std::abs(cc) < std::abs(c)) { j = jj; N = n; D = d; c = cc; }
+    }
+    if (N == 0 || N > kMaxGlide || seconds.load() > j * spb - 0.3) return; // too late to glide: the click keeps its tempo
+    const auto phi = [&](double u) { return D / 60 * (b0 * u + (b1 - b0) * u * u / 2 + c * (u * u / 2 - u * u * u / 3)); }; // beats
+    glideAt_[0] = sampleOf(int64_t(j) * kPPQ);
+    for (int i = 1; i < N; ++i)
+    {
+        double lo = 0, hi = 1;
+        for (int it = 0; it < 50; ++it) { const double m = (lo + hi) / 2; (phi(m) < i ? lo : hi) = m; }
+        glideAt_[i] = std::llround((j * spb + lo * D) * sampleRate_);
+    }
+    glideJ_ = j;
+    glideI_ = 0;
+    glideN_.store(N, std::memory_order_release);
 }
 
 // ---------------------------------------------------------------- the engine's own instrument

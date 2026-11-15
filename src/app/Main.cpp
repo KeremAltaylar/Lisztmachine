@@ -76,9 +76,18 @@ public:
 
         seed = juce::jmax<int64_t>(1, props.getUserSettings()->getIntValue("seed", 1)); // before the engine: Improvisation's chain is the seed
         levelThread.tick = [this] { sendLevels(); };
+        levelThread.hit = [this] { sendHits(); };
+        onset.thr = float(props.getUserSettings()->getDoubleValue("padThr", 0.02));
         levelThread.startThread();
         auto saved = props.getUserSettings()->getXmlValue("audio");
-        deviceManager.initialise(0, 4, saved.get(), true);
+        deviceManager.initialise(1, 4, saved.get(), true);
+        // input 1 on, for the kick (a setup saved before 0.13 had no inputs)
+        if (auto setup = deviceManager.getAudioDeviceSetup(); !setup.inputChannels[0])
+        {
+            setup.inputChannels.setBit(0);
+            setup.useDefaultInputChannels = false;
+            deviceManager.setAudioDeviceSetup(setup, true);
+        }
         deviceManager.addChangeListener(this);
         reload();
 
@@ -103,7 +112,7 @@ public:
         feedback.setTextBoxStyle(juce::Slider::TextBoxRight, false, 56, 24);
         feedback.onValueChange = [this] {
             props.getUserSettings()->setValue("feedback." + juce::String(scene), feedback.getValue());
-            for (auto* e : { engine.get(), nextEngine.get() }) if (e && e->hasFeedbackBus()) e->feedbackBus = float(feedback.getValue() / 100.0);
+            for (auto* e : { engine.get(), nextEngine.get(), starting.get() }) if (e && e->hasFeedbackBus()) e->feedbackBus = float(feedback.getValue() / 100.0);
         };
         feedback.setColour(juce::Slider::trackColourId, tok::accent);
         feedback.setColour(juce::Slider::backgroundColourId, tok::sunk);
@@ -283,7 +292,7 @@ public:
         g.setFont(juce::FontOptions(11.0f).withStyle("Bold"));
         const juce::String head = chained() ? juce::String(improv() ? "Improvisation" : "The whole concert") + dot + "song " + juce::String(improvK + 1)
                                                   + (concert() ? juce::String("/") + juce::String(int(std::size(kScenes))) : juce::String())
-                                              + (oldEngine ? dot + "changing over" : nextEngine ? dot + "next song ready" : loader ? dot + "writing the next song" : juce::String())
+                                              + (oldEngine ? dot + "changing over" : nextEngine || starting ? dot + "next song ready" : loader ? dot + "writing the next song" : juce::String())
                                            : juce::String(kSceneTitles[sceneBox.getSelectedId() - 1]);
         g.drawText("LISZTMACHINE" + dot + head.toUpperCase(), r.removeFromTop(16), juce::Justification::left);
         r.removeFromTop(tok::s2);
@@ -487,7 +496,7 @@ private:
     void setFx(MasterFx::Param p, float v)
     {
         props.getUserSettings()->setValue("fx." + juce::String(MasterFx::paramNames[p]), v);
-        for (auto* e : { engine.get(), nextEngine.get(), oldEngine.get() }) if (e) e->masterFx.p[p] = v;
+        for (auto* e : { engine.get(), nextEngine.get(), oldEngine.get(), starting.get() }) if (e) e->masterFx.p[p] = v;
     }
 
     void changeListenerCallback(juce::ChangeBroadcaster*) override
@@ -524,18 +533,29 @@ private:
         repaint();
     }
 
-    void audioDeviceIOCallbackWithContext(const float* const*, int, float* const* out, int numOut, int n,
+    void audioDeviceIOCallbackWithContext(const float* const* in, int numIn, float* const* out, int numOut, int n,
                                           const juce::AudioIODeviceCallbackContext&) override
     {
+        if (numIn > 0 && in[0] != nullptr) onset.process(in[0], n, loadedRate > 0 ? loadedRate : 48000.0);
         const juce::SpinLock::ScopedLockType sl(audioLock); // held by the message thread only to swap the engines
+        // the whole concert's next song starts on the sample its first beat is due (where the click's glide lands); read
+        // before this block moves the playing song on
+        if (starting && !starting->isPlaying())
+        {
+            const bool on = engine && engine->isPlaying();
+            const int64_t p = on ? engine->position() : 0;
+            if (!on || p + n > startAt) starting->goIn(on ? juce::jmax<int64_t>(0, startAt - p) : 0);
+        }
         if (engine) engine->render(out, numOut, n);
         else for (int c = 0; c < numOut; ++c) juce::FloatVectorOperations::clear(out[c], n);
-        // Improvisation's changeover: the last song's Release rings out under the new song's Seed
-        if (oldEngine && numOut <= mixBuf.getNumChannels() && n <= mixBuf.getNumSamples())
-        {
-            oldEngine->render(mixBuf.getArrayOfWritePointers(), numOut, n);
-            for (int c = 0; c < numOut; ++c) juce::FloatVectorOperations::add(out[c], mixBuf.getReadPointer(c), n);
-        }
+        // Improvisation's changeover: the last song's Release rings out under the new song's Seed (and the concert's next
+        // song, from its first sample until the message thread makes it the playing one)
+        for (auto* e : { oldEngine.get(), starting && starting->isPlaying() ? starting.get() : nullptr })
+            if (e && numOut <= mixBuf.getNumChannels() && n <= mixBuf.getNumSamples())
+            {
+                e->render(mixBuf.getArrayOfWritePointers(), numOut, n);
+                for (int c = 0; c < numOut; ++c) juce::FloatVectorOperations::add(out[c], mixBuf.getReadPointer(c), n);
+            }
         // the output level, then a ceiling under 0 dBFS: two songs at a changeover, or the click on the main outputs,
         // add to a limited mix
         // the in-ear mix on 3 (and 4): the click the engine wrote there at its level, and the music in mono, each its own
@@ -644,7 +664,16 @@ private:
         graveyard.erase(std::remove_if(graveyard.begin(), graveyard.end(), [](auto& t) { return !t->isThreadRunning(); }), graveyard.end());
         const bool going = engine->isPlaying() || engine->isFinished();
         const bool more = !concert() || improvK + 1 < int(std::size(kScenes)); // the concert ends after its ninth song
-        if (going && more && !loader && !nextEngine && engine->seconds.load() > 2.0) prepareNext();
+        if (going && more && !loader && !nextEngine && !starting && engine->seconds.load() > 2.0) prepareNext();
+        // the concert: the click glides into the next song's tempo and the audio thread starts it where the glide lands
+        if (concert() && nextEngine && !starting && engine->isPlaying())
+        {
+            engine->glideClick(nextEngine->composer()->bpm(), changeAt);
+            const juce::SpinLock::ScopedLockType sl(audioLock);
+            startAt = engine->landing() - nextEngine->preRollSamples();
+            starting = std::move(nextEngine);
+        }
+        if (starting && starting->isPlaying()) changeover();
         if (nextEngine && (engine->isFinished() || (engine->isPlaying() && engine->seconds.load() >= changeAt))) changeover();
         if (oldEngine)
         {
@@ -660,17 +689,18 @@ private:
     {
         std::unique_ptr<Engine> gone;
         engine->clickLevel = 0; // the click follows the new song from its first beat
+        const bool started = starting != nullptr; // the concert: already started by the audio thread
         {
             const juce::SpinLock::ScopedLockType sl(audioLock);
             gone = std::move(oldEngine);
             if (engine->isFinished()) { if (!gone) gone = std::move(engine); else engine.reset(); }
             else oldEngine = std::move(engine);
-            engine = std::move(nextEngine);
+            engine = std::move(started ? starting : nextEngine);
         }
-        engine->go();
+        if (!started) engine->go();
         ++improvK;
         changeAt = changeTime(*engine->composer());
-        announce(*engine, improvK);
+        announce(*engine, improvK, started ? engine->seconds.load() : 1e9);
         composer = engine->composer();
         const bool bus = engine->hasFeedbackBus();
         feedback.setEnabled(bus);
@@ -681,18 +711,19 @@ private:
         // a load under way is told to stop and left to finish on its own (joining it here could wait on this very thread)
         if (loader) { loader->signalThreadShouldExit(); graveyard.push_back(std::move(loader)); }
         ++loadGen;
-        std::unique_ptr<Engine> a, b;
+        std::unique_ptr<Engine> a, b, c;
         {
             const juce::SpinLock::ScopedLockType sl(audioLock);
             a = std::move(oldEngine);
             b = std::move(nextEngine);
+            c = std::move(starting);
         }
         if (engine) engine->stop();
     }
     // the click's switches on every engine (an old song ringing out keeps its click off: the click follows the new one)
     void applyClick()
     {
-        for (auto* e : { engine.get(), nextEngine.get() })
+        for (auto* e : { engine.get(), nextEngine.get(), starting.get() })
             if (e) { e->clickLevel = click.getToggleState() ? 0.5f : 0.0f; e->clickToMain = clickMain.getToggleState(); }
     }
     // a command from the visuals page
@@ -709,6 +740,11 @@ private:
             if (sel && sel != sceneBox.getSelectedId()) sceneBox.setSelectedId(sel, juce::sendNotificationSync);
         }
         else if (c.startsWith("earmusic/")) earMusic.setValue(c.fromFirstOccurrenceOf("earmusic/", false, false).getDoubleValue(), juce::sendNotificationSync);
+        else if (c.startsWith("padthr/")) // the kick detector's threshold (the page's [ ] keys)
+        {
+            onset.thr = juce::jlimit(0.001f, 0.5f, c.fromFirstOccurrenceOf("padthr/", false, false).getFloatValue());
+            props.getUserSettings()->setValue("padThr", double(onset.thr.load()));
+        }
         else if (c.startsWith("earclick/")) earClick.setValue(c.fromFirstOccurrenceOf("earclick/", false, false).getDoubleValue(), juce::sendNotificationSync);
         else if (c.startsWith("click/")) { click.setToggleState(c.endsWith("1"), juce::dontSendNotification); applyClick(); }
         else if (c.startsWith("clickmain/"))
@@ -725,6 +761,7 @@ private:
         juce::String j = "{\"playing\":" + juce::String(engine && engine->isPlaying() ? "true" : "false") + ",\"scene\":\"" + juce::String(scene)
                        + "\",\"click\":" + (click.getToggleState() ? "true" : "false") + ",\"clickMain\":" + (clickMain.getToggleState() ? "true" : "false")
                        + ",\"earMusic\":" + juce::String(earMusic.getValue(), 1) + ",\"earClick\":" + juce::String(earClick.getValue(), 1)
+                       + ",\"padThr\":" + juce::String(onset.thr.load(), 5)
                        + ",\"error\":" + juce::JSON::toString(error) + ",\"scenes\":[";
         for (int i = 0; i < int(std::size(kScenes)); ++i) j << "[\"" << kScenes[i] << "\"," << juce::JSON::toString(juce::String::fromUTF8(kSceneTitles[i])) << "],";
         j << "[\"improv\",\"Improvisation\"],[\"concert\",\"The whole concert\"]]}";
@@ -739,10 +776,10 @@ private:
         return d ? (d->getOutputLatencyInSamples() + d->getCurrentBufferSizeSamples()) / d->getCurrentSampleRate() : 0.0;
     }
     // a song starts: its show, and when its first bar is heard on the app's clock
-    void announce(Engine& e, int k)
+    void announce(Engine& e, int k, double head = 1e9) // head: where its playhead already is (1e9: just started)
     {
         if (!e.composer()) return;
-        const double at = LiveLink::now() + double(e.preRollSamples()) / loadedRate + outLatency();
+        const double at = LiveLink::now() + (head < 1e8 ? -head : double(e.preRollSamples()) / loadedRate) + outLatency();
         juce::MemoryOutputStream j;
         j << showHead(e.scene, uint64_t(improv() ? chainSeed : seed), 20.0) << ",\"at\":" << juce::String(at, 4) << ",\"now\":" << juce::String(LiveLink::now(), 4) << ",\"k\":" << k
           << ",\"piece\":\"" << (improv() ? juce::String("improv") : juce::String(e.scene)) << "\"";
@@ -763,9 +800,9 @@ private:
     // instruments load, and the page's picture should not stall with it.
     struct LevelThread : juce::Thread
     {
-        std::function<void()> tick;
+        std::function<void()> tick, hit;
         LevelThread() : juce::Thread("live link levels") {}
-        void run() override { while (!threadShouldExit()) { tick(); wait(50); } }
+        void run() override { for (int i = 0; !threadShouldExit(); ++i) { hit(); if (i % 5 == 0) tick(); wait(10); } }
     } levelThread;
     void sendLevels()
     {
@@ -797,7 +834,8 @@ private:
         juce::String j = "{\"now\":" + juce::String(LiveLink::now(), 4) + ",\"at\":" + juce::String(LiveLink::now() + outLatency(), 4)
                        + ",\"song\":" + juce::String(songAt.load(), 4) + ",\"pos\":" + juce::String(pos, 4) + ",\"v\":[";
         for (int r = 0; r < 4; ++r) j << juce::String(std::sqrt(role[r]), 5) << ",";
-        j << juce::String(std::sqrt(bus[0]), 5) << "," << juce::String(std::sqrt(bus[1]), 5) << "," << juce::String(master, 5) << "]}";
+        j << juce::String(std::sqrt(bus[0]), 5) << "," << juce::String(std::sqrt(bus[1]), 5) << "," << juce::String(master, 5)
+          << "],\"in\":" << juce::String(onset.meterOut.load(), 5) << "}";
         live.post("lv", j);
     }
 
@@ -805,6 +843,53 @@ private:
     int64_t chainSeed = 1;
     double changeAt = 1e9;
     std::unique_ptr<Engine> nextEngine, oldEngine;
+    // the whole concert's next song, waiting for the audio thread to start it on the sample the click glide lands on
+    // (startAt, in the playing song's samples, less the new song's pre-roll)
+    std::unique_ptr<Engine> starting;
+    int64_t startAt = 0;
+    // The kick on the interface's input 1 lights the visuals' drum-pad effect (Kerem, 2026-11-15): the page's onset
+    // detector (visuals/index.html, WORKLET), here on the app's own input, so the page needs no audio input of its own.
+    struct Onset
+    {
+        float hp = 0, px = 0, lp = 0, fast = 0, slow = 0, peak = 0, meter = 0;
+        double hi = 0, lo = 0;
+        int hold = 0, refr = 0;
+        std::atomic<float> thr { 0.02f }, meterOut { 0 }, lastPeak { 0 }, lastRatio { 0 };
+        std::atomic<int> hits { 0 };
+        void process(const float* x, int n, double sr) // audio thread
+        {
+            const float t = thr.load();
+            for (int i = 0; i < n; ++i)
+            {
+                hp = 0.996f * (hp + x[i] - px); px = x[i]; // rumble out
+                const float a = std::abs(hp), d = hp - lp;
+                lp = hp;
+                fast = juce::jmax(a, fast * 0.9985f);
+                slow += (fast - slow) * 0.0004f;
+                meter = juce::jmax(meter * 0.99995f, a);
+                if (hold > 0) // 6 ms after the onset: the true peak and the brightness
+                {
+                    peak = juce::jmax(peak, a); hi += double(d) * d; lo += double(hp) * hp;
+                    if (--hold == 0) { lastPeak = peak; lastRatio = float(hi / (lo + 1e-12)); hits.fetch_add(1); }
+                }
+                if (refr > 0) --refr;
+                else if (fast > t && fast > slow * 2.2f)
+                {
+                    hold = int(0.006 * sr); peak = a; hi = lo = 0; refr = int(0.045 * sr);
+                }
+            }
+            meterOut = meter;
+        }
+    } onset;
+    int hitsSent = 0;
+    void sendHits() // the level thread, every 10 ms
+    {
+        const int h = onset.hits.load();
+        if (h == hitsSent) return;
+        hitsSent = h;
+        if (live.clients() > 0)
+            live.post("hit", "{\"peak\":" + juce::String(onset.lastPeak.load(), 5) + ",\"ratio\":" + juce::String(onset.lastRatio.load(), 5) + "}");
+    }
     std::unique_ptr<Loader> loader;
     std::vector<std::unique_ptr<Loader>> graveyard;
     struct Loaded { int gen; std::unique_ptr<Engine> engine; juce::String error; };
