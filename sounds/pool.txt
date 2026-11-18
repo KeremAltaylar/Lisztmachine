@@ -1,0 +1,27 @@
+# Improvisation's extra pool (2026-11-18, Kerem: "broader range of possibilities for impro"): sounds from the free SFZ
+# libraries in tools/extra-instruments.txt that no song uses. Each improvised song adds one of these to some of its parts,
+# beside the patches it borrows. Not a song: no scene reads it.
+#   part  level  bright  patch
+# level: the dB this patch needs in Halftime's mix (master below), per-part gain included. Set by
+# liszt_render --audition against Halftime's own sfz in the same part (sustained by rms, plucked by peak).
+# Left out, measured: Pastabass (a fifth off), VPO solo woodwinds (17 cents sharp), War tuba (beating 335 %),
+# VPO choir female, celesta, Bear Sax, Gogodze (silent on the test note), Shinyguitar (sfizz cannot load it).
+master 8.5
+
+pad    13.0  1626  sfz/Virtual-Playing-Orchestra3/Strings/all-strings-SEC-sustain.sfz
+pad    10.4   933  sfz/Virtual-Playing-Orchestra3/Brass/french-horn-SEC-sustain.sfz
+pad    11.1  2025  sfz/Virtual-Playing-Orchestra3/Woodwinds/all-woodwinds-SEC-sustain.sfz
+pad    15.0  1812  sfz/Virtual-Playing-Orchestra3/Vocals/choir-MIXED-sustain.sfz
+pad     6.3  2541  sfz/Cowsynth/cowsynth_fancy_pad.sfz
+pad     7.7  1822  sfz/String_Cyborgs/Programs/Blackheart.sfz
+
+bass    6.8   412  sfz/Meatbass/Programs/arco_basic.sfz
+bass    3.6   772  sfz/Virtual-Playing-Orchestra3/Strings/bass-SEC-sustain.sfz
+bass    5.0   856  sfz/Fashionbass/fashionbass_clean.sfz
+bass    9.6   403  sfz/Swagbass/swagbass_clean.sfz
+
+chord   4.1   452  sfz/Emilyguitar/emily_clean.sfz
+chord   4.7   313  sfz/Virtual-Playing-Orchestra3/Percussion/vibraphone-open.sfz
+chord   5.3  2575  sfz/Cowsynth/cowsynth_asthmatic_organ.sfz
+
+lead   14.2  1653  sfz/Virtual-Playing-Orchestra3/Strings/1st-violin-SOLO-sustain.sfz

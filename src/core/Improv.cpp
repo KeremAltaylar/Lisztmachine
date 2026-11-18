@@ -354,6 +354,18 @@ std::string improvPalette(const ImprovSong& s, const std::function<std::string(c
         return 8.0;
     };
     const double master = masterOf(s.space);
+    std::vector<std::string> poolLines;
+    double poolMaster = 8.5;
+    {
+        std::istringstream in(read("pool"));
+        for (std::string l; std::getline(in, l);)
+        {
+            if (auto h = l.find('#'); h != std::string::npos) l.erase(h);
+            while (!l.empty() && (l.back() == '\r' || l.back() == ' ' || l.back() == '\t')) l.pop_back();
+            if (tok(l, 0) == "master") poolMaster = std::atof(tok(l, 1).c_str());
+            else if (!l.empty()) poolLines.push_back(l);
+        }
+    }
     std::ostringstream out;
     out << "# Improvisation " << s.k << ": " << s.name << " (generated, tools: src/core/Improv.cpp)\n";
     for (auto& l : lines(s.space))
@@ -404,6 +416,7 @@ std::string improvPalette(const ImprovSong& s, const std::function<std::string(c
         }
         const double shift = masterOf(d) - master + partMove(d, t);
         bool gain = false;
+        double trackGain = 0;
         out << "# " << name << " from " << all[size_t(d)]->scene << note << "\n";
         for (auto& l : lines(d))
         {
@@ -416,6 +429,7 @@ std::string improvPalette(const ImprovSong& s, const std::function<std::string(c
                 std::snprintf(buf, sizeof buf, "gain %s %.1f", name.c_str(), std::atof(tok(l, 2).c_str()) + shift);
                 out << buf << "\n";
                 gain = true;
+                trackGain = std::atof(tok(l, 2).c_str()) + shift;
             }
             else out << l << "\n";
         }
@@ -424,6 +438,30 @@ std::string improvPalette(const ImprovSong& s, const std::function<std::string(c
             char buf[96];
             std::snprintf(buf, sizeof buf, "gain %s %.1f", name.c_str(), shift);
             out << buf << "\n";
+            trackGain = shift;
+        }
+        // one sound from the extra pool (sounds/pool.txt) beside the borrowed ones, in about 3 parts in 5: its level is
+        // the one it needs under the pool's master, less the part gain this song already gives every patch of the part
+        std::vector<std::pair<double, std::string>> extra; // (level, "bright patch")
+        for (auto& l : poolLines)
+            if (tok(l, 0) == name)
+            {
+                std::istringstream in(l);
+                std::string a, b, patch;
+                in >> a >> b;
+                std::getline(in, patch);
+                patch.erase(0, patch.find_first_not_of(" \t"));
+                const auto p = patch.substr(patch.find_first_of(" \t") + 1);
+                if (!installed || installed(p.substr(p.find_first_not_of(" \t")))) extra.push_back({ std::atof(b.c_str()), patch });
+            }
+        uint64_t h = 1469598103934665603ull; // FNV-1a over the song and the part: the same choice every time
+        for (char ch : s.name + "/" + name) h = (h ^ uint8_t(ch)) * 1099511628211ull;
+        if (!extra.empty() && h % 5 < 3)
+        {
+            const auto& e = extra[size_t((h / 5) % extra.size())];
+            char buf[64];
+            std::snprintf(buf, sizeof buf, "%-8s %.1f ", name.c_str(), e.first + poolMaster - master - trackGain);
+            out << "# " << name << ": one more from the pool\n" << buf << e.second << "\n";
         }
     }
     return out.str();
