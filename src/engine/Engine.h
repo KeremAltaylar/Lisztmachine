@@ -398,7 +398,11 @@ public:
     // in the app 2026-11-15): over this song's last 12-24 s the click glides to the next song's tempo, a whole number of
     // bars, landing on its first beat at `landSec` (this song's time). The song does not finish before then. Message
     // thread, once, while it plays.
-    void glideClick(double nextBpm, double landSec);
+    // Improvisation (Kerem, 2026-11-18: "30 seconds or so between songs ... the metronome slowly transforms") glides over
+    // 24-40 s instead, across the overlap of this song's Release and the next one's Seed.
+    void glideClick(double nextBpm, double landSec, double minSec = 12, double maxSec = 24);
+    bool gliding() const { return glideN_.load() > 0; }
+    std::atomic<int64_t> clickFrom { 0 }; // no click before this sample (the next song's Seed: the old song's glide clicks)
     int64_t landing() const { return holdUntil_.load(); } // the sample the next song's beat 0 falls on
     // The drum pad on input 2 (Kerem, 2026-11-15): each hit plays one note of the chord sounding now on the song's own
     // synth, fast attack, a medium sustain for two beats, a long release; successive hits climb the chord. Any thread.

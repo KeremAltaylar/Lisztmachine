@@ -635,14 +635,16 @@ private:
     {
         return improv() ? "improv/" + std::to_string(k) : concert() ? std::string(kScenes[size_t(k) % std::size(kScenes)]) : scene;
     }
-    // seconds into a song where the next one begins: Improvisation a quarter into its Release; the concert when the
-    // song's last bar has ended and two seconds of its tail have rung
+    // seconds into a song where the next one begins: Improvisation at its Release (the next song's Seed, ~30 s, sounds
+    // under it; Kerem 2026-11-18: "30 seconds or so between songs that they can intersect"); the concert when the song's
+    // last bar has ended and two seconds of its tail have rung
     double changeTime(const Composer& c) const
     {
         if (concert()) return c.totalBars() * 240.0 / c.bpm() + 2.0;
-        const auto& r = c.sections().back();
-        return (r.startBar + 0.25 * r.bars) * 240.0 / c.bpm();
+        return c.sections().back().startBar * 240.0 / c.bpm();
     }
+    // how long a song's Seed is (Improvisation): its first beat after it is where the click's glide lands
+    static double seedSeconds(const Composer& c) { return c.sections().front().bars * 240.0 / c.bpm(); }
     std::unique_ptr<Engine> build(int k, juce::String& err, bool offThread)
     {
         Palette palette;
@@ -706,12 +708,18 @@ private:
         const bool going = engine->isPlaying() || engine->isFinished();
         const bool more = !concert() || improvK + 1 < int(std::size(kScenes)); // the concert ends after its ninth song
         if (going && more && !loader && !nextEngine && !starting && engine->seconds.load() > 2.0) prepareNext();
-        // the concert: the click glides into the next song's tempo and the audio thread starts it where the glide lands
-        if (concert() && nextEngine && !starting && engine->isPlaying())
+        // the click glides into the next song's tempo and the audio thread starts that song so the glide lands on its
+        // first beat: the concert's at its bar 0, over 12-24 s; Improvisation's after its Seed, which starts at this song's
+        // Release, over 24-40 s while the two songs overlap (the new song's own click waits for the end of its Seed)
+        if (nextEngine && !starting && engine->isPlaying())
         {
-            engine->glideClick(nextEngine->composer()->bpm(), changeAt);
+            const double seed = improv() ? seedSeconds(*nextEngine->composer()) : 0.0;
+            if (improv()) engine->glideClick(nextEngine->composer()->bpm(), changeAt + seed, 24, 40);
+            else engine->glideClick(nextEngine->composer()->bpm(), changeAt);
+            const int64_t seedSamples = std::llround(seed * loadedRate);
+            nextEngine->clickFrom = seedSamples > 0 ? seedSamples - 16 : 0;
             const juce::SpinLock::ScopedLockType sl(audioLock);
-            startAt = engine->landing() - nextEngine->preRollSamples();
+            startAt = engine->landing() - seedSamples - nextEngine->preRollSamples();
             starting = std::move(nextEngine);
         }
         if (starting && starting->isPlaying()) changeover();
@@ -729,8 +737,8 @@ private:
     void changeover()
     {
         std::unique_ptr<Engine> gone;
-        engine->clickLevel = 0; // the click follows the new song from its first beat
-        const bool started = starting != nullptr; // the concert: already started by the audio thread
+        const bool started = starting != nullptr; // already started by the audio thread
+        if (!started || !engine->gliding()) engine->clickLevel = 0; // else its glide clicks on into the new song's first beat
         {
             const juce::SpinLock::ScopedLockType sl(audioLock);
             gone = std::move(oldEngine);
@@ -761,10 +769,11 @@ private:
         }
         if (engine) engine->stop();
     }
-    // the click's switches on every engine (an old song ringing out keeps its click off: the click follows the new one)
+    // the click's switches on every engine (an old song ringing out keeps its click off: the click follows the new one,
+    // unless the old one is still gliding into it)
     void applyClick()
     {
-        for (auto* e : { engine.get(), nextEngine.get(), starting.get() })
+        for (auto* e : { engine.get(), nextEngine.get(), starting.get(), oldEngine && oldEngine->gliding() ? oldEngine.get() : nullptr })
             if (e) { e->clickLevel = click.getToggleState() ? 0.5f : 0.0f; e->clickToMain = clickMain.getToggleState(); }
     }
     // a command from the visuals page
@@ -825,7 +834,7 @@ private:
                        + ",\"earMusic\":" + juce::String(earMusic.getValue(), 1) + ",\"earClick\":" + juce::String(earClick.getValue(), 1)
                        + ",\"padThr\":" + juce::String(onset.thr.load(), 5) + ",\"pad2Thr\":" + juce::String(pad2.thr.load(), 5)
                        + ",\"padVol\":" + juce::String(padDb, 1) + ",\"kickIn\":" + juce::String(kickIn.load()) + ",\"padIn\":" + juce::String(padIn.load())
-                       + ",\"inputs\":" + juce::String(numInputs.load()) + ",\"inDev\":" + juce::JSON::toString(inputName) + ",\"padSound\":" + juce::JSON::toString(engine ? engine->padInfo() : juce::String())
+                       + ",\"inputs\":" + juce::String(numInputs.load()) + ",\"inDev\":" + juce::JSON::toString(inputName) + ",\"version\":\"" LISZT_COMMIT "\",\"padSound\":" + juce::JSON::toString(engine ? engine->padInfo() : juce::String())
                        + ",\"error\":" + juce::JSON::toString(error) + ",\"scenes\":[";
         for (int i = 0; i < int(std::size(kScenes)); ++i) j << "[\"" << kScenes[i] << "\"," << juce::JSON::toString(juce::String::fromUTF8(kSceneTitles[i])) << "],";
         j << "[\"improv\",\"Improvisation\"],[\"concert\",\"The whole concert\"]]}";

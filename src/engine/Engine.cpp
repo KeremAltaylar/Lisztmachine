@@ -1212,6 +1212,7 @@ void Engine::start(uint64_t seed, int startBar, bool play)
     clickEnv_ = 0;
     glideN_ = 0;
     holdUntil_ = 0;
+    clickFrom = 0;
     {   // the drum pad before any chord is heard: the key's tonic and fifth, from "<title> · <tonic> <mode> · ..."
         static const char* names[] = { "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B" };
         const auto words = juce::StringArray::fromTokens(juce::String::fromUTF8(composer_->describe().c_str()), " ", "");
@@ -1788,7 +1789,7 @@ void Engine::renderClick(float* const* out, int numChannels, int offset, int len
         else if (const int64_t b = int64_t(std::llround(double(s) / samplesPerTick_ / beatTicks));
                  sampleOf(b * beatTicks) == s && s < endSample_)
             beat = b;
-        if (beat >= 0)
+        if (beat >= 0 && s >= clickFrom.load())
         {
             clickFreq_ = beat % 4 == 0 ? 1760.0 : 1320.0;
             clickEnv_ = clickLevel;
@@ -1805,14 +1806,14 @@ void Engine::renderClick(float* const* out, int numChannels, int offset, int len
 
 // The glide (the visuals page's, 2026-11-04): tempo over the ramp b0 + (b1 - b0) u + c u (1 - u), c chosen so the bars come
 // out whole; the start bar is the one that keeps c, the bend, smallest.
-void Engine::glideClick(double b1, double land)
+void Engine::glideClick(double b1, double land, double minSec, double maxSec)
 {
     holdUntil_ = std::llround(land * sampleRate_);
     if (!composer_ || b1 <= 0) return;
     const double b0 = composer_->bpm(), spb = 60 / b0, mean = (b0 + b1) / 2;
     int j = 0, N = 0;
     double D = 0, c = 0;
-    for (int jj = int(std::floor((land - 12) / spb / 4)) * 4; jj > 0 && land - jj * spb <= 24; jj -= 4)
+    for (int jj = int(std::floor((land - minSec) / spb / 4)) * 4; jj > 0 && land - jj * spb <= maxSec; jj -= 4)
     {
         const double d = land - jj * spb;
         const int n = std::max(4, int(std::lround(mean * d / 240)) * 4);

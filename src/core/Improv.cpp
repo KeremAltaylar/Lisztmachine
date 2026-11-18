@@ -219,7 +219,7 @@ ImprovSong candidate(Rng& rng, int k)
 
     // the form: the donor's six parts fitted to a length of 3:20 to 4:45, a Seed before and a Release after
     const double barSec = 240.0 / s.bpm;
-    const int edge = std::max(4, int(std::lround(22.0 / barSec / 4)) * 4); // about 22 s each: the changeover
+    const int edge = std::max(4, int(std::lround(30.0 / barSec / 4)) * 4); // about 30 s each: the changeover (Kerem 2026-11-18: "30 seconds or so")
     const int want = int(rng.range(200, 285) / barSec);
     int donorBars = 0;
     for (auto& t : F.form) if (t.name) donorBars += t.bars;

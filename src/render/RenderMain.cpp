@@ -289,8 +289,9 @@ static double gPadEvery = 0;                   // --pad-every <beats>: a drum-pa
 static bool gStems = false;                  // --stems: also <out>.<track>.wav per track and <out>.delay/.reverb.wav, before the glue
 
 // Improvisation as the app plays it (src/app/Main.cpp): song k in one engine, song k+1 made ready silent beside it and
-// started a quarter of the way into k's Release, k ringing out under it in a second engine until it finishes. Writes
-// the whole chain to one WAV and <out>.chain.json (each song's start in the file, its plan), for checking the changeovers.
+// started at k's Release so that the click, gliding over 24-40 s, lands on its first beat after its Seed; k rings out
+// under it in a second engine until it finishes. Writes the whole chain to one WAV, the click to <out>.click.wav and
+// <out>.chain.json (each song's start in the file, its plan), for checking the changeovers.
 static int renderChain(uint64_t seed, int songs, const juce::File& out)
 {
     const double sr = 48000;
@@ -305,13 +306,20 @@ static int renderChain(uint64_t seed, int songs, const juce::File& out)
         e->start(seed, 0, false);
         return e;
     };
-    auto changeTime = [](const Composer& c) { const auto& r = c.sections().back(); return (r.startBar + 0.25 * r.bars) * 240.0 / c.bpm(); };
+    auto changeTime = [](const Composer& c) { return c.sections().back().startBar * 240.0 / c.bpm(); };
+    auto seedSeconds = [](const Composer& c) { return c.sections().front().bars * 240.0 / c.bpm(); };
 
     out.deleteFile();
     std::unique_ptr<juce::OutputStream> stream = std::make_unique<juce::FileOutputStream>(out);
     auto writer = juce::WavAudioFormat().createWriterFor(
         stream, juce::AudioFormatWriterOptions {}.withSampleRate(sr).withNumChannels(2).withBitsPerSample(24));
     if (!writer) { std::cerr << "cannot write " << out.getFullPathName() << "\n"; return 1; }
+
+    const auto clickFile = out.getSiblingFile(out.getFileNameWithoutExtension() + ".click.wav");
+    clickFile.deleteFile();
+    std::unique_ptr<juce::OutputStream> clickStream = std::make_unique<juce::FileOutputStream>(clickFile);
+    auto clickWriter = juce::WavAudioFormat().createWriterFor(
+        clickStream, juce::AudioFormatWriterOptions {}.withSampleRate(sr).withNumChannels(1).withBitsPerSample(24));
 
     std::unique_ptr<Engine> cur = build(0), next, old;
     if (!cur) return 1;
@@ -322,34 +330,47 @@ static int renderChain(uint64_t seed, int songs, const juce::File& out)
         std::cout << juce::String(double(at) / sr, 1) << " s  song " << k << ": " << cur->composer()->describe() << "\n";
     };
     note(0, 0);
-    juce::AudioBuffer<float> buf(2, block), tmp(2, block);
+    juce::AudioBuffer<float> buf(3, block), tmp(3, block);
     int k = 0;
-    int64_t done = 0;
+    int64_t done = 0, startAt = 0;
     float peak = 0;
+    bool armed = false;
     for (;;)
     {
         if (!next && k + 1 < songs && cur->seconds.load() > 2.0) next = build(k + 1);   // the app does this on a thread
-        const bool change = next && (cur->isFinished() || cur->seconds.load() >= changeTime(*cur->composer()));
-        if (change)
+        if (next && !armed && cur->isPlaying()) // the glide, and where the next song starts (the app's improvise())
         {
-            cur->clickLevel = 0;
+            const double seed = seedSeconds(*next->composer());
+            cur->glideClick(next->composer()->bpm(), changeTime(*cur->composer()) + seed, 24, 40);
+            const int64_t seedSamples = std::llround(seed * sr);
+            next->clickFrom = seedSamples - 16;
+            startAt = cur->landing() - seedSamples - next->preRollSamples();
+            armed = true;
+        }
+        if (armed && (!cur->isPlaying() || cur->position() + block > startAt))
+        {
+            next->goIn(cur->isPlaying() ? juce::jmax<int64_t>(0, startAt - cur->position()) : 0);
+            if (!cur->gliding()) cur->clickLevel = 0;
             old = cur->isFinished() ? nullptr : std::move(cur);
             cur = std::move(next);
-            cur->go();
+            armed = false;
             note(++k, done);
         }
         if (old && old->isFinished()) old.reset();
         if (cur->isFinished() && !next && !old) break;
         cur->service();
         if (old) old->service();
-        cur->render(buf.getArrayOfWritePointers(), 2, block);
+        buf.clear();
+        cur->render(buf.getArrayOfWritePointers(), 3, block);
         if (old)
         {
-            old->render(tmp.getArrayOfWritePointers(), 2, block);
-            for (int c = 0; c < 2; ++c) buf.addFrom(c, 0, tmp, c, 0, block);
+            tmp.clear();
+            old->render(tmp.getArrayOfWritePointers(), 3, block);
+            for (int c = 0; c < 3; ++c) buf.addFrom(c, 0, tmp, c, 0, block);
             for (int c = 0; c < 2; ++c) for (int i = 0; i < block; ++i) buf.setSample(c, i, ceilingClip(buf.getSample(c, i)));
         }
-        peak = juce::jmax(peak, buf.getMagnitude(0, block));
+        if (clickWriter) clickWriter->writeFromAudioSampleBuffer(juce::AudioBuffer<float>(buf.getArrayOfWritePointers() + 2, 1, block), 0, block);
+        peak = juce::jmax(peak, buf.getMagnitude(0, 0, block), buf.getMagnitude(1, 0, block));
         writer->writeFromAudioSampleBuffer(buf, 0, block);
         done += block;
     }

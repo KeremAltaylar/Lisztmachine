@@ -121,6 +121,9 @@ juce_add_gui_app(Lisztmachine
     MICROPHONE_PERMISSION_ENABLED TRUE # input 1: the kick that drives the visuals' drum-pad effect
     MICROPHONE_PERMISSION_TEXT "Lisztmachine listens to input 1 (the kick drum) to drive the visuals.")
 target_sources(Lisztmachine PRIVATE src/app/Main.cpp)
+# the code's version, shown on the visuals page (2026-11-18: which build is the Mac running?), read at each configure
+execute_process(COMMAND git -C "${CMAKE_SOURCE_DIR}" describe --tags --always OUTPUT_VARIABLE LISZT_COMMIT OUTPUT_STRIP_TRAILING_WHITESPACE ERROR_QUIET)
+target_compile_definitions(Lisztmachine PRIVATE LISZT_COMMIT="${LISZT_COMMIT}")
 target_link_libraries(Lisztmachine PRIVATE liszt_engine)
 if(APPLE) # the palette travels inside the .app
     add_custom_command(TARGET Lisztmachine POST_BUILD

@@ -32,7 +32,15 @@ cmake --version | head -1 | sed 's/^/   /'
 grep -q 'site --user-base' "$HOME/.zprofile" 2>/dev/null || echo 'export PATH="$(python3 -m site --user-base)/bin:$PATH"' >> "$HOME/.zprofile"
 
 say "3/6 The code (into $DIR)"
-if [ -d "$DIR/.git" ]; then git -C "$DIR" fetch --tags --quiet && git -C "$DIR" pull --quiet --ff-only || echo "   (kept the local copy as it is)"
+if [ -d "$DIR/.git" ]; then
+  # a file changed here (by hand or by a tool) used to stop the update silently (Kerem ran old code, 2026-11-18): it is
+  # put aside with git stash (git stash list shows it) and the copy matches GitHub's
+  git -C "$DIR" fetch --tags --quiet || die "Could not reach GitHub."
+  if [ -n "$(git -C "$DIR" status --porcelain --untracked-files=no)" ]; then
+    git -C "$DIR" stash --quiet && echo "   local changes put aside (git -C ~/Lisztmachine stash list)"
+  fi
+  git -C "$DIR" checkout --quiet master 2>/dev/null
+  git -C "$DIR" merge --quiet --ff-only origin/master || die "Could not update the code: send this to Claude."
 else git clone --quiet "$REPO_URL" "$DIR" || die "Could not download the code."; fi
 if [ -n "$LISZT_VERSION" ]; then git -C "$DIR" checkout --quiet "$LISZT_VERSION" || die "No version $LISZT_VERSION."; fi
 echo "   at $(git -C "$DIR" describe --tags --always)"
@@ -42,8 +50,11 @@ bash "$DIR/tools/install-mac.sh" || die "The instrument install stopped: send it
 
 say "5/6 Building the app (10-20 minutes the first time)"
 cmake -S "$DIR" -B "$DIR/build" -DCMAKE_BUILD_TYPE=Release -DCMAKE_POLICY_VERSION_MINIMUM=3.5 >/dev/null || die "Could not prepare the build."
-cmake --build "$DIR/build" --target Lisztmachine --parallel 8 2>&1 | grep -E " error |error:|Built target Lisztmachine" | tail -5
-[ -d "$DIR/build/Lisztmachine_artefacts/Release/Lisztmachine.app" ] || die "The build did not finish: send the lines above to Claude."
+# a failed build used to leave the old app in place and the launcher opened it (2026-11-18): the build's own result counts
+cmake --build "$DIR/build" --target Lisztmachine --parallel 8 > "$DIR/build/last-build.log" 2>&1
+OK=$?
+grep -E " error |error:|Built target Lisztmachine" "$DIR/build/last-build.log" | tail -5
+[ $OK -eq 0 ] && [ -d "$DIR/build/Lisztmachine_artefacts/Release/Lisztmachine.app" ] || die "The build failed: send the lines above (or ~/Lisztmachine/build/last-build.log) to Claude."
 # each build is a new ad-hoc signature, and macOS then silently hands the app silence for its inputs (both at -120 dB,
 # 2026-11-15): the old answer is forgotten so the app asks again ("Allow") when it opens
 tccutil reset Microphone com.keremaltaylar.lisztmachine >/dev/null 2>&1 || true

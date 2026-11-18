@@ -9,9 +9,9 @@ SERVER=$!
 trap 'kill $SERVER 2>/dev/null' EXIT
 sleep 1
 if [ -d "/Applications/Google Chrome.app" ]; then
-  open -a "Google Chrome" "http://127.0.0.1:$PORT/${1:-}"
+  open -a "Google Chrome" "http://127.0.0.1:$PORT/?v=$(date +%s)${1:-}"   # ?v=: never a cached old page
 else
-  open "http://127.0.0.1:$PORT/${1:-}"
+  open "http://127.0.0.1:$PORT/?v=$(date +%s)${1:-}"
 fi
 echo "Lisztmachine visuals: http://127.0.0.1:$PORT/  (close this window to stop)"
 wait $SERVER

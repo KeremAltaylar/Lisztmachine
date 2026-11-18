@@ -5,5 +5,8 @@
 cd "$(dirname "$0")" || exit 1
 APP="build/Lisztmachine_artefacts/Release/Lisztmachine.app"
 if [ ! -d "$APP" ]; then echo "The app is not built yet: see the README (cmake --build build --target Lisztmachine)."; exit 1; fi
+# an app still open from before would only come to the front, old code and all (2026-11-18): it is closed first
+osascript -e 'quit app "Lisztmachine"' >/dev/null 2>&1
+for i in 1 2 3 4 5 6 7 8 9 10; do pgrep -x Lisztmachine >/dev/null || break; sleep 0.5; done
 open "$APP"
 exec bash "visuals/Start Visuals.command" "#live"
