@@ -48,6 +48,17 @@ cp "$I/dc-erhu-trio.sfz" "$LIB/lib/aliexpress-erhu_v1000/Programs/" 2>/dev/null
 cp "$I/lm-cello.sfz" "$LIB/lib/Karoryfer_Bigcat_cello.v1.001/Karoryfer_Bigcat_cello/Programs/" 2>/dev/null
 cp "$I/noir-sax.sfz" "$I/wcc-bass-sax.sfz" "$LIB/lib/Weresax/Programs/" 2>/dev/null
 echo "   Lisztmachine's own programs copied in"
+# Improvisation's wider pool (2026-11-18, ~11 GB): tools/extra-instruments.txt, laid out as on the PC: a zip with one top
+# folder unpacked into lib/ (that folder), any other into lib/<zip name>
+grep -v '^#' "$REPO/tools/extra-instruments.txt" | tr -d '\r' | while read -r url; do
+  [ -n "$url" ] || continue
+  zip="$(basename "$url")"; [ "$zip" = 1.1.0.zip ] && zip=VSCO-2-CE-1.1.0.zip
+  done_mark="$LIB/lib/.done-$zip"
+  [ -f "$done_mark" ] && continue
+  get "$url" "$zip" || continue
+  if [ "$(unzip -Z1 "$DL/$zip" | cut -d/ -f1 | sort -u | wc -l)" -eq 1 ]; then unzip -q -n "$DL/$zip" -d "$LIB/lib"
+  else mkdir -p "$LIB/lib/${zip%.zip}" && unzip -q -n "$DL/$zip" -d "$LIB/lib/${zip%.zip}"; fi && touch "$done_mark" && rm -f "$DL/$zip" && echo "   ${zip%.zip}: installed"
+done
 
 say "Plugin synths (Mac versions)"
 have() { find "$VST" "/Library/Audio/Plug-Ins/VST3" -maxdepth 2 -iname "$1.vst3" 2>/dev/null | grep -q .; }

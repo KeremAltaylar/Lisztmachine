@@ -1,0 +1,31 @@
+# Extra free SFZ libraries for Improvisation (Kerem, 2026-11-18: "expand a lot"). One URL per line, unzipped into
+# ~/liszt-instruments/lib by tools/install-mac.sh (and on the PC). Karoryfer: free, sfzinstruments GitHub releases.
+https://github.com/sfzinstruments/karoryfer.squidpipes/releases/download/v1.001/karoryfer.squidpipes-v1.001.zip
+https://github.com/sfzinstruments/karoryfer.gogodze-phu-vol-ii/releases/download/v1.001/Karoryfer_Gogodze_Phu_vol_II.v1.001.zip
+https://github.com/sfzinstruments/karoryfer.gogodze-phu-vol-i/releases/download/v1.001/Karoryfer.Gogodze_Phu_vol_I.v1.001.zip
+https://github.com/sfzinstruments/karoryfer.war-tuba/releases/download/v1.002/Karoryfer_War_Tuba_v1002.zip
+https://github.com/sfzinstruments/karoryfer.string-cyborgs/releases/download/v1.001/Karoryfer.String_Cyborgs.v1.001.zip
+https://github.com/sfzinstruments/karoryfer.shinyguitar/releases/download/v1.002/Karoryfer.Shinyguitar.v1.002.zip
+https://github.com/sfzinstruments/karoryfer.meatbass/releases/download/v1.001/Karoryfer.Meatbass.v1.001.zip
+https://github.com/sfzinstruments/karoryfer.pastabass/releases/download/v1.101/Karoryfer.Pastabass.v1.101.zip
+https://github.com/sfzinstruments/karoryfer.272-merry-orks/releases/download/v1.001/Karoryfer.272_Merry_Orks.v1.001.zip
+https://github.com/sfzinstruments/karoryfer.cowsynth/releases/download/v1.001/Karoryfer.Cowsynth.v1.001.zip
+https://github.com/sfzinstruments/karoryfer.emilyguitar/releases/download/v1.001/Karoryfer.Emilyguitar.v1.001.zip
+https://github.com/sfzinstruments/karoryfer.ergo/releases/download/v1.001/Karoryfer.Ergo_EUB.v1.001.zip
+https://github.com/sfzinstruments/karoryfer.fashionbass/releases/download/v1.001/Karoryfer.Fashionbass.v1.001.zip
+https://github.com/sfzinstruments/karoryfer.swagbass/releases/download/v1.001/Karoryfer.Swagbass.v1.001.zip
+https://github.com/sfzinstruments/karoryfer.caveman-cosmonaut/releases/download/v1.001/Karoryfer.Caveman_Cosmonaut.v1.001.zip
+https://github.com/sfzinstruments/Karoryfer.TheHatWithThePhat/releases/download/v1.001/The.Hat.With.The.Phat.bank.zip
+https://github.com/sfzinstruments/Karoryfer.HorsePulse/releases/download/v1.000/Karoryfer_Horse_Pulse_1000.zip
+https://github.com/sfzinstruments/karoryfer.sneakybass/releases/download/v1.000/Sneakybass_v1.000.zip
+https://github.com/sfzinstruments/karoryfer.frankensnare/releases/download/v2.100/Frankensnare_2100.zip
+https://github.com/sfzinstruments/karoryfer.unruly-drums/releases/download/v1.100/Unruly_Drums_1100.zip
+https://github.com/sfzinstruments/karoryfer.big-rusty-drums/releases/download/v1.100/Big_Rusty_Drums_1100.zip
+https://github.com/sfzinstruments/karoryfer.swirly-drums/releases/download/v1.104/Swirly.Drums_1104.zip
+https://github.com/sfzinstruments/karoryfer.black-and-blue-basses/releases/download/v1.002/Black_And_Blue_Basses_1002.zip
+https://github.com/sfzinstruments/karoryfer.big-little-bass/releases/download/v1.000/Big_Little_Bass_1000.zip
+# Virtual Playing Orchestra 3 (Paul Battersby): wave files + standard scripts, same folder
+https://archive.org/download/virtual-playing-orchestra-3-2-wave-files/Virtual-Playing-Orchestra3-2-wave-files.zip
+https://virtualplaying.com/vp-downloads/Virtual-Playing-Orchestra3-3-standard-scripts.zip
+# VSCO-2 Community Edition (CC0), full
+https://github.com/sgossner/VSCO-2-CE/archive/refs/tags/1.1.0.zip
