@@ -336,6 +336,8 @@ void GenreComposer::planForm()
         themed = themed || theme;
         sections_.push_back({ t.name, bar, t.bars, t.energy, layersOf(t.layers), theme });
         drummerLeads_.push_back(std::strchr(t.layers, 'L') != nullptr);
+        halfSec_.push_back(std::strchr(t.layers, 'h') != nullptr);
+        if (theme) { peakFrom_ = bar; peakTo_ = bar + t.bars; }
         for (int i = 0; i < t.bars; ++i)
         {
             sectionOfBar_.push_back(int(sections_.size()) - 1);
@@ -386,7 +388,7 @@ std::vector<int> GenreComposer::chordTones(int bar, bool rootless) const
 {
     // thirds stacked on the root inside the mode: the triad, its seventh, its ninth. Rootless
     // (the bass has the root) it is third, fifth, seventh, ninth: the colour without the weight.
-    const auto& m = *spec_.mode;
+    const auto& m = modeAt(bar);
     const int r = rootAt(bar), n = 3 + spec_.ext;
     std::vector<int> pcs;
     for (int k = rootless && n > 3 ? 1 : 0; k < n; ++k) pcs.push_back((tonicAt(bar) + degreeSemis(m, r + 2 * k)) % 12);
@@ -489,7 +491,7 @@ void GenreComposer::emitHook(int bar, std::vector<Event>& out)
     if (calm && cycle % 2 == 1) return;       // alone, with room around it
     const int t0Cycle = (bar - within) * kBarTicks;
     const int64_t six = kSixteenth * (slow ? 2 : 1);
-    const auto& m = *spec_.mode;
+    const auto& m = modeAt(bar);
     const int r = rootAt(bar), lo = spec_.arpLo, hi = spec_.arpHi;
     const int rootP = pitchOf(bar, 0, lo + 5, lo + 16, 12 * (lo / 12)); // base on a C: it is a register, not a transposition
     // In eight bars: the question, its answer, the question, and a close (the answer cut to one
@@ -602,12 +604,12 @@ float GenreComposer::levelAt(int track, int bar) const
 
 int GenreComposer::pitchOf(int bar, int deg, int lo, int hi, int base) const
 {
-    return foldInto(base + tonicAt(bar) + degreeSemis(*spec_.mode, rootAt(bar) + deg), lo, hi);
+    return foldInto(base + tonicAt(bar) + degreeSemis(modeAt(bar), rootAt(bar) + deg), lo, hi);
 }
 
 int GenreComposer::ladderPitch(int bar, int idx, int lo, int hi) const
 {
-    int p = 12 * (lo / 12) + tonicAt(bar) + degreeSemis(*spec_.mode, rootAt(bar) + kLadder[idx % 7]);
+    int p = 12 * (lo / 12) + tonicAt(bar) + degreeSemis(modeAt(bar), rootAt(bar) + kLadder[idx % 7]);
     while (p < lo) p += 12;
     while (p > hi) p -= 12;
     return p;
@@ -653,7 +655,7 @@ void GenreComposer::emitPad(int bar, std::vector<Event>& out)
     {
         // the root and its fifth low, the colour of the chord (third, seventh, ninth) voiced above
         // them, moving as little as it can from the last chord
-        const auto& m = *spec_.mode;
+        const auto& m = modeAt(bar);
         const int r = rootAt(bar), lo = pitchOf(bar, 0, 36, 47, 36);
         want = { lo, lo + degreeSemis(m, r + 4) - degreeSemis(m, r) };
         for (int p : voice(bar, 3, 55, 76, true, padVoices_)) want.push_back(p);
@@ -663,11 +665,11 @@ void GenreComposer::emitPad(int bar, std::vector<Event>& out)
     int suspended = -1, sus = -1;
     if (!want.empty() && bar > 0 && rootAt(bar) != rootAt(bar - 1) && energyAt(bar) > .3f)
     {
-        const int third = (tonicAt(bar) + degreeSemis(*spec_.mode, rootAt(bar) + 2)) % 12;
+        const int third = (tonicAt(bar) + degreeSemis(modeAt(bar), rootAt(bar) + 2)) % 12;
         for (size_t i = 2; i < want.size(); ++i)
             if (want[i] % 12 == third)
             {
-                const int up = want[i] + degreeSemis(*spec_.mode, rootAt(bar) + 3) - degreeSemis(*spec_.mode, rootAt(bar) + 2);
+                const int up = want[i] + degreeSemis(modeAt(bar), rootAt(bar) + 3) - degreeSemis(modeAt(bar), rootAt(bar) + 2);
                 const auto has = [](const std::vector<int>& v, int p) { return std::find(v.begin(), v.end(), p) != v.end(); };
                 if (!has(padHeld_, want[i]) && !has(padHeld_, up) && !has(want, up) && up <= 76) { suspended = want[i]; sus = up; }
                 break;
@@ -704,7 +706,7 @@ void GenreComposer::emitHarm(int bar, std::vector<Event>& out)
     if (active(Harm, bar) && spec_.gaze)
     {   // open and wide: the root, its fifth in the mode, and above the octave the ninth, or the
         // eleventh where the ninth is only a half step (phrygian's flat second)
-        const auto& m = *spec_.mode;
+        const auto& m = modeAt(bar);
         const int r = rootAt(bar), pc = (tonicAt(bar) + degreeSemis(m, r)) % 12;
         const int root = 60 + (pc - 60 % 12 + 12) % 12;
         const int fifth = (degreeSemis(m, r + 4) - degreeSemis(m, r) + 24) % 12;
@@ -752,7 +754,7 @@ void GenreComposer::emitDrone(int bar, std::vector<Event>& out)
     std::vector<int> want;
     if (active(Drone, bar))
     {
-        const auto& m = *spec_.mode;
+        const auto& m = modeAt(bar);
         const int r = rootAt(bar), root = 40 + ((tonicAt(bar) + degreeSemis(m, r)) % 12 - 40 % 12 + 12) % 12;
         const int fifth = (degreeSemis(m, r + 4) - degreeSemis(m, r) + 24) % 12, ninth = (degreeSemis(m, r + 1) - degreeSemis(m, r) + 24) % 12;
         want = { root, root + fifth, root + 12 };
@@ -785,14 +787,14 @@ void GenreComposer::emitImpact(int bar, std::vector<Event>& out)
 bool GenreComposer::inMode(int bar, int pitch) const
 {
     for (int d = 0; d < 7; ++d)
-        if ((tonicAt(bar) + degreeSemis(*spec_.mode, d)) % 12 == pitch % 12) return true;
+        if ((tonicAt(bar) + degreeSemis(modeAt(bar), d)) % 12 == pitch % 12) return true;
     return false;
 }
 
 int GenreComposer::subPitch(int bar, char c) const
 {
     // the 808: the root low (41 to 78 Hz), a digit the scale degree above it, ^ the root an octave up
-    const auto& m = *spec_.mode;
+    const auto& m = modeAt(bar);
     const int r = lowRootAt(bar), root = lowPitch(bar, 0, 28, 39, 24);
     if (c == '^') return root + 12;
     const int deg = c >= '1' && c <= '9' ? c - '1' : 0;
@@ -959,7 +961,7 @@ void GenreComposer::emitPart(int track, const Part& part, int bar, std::vector<E
         if (track == Bass)
         {
             const int deg = c >= '1' && c <= '9' ? c - '1' : 0;
-            const auto& m = *spec_.mode;
+            const auto& m = modeAt(bar);
             const int r = lowRootAt(bar), root = lowPitch(bar, 0, 40, 51, 36); // written an octave up: the bass patches sound an octave down
             hit(t, root + degreeSemis(m, r + deg) - degreeSemis(m, r), vel, noteLen);
         }
@@ -972,7 +974,7 @@ void GenreComposer::emitPart(int track, const Part& part, int bar, std::vector<E
     if (track == Bass && P == 16 && bar + 1 < totalBars() && active(Bass, bar + 1) && lowRootAt(bar + 1) != lowRootAt(bar) && !attack && !halfT
         && pat.s[(int64_t(bar) * P + 14) % len] == '.' && pat.s[(int64_t(bar) * P + 15) % len] == '.' && energyAt(bar) > .3f)
     {
-        const auto& m = *spec_.mode;
+        const auto& m = modeAt(bar);
         const int next = lowPitch(bar + 1, 0, 40, 51, 36), now = lowPitch(bar, 0, 40, 51, 36);
         const int r1 = lowRootAt(bar + 1), step = next > now ? -1 : 1;
         const int p = next + degreeSemis(m, r1 + step) - degreeSemis(m, r1);
@@ -1047,7 +1049,7 @@ void GenreComposer::emitWalk(int bar, std::vector<Event>& out)
     // a beat is raked: a ghosted, swung eighth before it on the same note.
     const int64_t t0 = int64_t(bar) * kBarTicks;
     const int lo = 28, hi = 50; // E1 to D3, sounding where it is written
-    const auto& m = *spec_.mode;
+    const auto& m = modeAt(bar);
     const int r = lowRootAt(bar);
     auto nearest = [&](int pc, int to) {
         int best = -1;
@@ -1136,7 +1138,36 @@ void GenreComposer::emitBoom(int bar, std::vector<Event>& out)
     }
 }
 
-bool GenreComposer::summitHalftime(int bar) const { return spec_.summit == Summit::Halftime && sectionAt(bar).restoreTheme; }
+bool GenreComposer::summitHalftime(int bar) const
+{
+    return (spec_.summit == Summit::Halftime && sectionAt(bar).restoreTheme) || halfSec_[size_t(sectionOfBar_[size_t(bar)])];
+}
+
+void GenreComposer::emitMotif(int bar, std::vector<Event>& out)
+{
+    // The song before's theme, in this song's Seed (spec.motif): from the fourth bar, slowed to half speed, every
+    // other four bars, softly; it stops two bars before the Seed ends, so the new song's own parts arrive clean.
+    const auto& sec = sectionAt(bar);
+    const int in = bar - sec.startBar;
+    if (in < 4 || bar >= sec.startBar + sec.bars - 2 || ((in - 4) / 4) % 2 == 1) return;
+    const int within = (in - 4) % 4;
+    const int64_t t0Cycle = int64_t(bar - within) * kBarTicks, six = 2 * kSixteenth;
+    const auto& m = modeAt(bar);
+    const int r = rootAt(bar), lo = spec_.arpLo, hi = spec_.arpHi;
+    const int rootP = pitchOf(bar, 0, lo + 5, lo + 16, 12 * (lo / 12));
+    for (int i = 0; i < spec_.motifN; ++i)
+    {
+        const auto& n = spec_.motif[size_t(i)];
+        const int64_t t = t0Cycle + n.step * six;
+        if (t < int64_t(bar) * kBarTicks || t >= int64_t(bar + 1) * kBarTicks) continue;
+        int p = rootP + degreeSemis(m, r + n.deg) - degreeSemis(m, r);
+        while (p > hi) p -= 12;
+        while (p < lo) p += 12;
+        const int64_t len = std::max<int64_t>(kSixteenth, n.len * six - 12);
+        out.push_back({ t, Event::NoteOn, Arp, uint8_t(p), n.vel * .6f });
+        out.push_back({ t + len, Event::NoteOff, Arp, uint8_t(p), 0 });
+    }
+}
 
 bool GenreComposer::summitUnison(int bar) const
 {
@@ -1156,12 +1187,12 @@ int GenreComposer::lowRootAt(int bar) const
 
 int GenreComposer::lowPitch(int bar, int deg, int lo, int hi, int base) const
 {
-    return foldInto(base + tonicAt(bar) + degreeSemis(*spec_.mode, lowRootAt(bar) + deg), lo, hi);
+    return foldInto(base + tonicAt(bar) + degreeSemis(modeAt(bar), lowRootAt(bar) + deg), lo, hi);
 }
 
 int GenreComposer::over(int bar, int deg, int up) const
 {
-    const auto& m = *spec_.mode;
+    const auto& m = modeAt(bar);
     const int r = lowRootAt(bar);
     return degreeSemis(m, r + deg + up) - degreeSemis(m, r + deg);
 }
@@ -1169,7 +1200,7 @@ int GenreComposer::over(int bar, int deg, int up) const
 int GenreComposer::riffRoot(int bar, int deg) const
 {
     // the root folded into the riff's octave first, the degree's distance added after, so the riff keeps its contour
-    const auto& m = *spec_.mode;
+    const auto& m = modeAt(bar);
     const int r = lowRootAt(bar);
     return lowPitch(bar, 0, spec_.riffLo, spec_.riffLo + 11, 12 * (spec_.riffLo / 12)) + degreeSemis(m, r + deg) - degreeSemis(m, r);
 }
@@ -1334,7 +1365,7 @@ void GenreComposer::emitRiff(int bar, std::vector<Event>& out)
     if (spec_.riff == RiffStyle::None || attackBar(bar)) return;
     const bool unison = summitUnison(bar);
     if (!active(Riff, bar) && !unison) return;
-    const auto& m = *spec_.mode;
+    const auto& m = modeAt(bar);
     const int r = lowRootAt(bar);
     auto note = [&](int track, int64_t t, int64_t len, int p, float vel) {
         out.push_back({ t, Event::NoteOn, uint8_t(track), uint8_t(p), vel });
@@ -1519,7 +1550,7 @@ void GenreComposer::emitAttack(int bar, std::vector<Event>& out)
     const int64_t t0 = int64_t(bar) * kBarTicks, six = kSixteenth;
     auto& sec = sectionAt(bar);
     const bool final = bar + 1 == sec.startBar + sec.bars && bar + 1 < totalBars();
-    const auto& m = *spec_.mode;
+    const auto& m = modeAt(bar);
     std::vector<int> at;
     for (int i = 0; i < (cuts(bar) ? leadSix_ : 16); ++i) if (fig[i] != '.') at.push_back(i); // none in the silence
     auto note = [&](int track, int64_t t, int64_t len, int p, float vel) {
@@ -1565,7 +1596,7 @@ int GenreComposer::heldTrack(int bar) const
 void GenreComposer::emitTurn(int bar, size_t from, std::vector<Event>& out)
 {
     const int64_t t0 = int64_t(bar) * kBarTicks, cut = t0 + leadSix_ * kSixteenth, six = kSixteenth;
-    const auto& m = *spec_.mode;
+    const auto& m = modeAt(bar);
     auto note = [&](int track, int64_t t, int64_t len, int p, float vel) {
         out.push_back({ t, Event::NoteOn, uint8_t(track), uint8_t(p), vel });
         out.push_back({ t + len, Event::NoteOff, uint8_t(track), uint8_t(p), 0 });
@@ -1678,7 +1709,8 @@ void GenreComposer::generateBar(int bar, std::vector<Event>& out)
     emitPart(Perc, spec_.perc, bar, out);
     emitPart(Bass, spec_.bass, bar, out);
     emitPart(Chord, spec_.chord, bar, out);
-    if (spec_.lead == Arp) emitLead(bar, out);
+    if (spec_.motifN > 0 && sectionOfBar_[size_t(bar)] == 0) emitMotif(bar, out);
+    else if (spec_.lead == Arp) emitLead(bar, out);
     else if (spec_.hook) emitHook(bar, out);
     else emitArp(bar, out);
     emitPart(Sub, spec_.sub, bar, out);

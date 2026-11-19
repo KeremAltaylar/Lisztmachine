@@ -94,7 +94,19 @@ public:
     bool sing = false;                         // the soloist is a voice: long notes only
     bool pedal = false;                        // a change between parts of like energy leans on the next root (Turn::Pedal), not thinning
     bool quietEdges = false;                   // Improvisation: the first and last parts are the changeover between songs, the soloist rests in them
+    // Improvisation's harmony moves (Kerem, 2026-11-19): at the summit the key lifts this many semitones, or the mode
+    // turns brighter or darker (peakMode); both return after it, so the song still ends where its Release pivots
+    int lift = 0;
+    const Mode* peakMode = nullptr;
+    // its memory: the song before's theme (degrees above the chord's root), heard softly in the Seed, under the old
+    // song's Release, in this song's key, tempo and arp instrument
+    struct MotifNote { int8_t step, len, deg; float vel; };
+    std::array<MotifNote, 16> motif {};
+    int motifN = 0;
     };
+    // the hook: sixteenths over two bars, degrees above the chord's root
+    struct Note { int step, len, deg; float vel; };
+    const std::vector<Note>& homeHook() const { return hookHome_; }
 
     static const Spec* find(const std::string& scene);
     static const std::vector<const Spec*>& all();
@@ -105,8 +117,10 @@ public:
 
     const Spec& spec() const { return spec_; }
     int tonicPc() const { return tonicPc_; }
-    // halfway through the summit the song lifts a whole tone and stays there
-    int tonicAt(int bar) const { return (tonicPc_ + (bar >= liftBar_ ? 2 : 0)) % 12; }
+    // through the summit the key may lift (spec.lift) and the mode change colour (spec.peakMode)
+    bool atPeak(int bar) const { return bar >= peakFrom_ && bar < peakTo_; }
+    int tonicAt(int bar) const { return (tonicPc_ + (atPeak(bar) ? spec_.lift + 12 : 0)) % 12; }
+    const Mode& modeAt(int bar) const { return spec_.peakMode && atPeak(bar) ? *spec_.peakMode : *spec_.mode; }
     int rootAt(int bar) const { return rootOfBar_[size_t(bar)]; }
     const std::array<int, 4>& homeProgression() const { return home_; }
     bool active(int track, int bar) const;
@@ -161,14 +175,15 @@ private:
     int tier(int bar) const;
 
     const Spec& spec_;
-    int tonicPc_ = 0, liftBar_ = 1 << 30;
+    int tonicPc_ = 0, peakFrom_ = 1 << 30, peakTo_ = 1 << 30;
+    std::vector<bool> halfSec_;                     // per section: half time (a lowercase h in its layers)
+    void emitMotif(int bar, std::vector<Event>& out);
     std::vector<int> rootOfBar_;
     std::vector<int> arp_, arpHome_;                // ladder indices
     std::vector<int> arpRank_;
     std::vector<int> padHeld_, padVoices_, chordVoices_, harmHeld_, harmVoices_, droneHeld_;
     std::array<int, 4> home_ {}, away_ {};
     std::vector<bool> awayBar_;                     // the bars that play the breakdown's progression
-    struct Note { int step, len, deg; float vel; }; // the hook: sixteenths over two bars, degrees above the chord's root
     std::vector<Note> hook_, hookHome_, hookSummit_;
     struct RNote { int step, len, deg; float vel; bool palm; }; // the riff: two bars of sixteenths, degrees above the chord's root
     std::vector<RNote> riff_;

@@ -136,6 +136,9 @@ double dimsOf(const ImprovSong& a, const ImprovSong& b, std::vector<std::pair<st
         { "instruments", double(instr) / n },
         { "space", a.space != b.space ? 1.0 : 0.0 },
         { "length", std::min(1.0, std::abs(a.seconds - b.seconds) / 60.0) },
+        { "band", std::abs(a.band - b.band) / 3.0 },
+        { "character", a.character != b.character ? 1.0 : 0.0 },
+        { "shape", a.shape != b.shape ? 1.0 : 0.0 },
     };
     double sum = 0;
     for (auto& x : d) sum += x.second;
@@ -217,27 +220,115 @@ ImprovSong candidate(Rng& rng, int k)
         p.lead = G::Lead; p.sing = false; p.leadLo = L.leadLo; p.leadHi = L.leadHi;
     }
 
-    // the form: the donor's six parts fitted to a length of 3:20 to 4:45, a Seed before and a Release after
+    // the form: the donor's parts fitted to a length of 3:20 to 4:45, a Seed before and a Release after
     const double barSec = 240.0 / s.bpm;
     const int edge = std::max(4, int(std::lround(30.0 / barSec / 4)) * 4); // about 30 s each: the changeover (Kerem 2026-11-18: "30 seconds or so")
     const int want = int(rng.range(200, 285) / barSec);
     int donorBars = 0;
     for (auto& t : F.form) if (t.name) donorBars += t.bars;
     const double f = double(want - 2 * edge) / donorBars;
-    std::array<G::Sec, 10> form {};
-    int n = 0, total = 2 * edge;
-    form[size_t(n++)] = { "Seed", edge, .08f, "W" };
+    std::vector<G::Sec> mid;
     for (auto& t : F.form)
     {
         if (!t.name) break;
-        const int b = std::max(8, int(std::lround(t.bars * f / 4)) * 4);
-        form[size_t(n++)] = { t.name, b, t.energy, t.layers };
-        total += b;
+        mid.push_back({ t.name, std::max(8, int(std::lround(t.bars * f / 4)) * 4), t.energy, t.layers });
+    }
+
+    // Variety (Kerem, 2026-11-19): the band's size, its character, the song's shape, a solo, a beatless part, a part in
+    // half time, percussion across the bar, a harmony move. The chain keeps the band and the shape changing (fits).
+    s.band = std::array<int, 6> { 0, 1, 1, 2, 2, 3 }[size_t(rng.range(0, 5))];
+    s.character = std::array<int, 4> { 0, 0, 1, 2 }[size_t(rng.range(0, 3))];
+    s.shape = rng.range(0, 5);
+    s.solo = rng.chance(.5) ? (p.riff != G::RiffStyle::None && rng.chance(.4) ? 2 : 1) : 0;
+    s.drift = rng.chance(.35);
+    s.half = rng.chance(.35);
+    s.cross = rng.chance(.3);
+    s.harmonyMove = std::array<int, 7> { 0, 0, 1, 1, 2, 3, 4 }[size_t(rng.range(0, 6))];
+
+    // the shape: the same parts in another order (or at one level)
+    auto byEnergy = [&](bool up) { std::stable_sort(mid.begin(), mid.end(), [up](auto& a, auto& b) { return up ? a.energy < b.energy : a.energy > b.energy; }); };
+    if (s.shape == 1) byEnergy(true);
+    else if (s.shape == 2) byEnergy(false);
+    else if (s.shape == 3 || s.shape == 5)
+    {
+        byEnergy(true);
+        std::vector<G::Sec> o;
+        if (s.shape == 3) // two climbs, the second higher: every other part, then the rest
+        {
+            for (size_t i = 0; i < mid.size(); i += 2) o.push_back(mid[i]);
+            for (size_t i = 1; i < mid.size(); i += 2) o.push_back(mid[i]);
+        }
+        else // waves: low, high, low, high, closing in on the middle
+            for (size_t a = 0, b = mid.size(); a < b;) { o.push_back(mid[a++]); if (a < b) o.push_back(mid[--b]); }
+        mid = o;
+    }
+    else if (s.shape == 4) for (auto& t : mid) t.energy = .55f; // trance: one level, the parts only change colour
+
+    // a solo: the soloist alone over the bass (or the guitar's riff alone), before the last part
+    if (s.solo)
+        mid.insert(mid.end() - 1, { s.solo == 1 ? "Solo" : "Riff Break", s.bpm > 120 ? 16 : 8, .5f, s.solo == 1 ? "BUL" : "RUL" });
+    // a beatless part: pad, drone and the soloist, free over Kerem's kit
+    if (s.drift && mid.size() > 2)
+        mid.insert(mid.begin() + rng.range(1, int(mid.size()) - 1), { "Drift", s.bpm > 120 ? 16 : 8, .15f, "PWL" });
+
+    // the band's size: which layers each part keeps (the letters as Genres.cpp layersOf; the soloist plays throughout)
+    static std::deque<std::string> layerText; // the specs point at these: a deque never moves its strings
+    const char* const percs = "CYMSGHT";
+    const char keepA = percs[rng.range(0, 6)], keepB = percs[rng.range(0, 6)];
+    const int halfAt = s.half ? rng.range(0, int(mid.size()) - 1) : -1;
+    for (size_t i = 0; i < mid.size(); ++i)
+    {
+        auto& t = mid[i];
+        std::string out;
+        const std::string in = t.layers;
+        const auto has = [&](char c) { return in.find(c) != std::string::npos; };
+        const std::string melodic = s.band == 0 ? "BUW" : s.band == 1 ? "BUWPAR" : "PBUADFRW";
+        for (char c : in)
+        {
+            const bool perc = std::strchr("KSHCGYMTI", c) != nullptr;
+            if (c == 'L' || c == 'h' || (!perc && melodic.find(c) != std::string::npos)) out += c;
+            else if (perc && (s.band >= 2 || c == keepA || (s.band == 1 && c == keepB) || c == 'K')) out += c;
+        }
+        if (s.band == 3 && t.energy >= .4f) // the wall: every held part, doubled by the chords and the riff
+            for (char c : std::string("PDFW") + (p.riff != G::RiffStyle::None ? "R" : "")) if (out.find(c) == std::string::npos) out += c;
+        if (out.find_first_of("PBUADFRW") == std::string::npos) out += has('P') ? 'P' : 'W'; // never empty of a held part
+        if (int(i) == halfAt && t.energy >= .4f) out += 'h';
+        layerText.push_back(out);
+        t.layers = layerText.back().c_str();
+    }
+
+    // percussion across the bar: the perc on a grid of five or seven over the four beats
+    if (s.cross)
+    {
+        const int per = rng.chance(.5) ? 20 : 28; // quintuplet or septuplet sixteenths: kBarTicks divides by both
+        p.perc = { { { "euclid", per }, { "euclid", per }, { "euclid", per } } };
+    }
+
+    // harmony moves at the summit
+    static const std::pair<const Mode*, const Mode*> brighter[] = { { &kPhrygian, &kAeolian }, { &kAeolian, &kDorian }, { &kDorian, &kMelodicMinor },
+                                                                    { &kHarmonicMinor, &kMelodicMinor }, { &kPhrygianDominant, &kHarmonicMinor } };
+    static const std::pair<const Mode*, const Mode*> darker[] = { { &kDorian, &kAeolian }, { &kAeolian, &kPhrygian }, { &kMelodicMinor, &kDorian },
+                                                                  { &kHarmonicMinor, &kPhrygianDominant }, { &kHungarianMinor, &kHarmonicMinor } };
+    if (s.harmonyMove == 1) p.lift = std::array<int, 3> { 2, 3, -2 }[size_t(rng.range(0, 2))];
+    else if (s.harmonyMove == 2) p.pedal = true;
+    else if (s.harmonyMove == 3) { for (auto& [from, to] : brighter) if (from == s.mode) p.peakMode = to; }
+    else if (s.harmonyMove == 4) { for (auto& [from, to] : darker) if (from == s.mode) p.peakMode = to; }
+    if (s.harmonyMove >= 3 && !p.peakMode) s.harmonyMove = 0;
+
+    std::array<G::Sec, 10> form {};
+    int n = 0, total = 2 * edge;
+    form[size_t(n++)] = { "Seed", edge, .08f, "W" };
+    for (auto& t : mid)
+    {
+        if (n == 9) break; // the table holds ten parts with the Release
+        form[size_t(n++)] = t;
+        total += t.bars;
     }
     // never past five minutes (the engine's tail of a few seconds included)
     while (total * barSec > 290)
     {
         auto big = std::max_element(form.begin() + 1, form.begin() + n, [](auto& a, auto& b) { return a.bars < b.bars; });
+        if (big->bars <= 8) break;
         big->bars -= 4;
         total -= 4;
     }
@@ -264,6 +355,7 @@ bool fits(const ImprovSong& c, const ImprovSong* prev, int relax)
     for (int t = 0; t < G::kGenreTracks; ++t) same += c.sound[size_t(t)] == prev->sound[size_t(t)];
     if (same > G::kGenreTracks / 4) return false;
     if (c.tonic == prev->tonic) return false;
+    if (c.band == prev->band || c.shape == prev->shape) return false;
     // harmonic mixing: each note of the new drone is a tone of the old final chord, or a note of the old scale that
     // no chord tone sits a semitone from (a ninth, an eleventh: colour, never a rub)
     const uint32_t chord = finalChord(*prev), drone = seedDrone(c.tonic, *c.mode);
@@ -307,6 +399,16 @@ const ImprovSong& improvSong(uint64_t seed, int k)
             if (score > best.score) { best.s = c; best.score = score; }
         }
         ImprovSong s = best.score >= 0 ? best.s : candidate(rng, i); // (never met: thousands of candidates always hold one)
+        // its memory: the song before's theme (as its composer wrote it: the engine's seed, Composer.cpp makeComposer)
+        if (prev && prev->spec.hook && prev->spec.lead != G::Arp)
+        {
+            const G gc(prev->spec, seed * 7919 + uint64_t(i - 1) + 1);
+            for (auto& n : gc.homeHook())
+                if (s.spec.motifN < int(s.spec.motif.size()))
+                    s.spec.motif[size_t(s.spec.motifN++)] = { int8_t(n.step), int8_t(n.len), int8_t(n.deg), n.vel };
+            s.memory = s.spec.motifN > 0;
+            if (s.memory) s.spec.form[0].layers = "AW"; // the arp sounds in the Seed: it carries the memory
+        }
         if (prev)
         {
             s.distance = dimsOf(s, *prev, &s.dims);
@@ -371,20 +473,31 @@ std::string improvPalette(const ImprovSong& s, const std::function<std::string(c
     for (auto& l : lines(s.space))
     {
         const auto w = tok(l, 0);
+        // (no master move for the band's size: measured 2026-11-19, a duo, trio and walls came within 2 dB of one another
+        // without one; +3 on a duo took the overlap with a wall's Release to -0.08 dBFS)
         if (w == "shimmer" || w == "return" || w == "feedback" || w == "master" || (w == "send" && tok(l, 1) == "all")) out << l << "\n";
     }
+    // the character: in an acoustic song the melodic parts play only sampled instruments (sfz), in an electronic one
+    // only synths; a part no song has such an instrument for keeps any (strict is cleared for it)
+    bool strict = false;
+    auto patchOf = [](const std::string& l) {
+        std::istringstream in(l);
+        std::string a, b, c, patch;
+        in >> a >> b >> c;
+        std::getline(in, patch);
+        patch.erase(0, patch.find_first_not_of(" \t"));
+        return patch;
+    };
+    auto okPatch = [&](const std::string& patch) {
+        if (installed && !installed(patch)) return false;
+        return !strict || (patch.rfind("sfz/", 0) == 0) == (s.character == 1);
+    };
     static const char* perTrack[] = { "gain", "delay", "drive", "crush", "comp", "duck", "lowcut", "amp", "release", "feed", "send" };
     // a donor that has, for this track, a patch that sounds here: its patch lines are "<track> gain bright <patch...>"
     auto sounds = [&](int d, const std::string& name) {
         for (auto& l : lines(d))
         {
-            if (tok(l, 0) != name) continue;
-            std::istringstream in(l);
-            std::string a, b, c, patch;
-            in >> a >> b >> c;
-            std::getline(in, patch);
-            patch.erase(0, patch.find_first_not_of(" \t"));
-            if (!installed || installed(patch)) return true;
+            if (tok(l, 0) == name && okPatch(patchOf(l))) return true;
         }
         return false;
     };
@@ -393,6 +506,14 @@ std::string improvPalette(const ImprovSong& s, const std::function<std::string(c
         const std::string name = info.trackNames[t];
         int d = s.sound[size_t(t)];
         std::string note;
+        static const int melodicParts[] = { G::Pad, G::Bass, G::Arp, G::Chord, G::Harm, G::Riff, G::Drone, G::Lead };
+        strict = s.character != 0 && std::find(std::begin(melodicParts), std::end(melodicParts), t) != std::end(melodicParts);
+        if (strict)
+        {
+            bool any = false;
+            for (int c = 0; c < int(all.size()) && !any; ++c) any = sounds(c, name);
+            if (!any) strict = false;
+        }
         if (!sounds(d, name))
         {   // the planned instrument is not installed here: the same part from another song (one that plays it, then any)
             int alt = -1;
@@ -421,7 +542,7 @@ std::string improvPalette(const ImprovSong& s, const std::function<std::string(c
         for (auto& l : lines(d))
         {
             const auto w = tok(l, 0);
-            if (w == name) { out << l << "\n"; continue; }
+            if (w == name) { if (!strict || okPatch(patchOf(l))) out << l << "\n"; continue; }
             if (std::find(std::begin(perTrack), std::end(perTrack), w) == std::end(perTrack) || tok(l, 1) != name) continue;
             if (w == "gain")
             {
@@ -456,7 +577,7 @@ std::string improvPalette(const ImprovSong& s, const std::function<std::string(c
             }
         uint64_t h = 1469598103934665603ull; // FNV-1a over the song and the part: the same choice every time
         for (char ch : s.name + "/" + name) h = (h ^ uint8_t(ch)) * 1099511628211ull;
-        if (!extra.empty() && h % 5 < 3)
+        if (!extra.empty() && s.character != 2 && (s.character == 1 || h % 5 < 3))
         {
             const auto& e = extra[size_t((h / 5) % extra.size())];
             char buf[64];
@@ -480,6 +601,13 @@ std::string improvJson(const ImprovSong& s)
       << ",\"melody\":" << q(all[size_t(s.melody)]->scene) << ",\"riff\":" << q(kRiffs[int(s.spec.riff)])
       << ",\"summit\":" << q(kSummits[int(s.spec.summit)]) << ",\"space\":" << q(all[size_t(s.space)]->scene)
       << ",\"soloist\":" << q(s.spec.lead == G::Arp ? "saxophone (arp)" : std::string("lead from ") + all[size_t(s.sound[G::Lead])]->scene)
+      << ",\"band\":" << q(std::array<const char*, 4> { "duo", "trio", "full band", "wall" }[size_t(s.band)])
+      << ",\"character\":" << q(std::array<const char*, 3> { "mixed", "acoustic", "electronic" }[size_t(s.character)])
+      << ",\"shape\":" << q(std::array<const char*, 6> { "arc", "climb", "dissolve", "two peaks", "trance", "waves" }[size_t(s.shape)])
+      << ",\"solo\":" << q(std::array<const char*, 3> { "none", "soloist", "riff break" }[size_t(s.solo)])
+      << ",\"harmonyMove\":" << q(std::array<const char*, 5> { "none", "key lift", "pedal", "brighter peak", "darker peak" }[size_t(s.harmonyMove)])
+      << ",\"drift\":" << (s.drift ? "true" : "false") << ",\"half\":" << (s.half ? "true" : "false")
+      << ",\"cross\":" << (s.cross ? "true" : "false") << ",\"memory\":" << (s.memory ? "true" : "false")
       << ",\"distance\":" << s.distance << ",\"dims\":{";
     for (size_t i = 0; i < s.dims.size(); ++i) o << (i ? "," : "") << q(s.dims[i].first) << ":" << s.dims[i].second;
     o << "},\"sounds\":{";

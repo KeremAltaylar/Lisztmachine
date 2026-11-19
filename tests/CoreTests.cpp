@@ -187,10 +187,16 @@ int main()
     }
     // Improvisation: a chain of songs, each at most five minutes, each different from the one before in every
     // dimension that is measured, and the next drone inside the last song's final chord
+    std::array<int, 4> bands {};
+    std::array<int, 6> shapes {};
+    std::array<int, 5> moves {};
+    int solos = 0, drifts = 0, halves = 0, crosses = 0, memories = 0, songs = 0;
     for (seed = 1; seed <= 6; ++seed)
         for (int k = 0; k < 12; ++k)
         {
             const auto& s = improvSong(seed, k);
+            ++songs; ++bands[size_t(s.band)]; ++shapes[size_t(s.shape)]; ++moves[size_t(s.harmonyMove)];
+            solos += s.solo > 0; drifts += s.drift; halves += s.half; crosses += s.cross; memories += s.memory;
             auto c = makeComposer("improv/" + std::to_string(k), seed);
             auto ev = generateAll(*c);
             const double secs = c->totalBars() * 240.0 / c->bpm();
@@ -200,7 +206,7 @@ int main()
             if (k > 0)
             {
                 for (auto& d : s.dims)
-                    if (d.first != "length" && d.first != "space") CHECK(d.second > 0, "improv %d: %s same as the song before", k, d.first.c_str());
+                    if (d.first != "length" && d.first != "space" && d.first != "character") CHECK(d.second > 0, "improv %d: %s same as the song before", k, d.first.c_str());
                 CHECK(s.distance >= 0.75, "improv %d: distance %.2f", k, s.distance);
             }
             {   // every borrowed instrument is a real one: no silent placeholder (internal/none) but the ghost pulse
@@ -221,6 +227,8 @@ int main()
                     ++at;
                 }
                 CHECK(pal.find("# drone from") != std::string::npos, "improv %d: palette not read", k);
+                // the character: an electronic song takes nothing from the sampled pool
+                if (s.character == 2) CHECK(pal.find("from the pool") == std::string::npos, "improv %d: electronic song with a pool sample", k);
                 // on a machine without the sampled instruments (Kerem's Mac before installing them): every track still has a sound
                 const auto bare = improvPalette(s, [&](const std::string& sc) {
                     std::string t;
@@ -241,6 +249,14 @@ int main()
             }
             if (seed == 1) std::printf("      improv %2d  %-22s %s  %.0f%% different  %s\n", k, s.name.c_str(), c->describe().c_str(), 100 * s.distance, s.move.c_str());
         }
+    // the variety (Kerem, 2026-11-19): every band size, shape and harmony move turns up, and the rest now and then
+    for (int b : bands) CHECK(b > 0, "a band size never chosen");
+    for (int b : shapes) CHECK(b > 0, "a shape never chosen");
+    for (int b : moves) CHECK(b > 0, "a harmony move never chosen");
+    CHECK(solos > songs / 5 && drifts > songs / 8 && halves > songs / 8 && crosses > songs / 8 && memories > songs / 5,
+          "solos %d drifts %d halves %d crosses %d memories %d of %d", solos, drifts, halves, crosses, memories, songs);
+    std::printf("      improv variety over %d songs: bands %d/%d/%d/%d, shapes %d/%d/%d/%d/%d/%d, solos %d, drifts %d, half %d, cross %d, memory %d\n",
+                songs, bands[0], bands[1], bands[2], bands[3], shapes[0], shapes[1], shapes[2], shapes[3], shapes[4], shapes[5], solos, drifts, halves, crosses, memories);
     seed = 0;
 
     std::printf("%s (%d failures)\n", failures ? "FAILED" : "all checks passed", failures);

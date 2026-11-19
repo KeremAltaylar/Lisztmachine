@@ -33,6 +33,14 @@ struct ImprovSong
     std::string name, move;                                // its title; the harmonic move into it
     double distance = 1;                                   // 0..1 from the song before: the share of dimensions that differ
     std::vector<std::pair<std::string, double>> dims;      // each dimension's difference from the song before
+    // Kerem, 2026-11-19 ("more variety ... some songs can have lesser synth or some have much more"):
+    int band = 2;      // 0 duo, 1 trio, 2 full band, 3 wall: how many parts play
+    int character = 0; // 0 mixed, 1 acoustic (sampled instruments only), 2 electronic (synths only), melodic parts
+    int shape = 0;     // 0 arc (the donor's order), 1 climb, 2 dissolve, 3 two peaks, 4 trance (flat), 5 waves
+    int solo = 0;      // 0 none, 1 the soloist alone over the bass, 2 a riff break
+    bool drift = false, half = false, cross = false; // a beatless part; a part in half time; percussion across the bar
+    int harmonyMove = 0; // 0 none, 1 the key lifts at the summit, 2 pedals, 3 the summit brighter, 4 darker
+    bool memory = false; // the song before's theme heard in the Seed
 };
 
 // "improv/<k>": song k of the chain (the chain is the seed); false for any other scene
