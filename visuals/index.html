@@ -108,7 +108,7 @@ nav button[aria-pressed="true"] { color: var(--ember); }
       <button class="go" id="piece-live" data-piece="live" disabled>Live from the app</button>
     </div>
     <button class="go" id="go" hidden disabled>Loading…</button>
-    <p class="keys"><kbd>1</kbd>–<kbd>9</kbd> study · <kbd>G</kbd> new look · <kbd>Space</kbd> pause · <kbd>←</kbd><kbd>→</kbd> 10 s · <kbd>↑</kbd><kbd>↓</kbd> section · <kbd>S</kbd> strobe on/off · <kbd>B</kbd> feedback on/off · <kbd>K</kbd> test drum hit · <kbd>[</kbd><kbd>]</kbd> kick sensitivity · <kbd>{</kbd><kbd>}</kbd> drum pad sensitivity (input 2) · <kbd>,</kbd><kbd>.</kbd> pad effect · <kbd>P</kbd> hits: affect / layer / off · <kbd>M</kbd> metronome on/off · <kbd>C</kbd> code in the picture on/off · <kbd>V</kbd> the machine's voice: bottom, top, off · <kbd>H</kbd> hide controls · <kbd>F</kbd> full screen</p>
+    <p class="keys"><kbd>1</kbd>–<kbd>9</kbd> study · <kbd>G</kbd> new look · <kbd>Space</kbd> pause · <kbd>←</kbd><kbd>→</kbd> 10 s · <kbd>↑</kbd><kbd>↓</kbd> section · <kbd>S</kbd> strobe on/off · <kbd>B</kbd> feedback on/off · <kbd>K</kbd> test drum hit · <kbd>J</kbd> test pad note · <kbd>[</kbd><kbd>]</kbd> kick sensitivity · <kbd>{</kbd><kbd>}</kbd> drum pad sensitivity (input 2) · <kbd>,</kbd><kbd>.</kbd> pad effect · <kbd>P</kbd> hits: affect / layer / off · <kbd>M</kbd> metronome on/off · <kbd>C</kbd> code in the picture on/off · <kbd>V</kbd> the machine's voice: bottom, top, off · <kbd>H</kbd> hide controls · <kbd>F</kbd> full screen</p>
     <p class="err" id="err" hidden></p>
   </div>
 </div>
@@ -303,6 +303,7 @@ function liveLink(waiting) {
     test.onclick = () => cmd('padtest');
     const padName = Object.assign(document.createElement('span'), { className: 'padname' });
     bar.append(sel, play, click, main, earMusic.box, earClick.box, kickIn.box, padIn.box, padVol.box, test, padName, note);
+    L.padTest = () => cmd('padtest');
     L.pad2 = k => { if (L.app?.pad2Thr != null) cmd('pad2thr/' + Math.max(0.001, Math.min(0.5, L.app.pad2Thr * k)).toFixed(5)); };
     sel.onchange = () => cmd('scene/' + sel.value);
     play.onclick = () => cmd(L.app?.playing ? 'stop' : 'play');
@@ -363,6 +364,7 @@ function liveLink(waiting) {
     es.addEventListener('stop', () => { L.stopped = true; });
     // the kick on the interface's input 1, detected by the app (2026-11-15): the drum-pad effect without a browser input
     es.addEventListener('hit', e => L.onHit?.(JSON.parse(e.data)));
+    es.addEventListener('hit2', e => L.onHit2?.(JSON.parse(e.data)));   // a drum-pad note (input 2), as the app played it
     // a song: its notes, parts and look join the show where it is heard
     L.add = m => {
       const sh = L.show, t = m.at - L.T0;
@@ -646,7 +648,7 @@ fn down13(uv: vec2f, karis: bool) -> vec3f {
 }
 
 @group(0) @binding(3) var bloom: texture_2d<f32>;
-struct Post { a: vec4f, wb: vec4f, lo: vec4f, hi: vec4f };
+struct Post { a: vec4f, wb: vec4f, lo: vec4f, hi: vec4f, note: vec4f };   // note: the drum pad's last note (see ringAt)
 // a: exposure, bloom mix, grain, fade · wb: white balance gains · lo, hi: the colour world (w: its amount)
 @group(0) @binding(4) var<uniform> post: Post;
 fn aces(x: vec3f) -> vec3f { return clamp((x * (2.51 * x + 0.03)) / (x * (2.43 * x + 0.59) + 0.14), vec3f(0.0), vec3f(1.0)); }
@@ -709,6 +711,33 @@ fn bodyRing(uv: vec2f) -> f32 {
   let r = length((uv - 0.5) * vec2f(u.res.x / u.res.y, 1.0));
   let sa = u.body[1].z;
   return exp(-pow((r - sa * 1.3) / (0.03 + 0.06 * sa), 2.0)) * u.body[1].w * exp(-sa * 2.5);
+}
+// The drum pad's note (input 2, Kerem 2026-11-20: "different than kick 1 ... different effects style"). The kick moves
+// the frame rigidly; a note makes it RESONATE: a wave spreads from where the note sits (its place on the circle of
+// fifths), the picture refracts in standing rings as if seen through struck glass, finer for higher notes, and its
+// own light takes the note's colour (one hue per pitch class, fifths apart = neighbours) in bands at the rings'
+// crests. Both ring away with the sound (~2 s). No layer is drawn: only the picture's own pixels move and recolour.
+// post.note: seconds since the note, strength (0: none), hue, height (0 middle C .. 1 two octaves up)
+fn ringAt(uv: vec2f) -> vec4f {                 // xy: refraction, z: colour amount, w: light
+  let P = post.note;
+  if (P.y <= 0.0 || P.x > 5.0) { return vec4f(0.0); }
+  let asp = u.res.x / u.res.y;
+  let a = 6.2831853 * P.z;
+  let q = (uv - 0.5) * vec2f(asp, 1.0) - vec2f(cos(a), sin(a)) * 0.3;
+  let r = length(q);
+  let env = P.y * smoothstep(0.0, 0.03, P.x) * exp(-P.x / 1.1);
+  let front = 0.1 + 1.6 * (1.0 - exp(-P.x * 1.8));                          // the wave front: fast, then slowing
+  let reach = 1.0 - smoothstep(front - 0.35, front, r);                     // what the sound has reached
+  let k = mix(26.0, 80.0, P.w);                                              // higher notes: finer rings
+  let wave = sin(r * k) * cos(P.x * 6.2831853 * (3.0 + 4.0 * P.w));       // standing: the rings stay, their sign flutters
+  let e = env * reach;
+  let dir = q / max(r, 1e-3) / vec2f(asp, 1.0);
+  let crest = sin(r * k * 0.5);
+  return vec4f(dir * 0.007 * e * wave, clamp(1.3 * e * (0.6 + 0.4 * crest * crest), 0.0, 1.0), 0.5 * e * wave * wave);
+}
+fn hueOf(h: f32) -> vec3f {
+  let c = 0.5 + 0.5 * cos(6.2831853 * (h - vec3f(0.0, 0.33333, 0.66667)));
+  return c * c / max(max(c.r * c.r, max(c.g * c.g, c.b * c.b)), 1e-3);
 }
 fn padLift() -> f32 {
   if (padFn() < 0) { return 0.0; }
@@ -841,14 +870,17 @@ fn padLayer(uv: vec2f) -> vec4f {
 }
 
 @fragment fn composite(i: VO) -> @location(0) vec4f {
-  let tuv = i.uv + padWarp(i.uv) + bodyWarp(i.uv);
+  let rg = ringAt(i.uv);
+  let tuv = i.uv + padWarp(i.uv) + bodyWarp(i.uv) + rg.xy;
   var c = tap(tuv);
   let b = min(textureSampleLevel(bloom, smp, tuv, 0.0).rgb, vec3f(6e4));
-  c = mix(c, b, post.a.y) * post.a.x * (1.0 + padLift() + 0.6 * bodyRing(i.uv));
+  c = mix(c, b, post.a.y) * post.a.x * (1.0 + padLift() + 0.6 * bodyRing(i.uv) + rg.w);
   c *= post.wb.rgb;                                                          // automatic white balance
   let l = luma(c);                                                           // the colour world: light by brightness
   let tone = mix(post.lo.rgb, post.hi.rgb, smoothstep(0.0, 0.22, l / (1.0 + l)));   // only the deepest shadow takes lo: halfway they would meet in grey
   c = mix(c, vec3f(l) * tone / max(luma(tone), 1e-3), post.lo.w);
+  let nl = luma(c);                                                          // the pad's note: its colour in the picture's own light
+  c = mix(c, nl * hueOf(post.note.z) * 1.6 + 0.08 * rg.z, rg.z);
   c = aces(c);
   let q = i.uv - 0.5;
   c *= 1.0 - dot(q, q) * 0.55;
@@ -2739,7 +2771,7 @@ registerProcessor('master-fx', MasterFx);`;
   const pComp = g.fullscreen(COMMON + POST, 'composite', format);
   const pMix = g.fullscreen(MIX, 'mixf');
   const pOuter = g.fullscreen(MIX, 'outerf');
-  const postU = device.createBuffer({ size: 64, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+  const postU = device.createBuffer({ size: 80, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
   const mixU = device.createBuffer({ size: 160, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
   const postIn = device.createBuffer({ size: Udata.byteLength, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });   // the composite's view of U
   // Every study has its own uniforms and its own target, so two can run at once during a transition.
@@ -2959,6 +2991,7 @@ registerProcessor('master-fx', MasterFx);`;
     else if (e.key === 's' || e.key === 'S') { D.strobe = !D.strobe; }
     else if (e.key === 'b' || e.key === 'B') { D.feedback = !D.feedback; }
     else if (e.key === 'k' || e.key === 'K') { padHit(0.4 + Math.random() * 0.6, Math.random()); }   // a pretend hit, for trying it without the pad
+    else if (e.key === 'j' || e.key === 'J') { if (LIVE) LIVE.padTest(); else pad2Hit(60 + Math.floor(Math.random() * 24), 0.5 + Math.random() * 0.5); }   // a drum-pad note (in the app: heard too)
     else if (e.key === ',') { setAmt(pad.amt - 10); }
     else if (e.key === '.') { setAmt(pad.amt + 10); }
     else if (e.key === 'p' || e.key === 'P') { nextLayer(); }
@@ -2998,6 +3031,15 @@ registerProcessor('master-fx', MasterFx);`;
     try { localStorage.setItem('lisztmachine-pad-amt', pad.amt); } catch {}
   };
   window.__pad = pad;
+  // The drum pad's notes (input 2): each colours and rings the picture (ringAt); the Pad effect slider scales it too.
+  // Hue on the circle of fifths: a chord's notes sit near each other in colour, a far key changes the colour world.
+  const pad2Hit = (note, vel) => { pad.note = { t: visT, note, vel }; pad.lit2 = 6; };
+  const padNote = () => {
+    const n = pad.note;
+    if (!n) return [99, 0, 0, 0];
+    return [visT - n.t, n.vel * Math.min(1.3, 0.15 + 0.6 * padK().s), ((n.note % 12) * 7 % 12) / 12, Math.max(0, Math.min(1, (n.note - 60) / 24))];
+  };
+  window.__pad2 = pad2Hit;
   // The hit layer: each section of each piece gets one of eight forms (adjacent sections always differ:
   // the step 3 is coprime to 8) and a colour opposite the piece's colour world, turned ±54° per section.
   // 'affect': no layer, the hit acts on the picture itself (a function per section, see padWarp)
@@ -3233,6 +3275,7 @@ registerProcessor('master-fx', MasterFx);`;
     LIVE.onHit = m => padHit(Math.max(0.15, Math.min(1, (dB(m.peak) - dB(pad.thr)) / 30)), Math.max(0, Math.min(1, (Math.log10(m.ratio + 1e-9) + 2.2) / 2)));
     LIVE.onMeter = (x, m) => { pad.meter = x; if (m.in2 != null) pad.in2 = m.in2; if (m.hits2 != null && m.hits2 !== pad.hits2) { if (pad.hits2 != null) pad.lit2 = 6; pad.hits2 = m.hits2; } };
     LIVE.onThr = x => { pad.thr = x; };
+    LIVE.onHit2 = m => pad2Hit(m.note, Math.max(0.3, Math.min(1, (dB(m.peak) - dB(LIVE.app?.pad2Thr ?? 0.02)) / 30 + 0.3)));
     if (LIVE.app?.padThr != null) pad.thr = LIVE.app.padThr;
   }
   setAmt(pad.amt);
@@ -3784,7 +3827,7 @@ registerProcessor('master-fx', MasterFx);`;
     const hi = W.hi.map((x, k) => x + (hot[k] - x) * warm), lo = W.lo.map((x, k) => x + (hot[k] * 0.6 - x) * warm * 0.5);
     device.queue.writeBuffer(postU, 0, new Float32Array([on ? (bodyNow[11] ? 0.55 + 0.7 * bodyNow[0] + 0.25 * bodyNow[9] : 0.35 + 1.15 * bodyNow[0] + 0.4 * bodyNow[9]) : 1.0,   // the whole-frame studies are bright already: a narrower range
       study.bloom + (b.bloom - study.bloom) * blend + (bodyNow[11] ? 0.15 : 0.3) * bodyNow[10], 0.05, 1,
-      ...wb, 0, ...lo, 0.85 * LOOK.colour / 100 + 0.5 * warm, ...hi, 0]));
+      ...wb, 0, ...lo, 0.85 * LOOK.colour / 100 + 0.5 * warm, ...hi, 0, ...padNote()]));
     fbi = 1 - fbi;
     g.draw(enc, pMix, mixGroup(study, b, fbi), g.fbViews[fbi]);
     g.draw(enc, pOuter, outerBG[fbi], g.fboViews[fbi]);

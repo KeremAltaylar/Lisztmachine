@@ -588,6 +588,7 @@ private:
         }
         if (engine) engine->render(out, numOut, n);
         else for (int c = 0; c < numOut; ++c) juce::FloatVectorOperations::clear(out[c], n);
+        if (engine && engine->padStruck.exchange(0) > 0) { padNote = engine->padStruckNote.load(); ++padStruck; } // for the visuals
         // Improvisation's changeover: the last song's Release rings out under the new song's Seed (and the concert's next
         // song, from its first sample until the message thread makes it the playing one)
         for (auto* e : { oldEngine.get(), starting && starting->isPlaying() ? starting.get() : nullptr })
@@ -957,12 +958,19 @@ private:
             meterOut = meter;
         }
     } onset, pad2; // input 1 the kick (the visuals), input 2 the drum pad (a note)
-    int hitsSent = 0, pad2Seen = 0;
+    int hitsSent = 0, pad2Seen = 0, padSent = 0;
+    std::atomic<int> padStruck { 0 }, padNote { 60 }; // drum-pad notes played (audio thread), the last one
     double padDb = 0; // the drum pad's level, dB (-60: off)
     std::atomic<int> kickIn { 0 }, padIn { 1 }, numInputs { 0 }; // the kick's and the drum pad's input (0 = input 1), how many there are
     std::atomic<bool> padTest { false };
     void sendHits() // the level thread, every 10 ms
     {
+        if (const int s = padStruck.load(); s != padSent) // a drum-pad note: the visuals colour it by its pitch
+        {
+            padSent = s;
+            if (live.clients() > 0)
+                live.post("hit2", "{\"note\":" + juce::String(padNote.load()) + ",\"peak\":" + juce::String(pad2.lastPeak.load(), 5) + "}");
+        }
         const int h = onset.hits.load();
         if (h == hitsSent) return;
         hitsSent = h;

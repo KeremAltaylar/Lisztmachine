@@ -105,5 +105,3 @@ lead     0.0       0  internal/none
 # crowded"): the low hits, an eight-bar sentence (Sentence, Composer.h) on the engine's frame drum
 boom    -2.0    1000  internal/boom  # +2: level with the other songs (rms -25)
 
-# the drum pad on input 2 (2026-11-15): its sound, gain dB
-drumpad 2.7 3rd/Giana Brotherz/Keys/Glassy E-Piano

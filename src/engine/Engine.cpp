@@ -648,6 +648,9 @@ TrackMix mixFor(const std::string& name)
 }
 } // namespace
 
+// The drum pad's own voice (input 2) and its gain, dB: the pad's rms about 6 dB under the mix (measured 2026-11-20)
+static constexpr const char* kPadVoice = "3rd/Bluelight/Keys/Donna's Glass Hammers";
+static constexpr float kPadVoiceDb = 3.0f; // at 4.0: pad -5.2 (halftime), -5.9 (doom), -5.4 (berlin) dB under the mix
 // The engine's own synths: no Surge instance, one sound for the whole song.
 static bool isEngineSound(const juce::String& patch) { return patch.startsWith("internal/"); }
 
@@ -967,22 +970,11 @@ juce::String Engine::load(double sampleRate, int maxBlock, const Palette& palett
     fbBus_.prepare(sampleRate);
     reverbBus_.setSize(busChannels(*reverb_), maxBlock);
 
-    // The drum pad's sound: the palette's, else one of the song's own Surge sounds, keys, bells, plucks or mallets
-    // first (a struck sound), from its melody, then its harmony, then any part
+    // The drum pad's sound: the palette's 'drumpad' line, else the pad's own voice, the same struck glass in every
+    // song, so it stands apart from the song's synths (2026-11-20; measured in tune, pitch spread 6 cents)
     pad_ = {};
-    pad_.patch = palette.padPatch;
-    float padDb = palette.padGainDb;
-    const auto plainSurge = [](const juce::String& p) {
-        return !isEngineSound(p) && !isDexedSound(p) && !isSfzSound(p) && !isVstSound(p) && findSurgePatch(p).existsAsFile();
-    };
-    for (int pass = 0; pass < 2 && pad_.patch.isEmpty(); ++pass)
-        for (int role : { 3, 0, 2, 1 })
-            for (int i = 0; i < numTracks_ && pad_.patch.isEmpty(); ++i)
-                if (palette.info->role[i] == role)
-                    for (auto& e : palette.parts[i])
-                        if (plainSurge(e.patch) && (pass == 1 || e.patch.containsIgnoreCase("Keys") || e.patch.containsIgnoreCase("Bell")
-                                                    || e.patch.containsIgnoreCase("Pluck") || e.patch.containsIgnoreCase("Mallet")))
-                        { pad_.patch = e.patch; padDb = e.gainDb; break; }
+    pad_.patch = palette.padPatch.isNotEmpty() ? palette.padPatch : juce::String(kPadVoice);
+    float padDb = palette.padPatch.isNotEmpty() ? palette.padGainDb : kPadVoiceDb;
     if (pad_.patch.isNotEmpty())
     {
         guarded([&] {
@@ -992,10 +984,10 @@ juce::String Engine::load(double sampleRate, int maxBlock, const Palette& palett
             p->prepareToPlay(sampleRate, maxBlock);
             if (e = loadSurgePatch(*p, findSurgePatch(pad_.patch)); e.isNotEmpty()) { pad_.info = " · " + e; return; }
             purify(*p, true); // in tune with the song: no detune
-            // fast attack, a medium sustain, a long release (Kerem: "short attack long release medium sustain")
+            // struck: a fast attack that rings away over about two seconds, no held sustain (2026-11-20)
             for (auto sc : { "A", "B" })
-                for (auto [name, value] : { std::pair<const char*, const char*> { "Attack", "3.00 ms" }, { "Decay", "1.20 s" },
-                                            { "Sustain", "45.00 %" }, { "Release", "4.50 s" } })
+                for (auto [name, value] : { std::pair<const char*, const char*> { "Attack", "2.00 ms" }, { "Decay", "2.00 s" },
+                                            { "Sustain", "0.00 %" }, { "Release", "2.00 s" } })
                     if (auto err = setParameterText(*p, juce::String(sc) + " Amp EG " + name, value); err.isNotEmpty())
                         pad_.info << " · " << err.substring(0, 100);
             p->reset();
@@ -1646,7 +1638,9 @@ void Engine::renderChunk(float* const* out, int numChannels, int offset, int len
             const int k = pad_.count++ % (2 * n); // up the chord over two octaves from middle C, then again
             pad_.note = 60 + pcs[k % n] + 12 * (k / n);
             pad_.midi.addEvent(juce::MidiMessage::noteOn(1, pad_.note, v), 0);
-            pad_.left = int64_t(2 * kPPQ * samplesPerTick_); // held two beats, then the long release
+            pad_.left = int64_t(kPPQ * samplesPerTick_); // let go after a beat: the ring goes on in the release
+            padStruckNote = pad_.note;
+            ++padStruck;
         }
         else if (pad_.note >= 0 && (pad_.left -= len) <= 0)
         {

@@ -117,5 +117,3 @@ delay lead 0.75 0.35 0.22
 # crowded"): the low hits, an eight-bar sentence (Sentence, Composer.h) on the engine's frame drum
 boom    -4.0    1000  internal/boom  # about 4 dB under the 808 (measured in Doom and Liquid)
 
-# the drum pad on input 2 (2026-11-15): its sound, gain dB
-drumpad 8.3 3rd/Luna/Keys/Electric Nightmares
