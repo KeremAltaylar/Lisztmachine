@@ -1660,8 +1660,7 @@ void Engine::renderChunk(float* const* out, int numChannels, int offset, int len
             const float* x = view.getReadPointer(juce::jmin(c, view.getNumChannels() - 1));
             for (int n = 0; n < len; ++n) sq += double(x[n] * g) * double(x[n] * g);
             juce::FloatVectorOperations::addWithMultiply(pa[c], x, g, len);
-            juce::FloatVectorOperations::addWithMultiply(delayIn.getWritePointer(c), x, 0.25f * g, len);
-            juce::FloatVectorOperations::addWithMultiply(reverbIn.getWritePointer(c), x, 0.5f * g, len);
+            juce::FloatVectorOperations::addWithMultiply(reverbIn.getWritePointer(c), x, 0.5f * g, len); // no delay (Kerem, 2026-11-20)
         }
         padSq = padSq.load() + sq;
         padN = padN.load() + 2 * len;
