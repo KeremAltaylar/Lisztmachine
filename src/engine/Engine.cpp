@@ -650,7 +650,7 @@ TrackMix mixFor(const std::string& name)
 
 // The drum pad's own voice (input 2) and its gain, dB: the pad's rms about 6 dB under the mix (measured 2026-11-20)
 static constexpr const char* kPadVoice = "3rd/Bluelight/Keys/Donna's Glass Hammers";
-static constexpr float kPadVoiceDb = 3.0f; // at 4.0: pad -5.2 (halftime), -5.9 (doom), -5.4 (berlin) dB under the mix
+static constexpr float kPadVoiceDb = 1.0f; // with the octave under it, at 3.0: -3.7 (halftime), -4.4 (doom) dB under the mix
 // The engine's own synths: no Surge instance, one sound for the whole song.
 static bool isEngineSound(const juce::String& patch) { return patch.startsWith("internal/"); }
 
@@ -1632,12 +1632,13 @@ void Engine::renderChunk(float* const* out, int numChannels, int offset, int len
         if (mask) padMask_ = mask;
         if (const float v = padHit_.exchange(0); v > 0 && padMask_)
         {
-            if (pad_.note >= 0) pad_.midi.addEvent(juce::MidiMessage::noteOff(1, pad_.note), 0);
+            if (pad_.note >= 0) { pad_.midi.addEvent(juce::MidiMessage::noteOff(1, pad_.note), 0); pad_.midi.addEvent(juce::MidiMessage::noteOff(1, pad_.note - 12), 0); }
             int pcs[12], n = 0;
             for (int pc = 0; pc < 12; ++pc) if (padMask_ & (1 << pc)) pcs[n++] = pc;
             const int k = pad_.count++ % (2 * n); // up the chord over two octaves from middle C, then again
             pad_.note = 60 + pcs[k % n] + 12 * (k / n);
             pad_.midi.addEvent(juce::MidiMessage::noteOn(1, pad_.note, v), 0);
+            pad_.midi.addEvent(juce::MidiMessage::noteOn(1, pad_.note - 12, 0.85f * v), 0); // and an octave under it (Kerem, 2026-11-20)
             pad_.left = int64_t(kPPQ * samplesPerTick_); // let go after a beat: the ring goes on in the release
             padStruckNote = pad_.note;
             ++padStruck;
@@ -1645,6 +1646,7 @@ void Engine::renderChunk(float* const* out, int numChannels, int offset, int len
         else if (pad_.note >= 0 && (pad_.left -= len) <= 0)
         {
             pad_.midi.addEvent(juce::MidiMessage::noteOff(1, pad_.note), 0);
+            pad_.midi.addEvent(juce::MidiMessage::noteOff(1, pad_.note - 12), 0);
             pad_.note = -1;
         }
         pad_.buf.clear();
