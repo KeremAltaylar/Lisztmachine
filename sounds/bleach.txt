@@ -37,8 +37,8 @@ send pad reverb 0.30
 
 # Balance
 gain pulse   0.0
-gain metal   -8.0
-gain tick    8.0
+gain metal   -12.0
+gain tick    -6.0  # Kerem 2026-11-21: the high rhythms too loud (was 8.0)
 gain perc    -6.0
 gain pad     -3.0
 gain bass    5.0
@@ -66,12 +66,12 @@ lowcut chord 150
 
 # The percussion section (modal: struck and shaken objects, tuned to the chords)
 ground   0.0    1000  internal/modal-log
-body     0.0    1000  internal/modal-block
+body     0.0    1000  internal/modal-skin
 mallet   0.0    1000  internal/modal-kalimba
 texture  0.0    1000  internal/modal-crackle
 impact   0.0    1000  internal/modal-plate
-gain ground  -23.0
-gain body    -15.0
+gain ground  -16.0
+gain body    -8.0
 gain mallet  -28.0
 gain texture -25.0
 gain impact -6.0

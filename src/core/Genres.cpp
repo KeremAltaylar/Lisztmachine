@@ -308,23 +308,26 @@ const G::Spec kBleach {
     .scene = "bleach", .title = "Bleach",
     .bpmLo = 168, .bpmHi = 172, .mode = &kHarmonicMinor, .tonics = { 4, 11, 9, 2, 7 },
     .progs = { { { 0, 3, 4, 0 }, { 5, 1, 4, 0 }, { 0, 5, 3, 4 } } }, .preRoot = 4,
-    .form = { { { "Lye", 16, .15f, "PAT" }, { "Starch", 24, .40f, "PADBUHTGM" }, { "Bleach", 48, .85f, "PKSHCBUADTGYMIR" },
+    .form = { { { "Lye", 16, .15f, "PAT" }, { "Starch", 24, .40f, "PADBUHTGYM" }, { "Bleach", 48, .85f, "PKSHCBUADTGYMIR" },
                 { "Linen", 24, .35f, "PAFTM" },
                 { "Burn", 64, 1.0f, "PKSHCBUADFTGYMIR" }, { "White", 16, .15f, "PAT" } } },
-    .pulse = part("X.........X.....", "X.....X...X.....", "X..X..X...X..X.."),
+    // 2026-11-21 (Kerem: "more rhythm and percussion like dnb or hard jungle and breakcore", the high rhythms too loud):
+    // the low log and the hand drum play a break (the amen's shape: the low on 1, the and of 1, the and of 3; the skin
+    // on 2 and 4 with ghosts around them), the second bar rolling; chopped and stuttered on the skin, the ticks under them
+    .pulse = part("X.........X.....", "X.X.......XX....", "X.X.......XX....X.X.......X...X."),
     .metal = part("", "....1.....2...1.", "..1.2..1.3.2..1."),
-    .tick = part("x...x...x...x...", "x.xgx.oxx.xgx.ox", "xgoxxgo2xgoxxgo2"),
-    .perc = part("", "......1.........", "...1..1....2.1.."), // iron, off his backbeat
+    .tick = part("x...x...x...x...", "x.x.x.x.x.x.x.x.", "x.xgx.oxx.xgx.ox"),
+    .perc = part("", "..1.......1.....", "..1....1..1...2."), // iron, off his backbeat
     .bass = part("x---------------", "x-----x---x-----", "x--x--x-..x-5-8-"), // the growl's wobble rhythm
     .chord = part("", "x.....x...x.....", "x..x..x.x.x..x.."), // string stabs
     .sub = part("x---------------", "x-------x-------", "x-----x-x---^---"),
-    .ground = part("", "1.........2.....", "1..2......2..1.."),
-    .body = part("", "..o...o...o.o...", ".o.o..o.o..o..o."),
+    .ground = part("1.........1.....", "1.1.......21....", "1.1.......21....1.1.......2...1."),
+    .body = part("....x.......x...", "....x..g.g..x..g", "....x..g.gg.x..g....x..g.g..xg.x"),
     .mallet = part("", "1.....2.........", "1..3..2..4.1..3."),
     .texture = part("x---------------", "x-------x-------", "x---x---x---x---"),
     .arpRate = { 16, 16, 16 }, .arpLenLo = 6, .arpLenHi = 8, .arpDensLo = .9f, .arpDensHi = 1.0f, .arpGate = .6f,
     .arpLo = 60, .arpHi = 86, .percLo = 36, .percHi = 52, .harmLo = 45, .harmHi = 64, .ext = 0, .hook = false, // the male choir: G2-F4
-    .chop = .25f, .gap = .12f, .stutter = .30f, .stutterTrack = G::Tick, .stutterDiv = 64,
+    .chop = .35f, .gap = .10f, .stutter = .35f, .stutterTrack = G::Body, .stutterDiv = 32,
     .riff = G::RiffStyle::Chug, .riffLo = 33, .summit = G::Summit::Halftime, .build = true,
     .leadLo = 67, .leadHi = 84, .sing = true, // the soprano (samples G4-C6)
 };
