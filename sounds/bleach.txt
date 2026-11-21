@@ -68,25 +68,23 @@ gain ground  -22.0
 gain mallet  -28.0
 gain texture -25.0
 gain impact -6.0
-comp body -24 3 8 90 0.35
-duck body 0.2
 duck mallet 0.15
 delay mallet 0.75 0.4 0.25
 delay impact 1.5 0.55 0.4 throws
 
 boom    -3.0    1000  internal/boom
 
-# 2026-11-21 (Kerem: "yeah I want it": real breaks in this song only): a CC0 acoustic kit (Karoryfer Big Rusty Drums,
-# on the Mac from the Improvisation install) chopped and stuttered by the composer, crushed and driven like a breakcore
-# break; the hats kept low (he found the high rhythms too loud)
-pulse    0.0    1000  sfz/Big_Rusty_Drums_1100/Programs/03-kick.sfz
-body     0.0    1000  sfz/Big_Rusty_Drums_1100/Programs/04-snare.sfz
-tick     0.0    1000  sfz/Big_Rusty_Drums_1100/Programs/06-hihat.sfz
-gain pulse   18.0
-gain body    12.0
-gain tick   16.0
-drive pulse 0.40 4000
-drive body  0.55 6000
-crush body  10 2 0.35
-comp body -20 4 2 60 0.5
-crush tick  10 2 0.3
+# 2026-11-21 (Kerem: "use these for breaks", the KAN Amen Break Tribute pack, "the design of that amen dnb box"): the
+# body track is BreakMachine's player (Engine.cpp BreakInstrument) on the amen: the original and three cuts (bleach.breaks,
+# copied beside the WAVs), sliced, sorted into kick, snare and hat, chopped into A A' A FILL phrases; wilder with the
+# energy. Centred and full (the hand drums' pan and low cut are not for a break). The hats and the kick gone: the break
+# has its own; the pulse is silent again (it still ducks the mix on the downbeats).
+pulse    0.0      60  internal/none
+tick     0.0      60  internal/none
+body     0.0    1000  sfz/KAN Amen Break Tribute/Drum Loops/bleach.breaks
+gain body    0.0
+pan body     0
+lowcut body  30
+duck body    0
+drive body  0.35 7000
+comp body -22 4 2 60 0.5

@@ -58,6 +58,7 @@ struct Palette
     CompSpec comps[kMaxTracks];         // "comp <track> thresholdDb ratio attackMs releaseMs mix"
     float duckDepth[kMaxTracks];        // "duck <track> depth": over the mix stage's own; -1 keeps it
     float lowCutHz[kMaxTracks];         // "lowcut <track> Hz": over the mix stage's own; -1 keeps it
+    float pan[kMaxTracks];              // "pan <track> -1..1": over the mix stage's own; below -1 keeps it
     float releaseS[kMaxTracks] = {};    // "release <track> seconds": a Surge sound's amp envelope lets go at least this slowly
     float sends[kMaxTracks][2];         // "send <track>|all delay|reverb amount": over the scene's sends; -1 keeps them
     float shimmer = 0;                  // "shimmer amount": the reverb also fed an octave up

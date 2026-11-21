@@ -330,7 +330,7 @@ const G::Spec kBleach {
     .chop = .35f, .gap = .10f, .stutter = .35f, .stutterTrack = G::Body, .stutterDiv = 32,
     .riff = G::RiffStyle::Chug, .riffLo = 33, .summit = G::Summit::Halftime, .build = true,
     .leadLo = 67, .leadHi = 84, .sing = true, // the soprano (samples G4-C6)
-    .kit = true, // real breaks: kick, snare, hats (Kerem's exception for this song)
+    .breaks = true, // the KAN amen chopped by BreakMachine's player (Kerem's exception for this song)
 };
 
 bool is(const char* a, const char* b) { return std::strcmp(a, b) == 0; }
@@ -637,9 +637,7 @@ bool GenreComposer::active(int track, int bar) const
 
 std::array<int, 2> GenreComposer::range(int track) const
 {
-    if (spec_.kit && track == Pulse) return { 36, 36 };
-    if (spec_.kit && track == Body) return { 38, 38 };
-    if (spec_.kit && track == Tick) return { 42, 46 };
+    if (spec_.breaks && track == Body) return { 36, 99 };
     switch (track)
     {
         case Pad: return { 36, 76 };
@@ -1814,7 +1812,7 @@ void GenreComposer::generateBar(int bar, std::vector<Event>& out)
     if (spec_.lead == Drone) emitLead(bar, out);
     else emitDrone(bar, out);
     emitPart(Ground, spec_.ground, bar, out);
-    emitPart(Body, spec_.body, bar, out);
+    if (!spec_.breaks) emitPart(Body, spec_.body, bar, out);
     emitPart(Mallet, spec_.mallet, bar, out);
     emitPart(Texture, spec_.texture, bar, out);
     emitImpact(bar, out);
@@ -1824,15 +1822,30 @@ void GenreComposer::generateBar(int bar, std::vector<Event>& out)
     emitAttack(bar, out);
     emitTurn(bar, from, out);
     emitHeld(Fx, bar, out, fxHeld_, active(Fx, bar) ? foldInto(48 + tonicAt(bar), 48, 59) : -1);
-    if (spec_.kit)
-        for (size_t i = from; i < out.size(); ++i)
-        {
-            auto& ev = out[i];
-            if (ev.type != Event::NoteOn && ev.type != Event::NoteOff) continue;
-            if (ev.track == Pulse) ev.pitch = 36;
-            else if (ev.track == Body) ev.pitch = 38;
-            else if (ev.track == Tick) ev.pitch = ev.pitch >= 96 ? 46 : 42;
-        }
+    if (spec_.breaks) // the break owns its track: the end figures' and builds' hand-drum hits leave it
+    {
+        out.erase(std::remove_if(out.begin() + std::ptrdiff_t(from), out.end(), [](const Event& e) {
+            return e.track == Body && (e.type == Event::NoteOn || e.type == Event::NoteOff); }), out.end());
+        emitBreaks(bar, out);
+    }
+}
+
+// The break's beat notes (BreakInstrument, Engine.cpp): every beat of the song, pitch 36 + its place in the eight-bar
+// phrase (68 + it on a part's first beat: a new pattern), velocity how wild, the lowest silent. It plays where the body
+// would, louder with the energy, and stops on the parts' end figures, like the other drums.
+void GenreComposer::emitBreaks(int bar, std::vector<Event>& out)
+{
+    const int si = sectionOfBar_[size_t(bar)];
+    const bool first = bar == 0 || sectionOfBar_[size_t(bar - 1)] != si;
+    const bool loud = active(Body, bar) && !attackBar(bar);
+    const float wild = std::clamp(.15f + .75f * energyAt(bar), .1f, .95f);
+    for (int b = 0; b < 4; ++b)
+    {
+        const int64_t t = int64_t(bar) * kBarTicks + b * kPPQ;
+        const int pitch = (first && b == 0 ? 68 : 36) + (bar % 8) * 4 + b;
+        out.push_back({ t, Event::NoteOn, uint8_t(Body), uint8_t(pitch), loud ? wild : .005f });
+        out.push_back({ t + kPPQ / 2, Event::NoteOff, uint8_t(Body), uint8_t(pitch), 0 });
+    }
 }
 
 std::string GenreComposer::describe() const

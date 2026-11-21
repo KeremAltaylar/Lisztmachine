@@ -48,6 +48,16 @@ cp "$I/dc-erhu-trio.sfz" "$LIB/lib/aliexpress-erhu_v1000/Programs/" 2>/dev/null
 cp "$I/lm-cello.sfz" "$LIB/lib/Karoryfer_Bigcat_cello.v1.001/Karoryfer_Bigcat_cello/Programs/" 2>/dev/null
 cp "$I/noir-sax.sfz" "$I/wcc-bass-sax.sfz" "$LIB/lib/Weresax/Programs/" 2>/dev/null
 echo "   Lisztmachine's own programs copied in"
+# Bleach's breaks (2026-11-21): Kerem's KAN Amen Break Tribute pack, from his WeTransfer link (its licence: not to be
+# shared, so it is not in the repo), with the repo's list of which breaks to play (bleach.breaks) beside its loops
+K="$LIB/lib/KAN Amen Break Tribute"
+if [ ! -d "$K/Drum Loops" ]; then
+  kan=$(curl -s -X POST "https://wetransfer.com/api/v4/transfers/966d7c4037ea1525f106f68ea5b9780a20240918101535/download"         -H "Content-Type: application/json" -H "x-requested-with: XMLHttpRequest" -d '{"security_hash":"fde53a","intent":"entire_transfer"}' |
+        python3 -c "import sys,json; print(json.load(sys.stdin)['direct_link'])" 2>/dev/null)
+  if [ -n "$kan" ] && get "$kan" kan-amen.zip && unzip -q -o "$DL/kan-amen.zip" -x "__MACOSX/*" -d "$LIB/lib"; then echo "   KAN Amen Break Tribute: installed"
+  else echo "   KAN Amen Break Tribute: could not download (the WeTransfer link may have expired)"; fail=1; fi
+fi
+cp "$I/bleach.breaks" "$K/Drum Loops/" 2>/dev/null
 # Improvisation's wider pool (2026-11-18, ~11 GB): tools/extra-instruments.txt, laid out as on the PC: a zip with one top
 # folder unpacked into lib/ (that folder), any other into lib/<zip name>
 grep -v '^#' "$REPO/tools/extra-instruments.txt" | tr -d '\r' | while read -r url; do
@@ -137,7 +147,7 @@ missing=0
 while IFS= read -r p; do
   rel="${p#sfz/}"
   [ -f "$LIB/lib/$rel" ] || [ -f "$LIB/$rel" ] || { echo "   MISSING sampled instrument: $rel"; missing=1; }
-done < <(grep -hoE "sfz/[^#]*\.sfz" "$REPO"/sounds/*.txt | sed 's/[[:space:]]*$//' | sort -u)
+done < <(grep -hoE "sfz/[^#]*\.(sfz|breaks)" "$REPO"/sounds/*.txt | sed 's/[[:space:]]*$//' | sort -u)
 while IFS= read -r n; do
   have "$n" || { echo "   MISSING plugin: $n.vst3"; missing=1; }
 done < <(grep -hoE "vst/[^/]+" "$REPO"/sounds/*.txt | sed 's|vst/||' | sort -u)

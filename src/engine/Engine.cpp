@@ -1,6 +1,8 @@
 #include "Engine.h"
 #include "Improv.h"
 #include <sfizz.hpp>
+#include "Break.h"
+#include <juce_audio_formats/juce_audio_formats.h>
 
 namespace liszt {
 
@@ -250,10 +252,125 @@ private:
     juce::String name_;
     int lastCc_ = -1;
 };
+// Breaks (Kerem, 2026-11-21, Bleach: "use these for breaks ... the design of that amen dnb box"): BreakMachine's player
+// (Break.h) as an instrument. A `.breaks` file lists recorded breaks (one WAV path a line, beside it); each is sliced at
+// its onsets and sorted into kick, snare and hat, and the player chops them into two-bar patterns, phrased A A' A FILL
+// over eight bars. The composer drives it with one note a beat: pitch 36 + the beat's place in the eight-bar phrase
+// (0-31), or 68 + it for a new pattern (a new part); velocity = how wild (chaos, density and rolls grow with it), and
+// the lowest velocity = silent. Between the notes the position runs on at the tempo the notes keep.
+class BreakInstrument : public juce::AudioPluginInstance
+{
+public:
+    BreakInstrument() : juce::AudioPluginInstance(BusesProperties().withOutput("Out", juce::AudioChannelSet::stereo(), true)) {}
+    bool load(const juce::File& list)
+    {
+        juce::AudioFormatManager fm;
+        fm.registerBasicFormats();
+        juce::StringArray lines;
+        list.readLines(lines);
+        std::vector<brk::Break> parts;
+        for (auto line : lines)
+        {
+            line = line.upToFirstOccurrenceOf("#", false, false).trim();
+            if (line.isEmpty()) continue;
+            std::unique_ptr<juce::AudioFormatReader> r(fm.createReaderFor(list.getSiblingFile(line)));
+            if (!r || r->lengthInSamples < 1000) continue;
+            juce::AudioBuffer<float> b(2, int(r->lengthInSamples));
+            r->read(&b, 0, int(r->lengthInSamples), 0, true, true);
+            brk::Break k;
+            k.sr = r->sampleRate;
+            k.l.assign(b.getReadPointer(0), b.getReadPointer(0) + b.getNumSamples());
+            k.r.assign(b.getReadPointer(1), b.getReadPointer(1) + b.getNumSamples());
+            brk::analyse(k, 0.5f);
+            if (!k.slices.empty()) parts.push_back(std::move(k));
+        }
+        if (parts.empty()) return false;
+        std::vector<const brk::Break*> ptrs;
+        for (auto& k : parts) ptrs.push_back(&k);
+        kit_ = brk::combine(ptrs);
+        name_ = list.getFileNameWithoutExtension();
+        return true;
+    }
+    const juce::String getName() const override { return "breaks " + name_; }
+    void prepareToPlay(double sr, int) override { sr_ = sr; player_.prepare(sr); player_.setBreak(&kit_); player_.seed(1); player_.evolve = 1; }
+    void releaseResources() override {}
+    void processBlock(juce::AudioBuffer<float>& buf, juce::MidiBuffer& midi) override
+    {
+        const int n = buf.getNumSamples();
+        float* L = buf.getWritePointer(0);
+        float* R = buf.getWritePointer(juce::jmin(1, buf.getNumChannels() - 1));
+        int done = 0;
+        auto run = [&](int upTo) { // the player from `done` to `upTo`, at the beat position the notes keep
+            if (upTo <= done) return;
+            const bool playing = loud_ && anchor_ >= 0 && double(clock_ + done - anchor_) < 1.5 * quarter_;
+            const double ppq = anchorPpq_ + double(clock_ + done - anchor_) / quarter_;
+            player_.render(L + done, R + done, upTo - done, ppq, 1.0 / quarter_, playing);
+            done = upTo;
+        };
+        for (const auto meta : midi)
+        {
+            const auto m = meta.getMessage();
+            if (m.isAllNotesOff() || m.isAllSoundOff()) { loud_ = false; continue; }
+            if (!m.isNoteOn()) continue;
+            const int at = juce::jlimit(0, n, meta.samplePosition);
+            run(at);
+            const int note = m.getNoteNumber();
+            if (note < 36 || note > 99) continue;
+            const int pos = (note - 36) % 32;
+            const int64_t now = clock_ + at;
+            if (anchor_ >= 0)
+            {
+                const int beats = (pos - lastPos_ + 32) % 32;
+                if (beats >= 1 && beats <= 4) quarter_ = double(now - anchor_) / beats; // the tempo the notes keep
+                if (pos < lastPos_) phrase_ += 1;
+            }
+            anchor_ = now, lastPos_ = pos, anchorPpq_ = phrase_ * 32.0 + pos;
+            const float v = float(m.getVelocity()) / 127.0f;
+            loud_ = m.getVelocity() > 1;
+            player_.gen.chaos = v, player_.gen.density = .45f + .45f * v, player_.gen.rolls = .25f + .55f * v;
+            player_.gen.reverse = .15f, player_.gen.pitch = .1f;
+            if (note >= 68) player_.requestNew();
+        }
+        run(n);
+        clock_ += n;
+        for (int c = 2; c < buf.getNumChannels(); ++c) buf.clear(c, 0, n);
+    }
+    void reset() override { loud_ = false; }
+    double getTailLengthSeconds() const override { return 0.5; }
+    bool acceptsMidi() const override { return true; }
+    bool producesMidi() const override { return false; }
+    juce::AudioProcessorEditor* createEditor() override { return nullptr; }
+    bool hasEditor() const override { return false; }
+    int getNumPrograms() override { return 1; }
+    int getCurrentProgram() override { return 0; }
+    void setCurrentProgram(int) override {}
+    const juce::String getProgramName(int) override { return name_; }
+    void changeProgramName(int, const juce::String&) override {}
+    void getStateInformation(juce::MemoryBlock&) override {}
+    void setStateInformation(const void*, int) override {}
+    void fillInPluginDescription(juce::PluginDescription& d) const override { d.name = getName(); d.pluginFormatName = "breaks"; d.isInstrument = true; }
+
+private:
+    brk::Break kit_;
+    brk::Player player_;
+    juce::String name_;
+    double sr_ = 48000, quarter_ = 48000 * 60.0 / 170, anchorPpq_ = 0;
+    int64_t clock_ = 0, anchor_ = -1;
+    int lastPos_ = 0;
+    int64_t phrase_ = 0;
+    bool loud_ = false;
+};
 } // namespace
 
 std::unique_ptr<juce::AudioPluginInstance> createSfz(double sampleRate, int maxBlock, const juce::File& sfz, juce::String& error)
 {
+    if (sfz.hasFileExtension(".breaks"))
+    {
+        auto b = std::make_unique<BreakInstrument>();
+        if (!sfz.existsAsFile() || !b->load(sfz)) { error = "no breaks in " + sfz.getFullPathName(); return nullptr; }
+        b->prepareToPlay(sampleRate, maxBlock);
+        return b;
+    }
     auto p = std::make_unique<SfzInstrument>();
     if (!sfz.existsAsFile()) { error = "no sfz file " + sfz.getFullPathName(); return nullptr; }
     if (!p->load(sfz)) { error = "sfizz could not load " + sfz.getFullPathName(); return nullptr; }
@@ -671,6 +788,7 @@ juce::String Palette::load(const juce::File& file, const std::string& sceneName)
     for (auto& c : comps) c = {};
     for (auto& d : duckDepth) d = -1;
     for (auto& d : lowCutHz) d = -1;
+    for (auto& d : pan) d = -9;
     for (auto& d : delays) d = {};
     for (auto& r : releaseS) r = 0;
     for (auto& t : sends) t[0] = t[1] = -1;
@@ -707,7 +825,7 @@ juce::String Palette::load(const juce::File& file, const std::string& sceneName)
         if (tokens[0] == "return" && tokens.size() >= 3 && (tokens[1] == "delay" || tokens[1] == "reverb" || tokens[1] == "feedback"))
         { returnDb[tokens[1] == "reverb" ? 1 : tokens[1] == "feedback" ? 2 : 0] = tokens[2].getFloatValue(); continue; }
         if (tokens[0] == "feedback" && tokens.size() >= 3) { fbBeats = tokens[1].getFloatValue(); fbAmount = tokens[2].getFloatValue(); continue; }
-        if (tokens[0] == "gain" || tokens[0] == "delay" || tokens[0] == "drive" || tokens[0] == "crush" || tokens[0] == "comp" || tokens[0] == "duck" || tokens[0] == "lowcut" || tokens[0] == "amp" || tokens[0] == "release" || tokens[0] == "feed")
+        if (tokens[0] == "gain" || tokens[0] == "delay" || tokens[0] == "drive" || tokens[0] == "crush" || tokens[0] == "comp" || tokens[0] == "duck" || tokens[0] == "lowcut" || tokens[0] == "pan" || tokens[0] == "amp" || tokens[0] == "release" || tokens[0] == "feed")
         {
             const int t = info->trackOf(tokens[1].toStdString());
             if (t < 0) return where + "no track '" + tokens[1] + "' in the " + juce::String(scene) + " scene";
@@ -718,6 +836,7 @@ juce::String Palette::load(const juce::File& file, const std::string& sceneName)
             else if (tokens[0] == "feed") feeds[t] = juce::jmax(0.0f, tokens[2].getFloatValue());
             else if (tokens[0] == "release") releaseS[t] = juce::jmax(0.0f, tokens[2].getFloatValue());
             else if (tokens[0] == "lowcut") lowCutHz[t] = juce::jmax(0.0f, tokens[2].getFloatValue());
+            else if (tokens[0] == "pan") pan[t] = juce::jlimit(-1.0f, 1.0f, tokens[2].getFloatValue());
             else if (tokens[0] == "amp" && tokens.size() >= 5) amps[t] = { juce::jlimit(0.0f, 1.0f, tokens[2].getFloatValue()), tokens[3].getFloatValue(), juce::jlimit(0.0f, 1.0f, tokens[4].getFloatValue()),
                                                                      tokens.size() >= 6 ? tokens[5].getFloatValue() : 110.0f, tokens.size() >= 7 ? tokens[6].getFloatValue() : 7.0f,
                                                                      tokens.size() >= 8 ? tokens[7].getFloatValue() : 5200.0f, tokens.size() >= 9 ? tokens[8].getFloatValue() : 3.0f,
@@ -914,7 +1033,8 @@ juce::String Engine::load(double sampleRate, int maxBlock, const Palette& palett
         t.internal = isEngineSound(first);
         t.trim = juce::Decibels::decibelsToGain(palette.trackGainDb[i]);
         t.echo.prepare(sampleRate);
-        const auto m = mixFor(palette.info->trackNames[i]);
+        auto m = mixFor(palette.info->trackNames[i]);
+        if (palette.pan[i] >= -1) m.pan = palette.pan[i];
         t.duck = m.duck;
         t.width = m.width;
         t.panL = std::sqrt(2.0f) * std::cos((m.pan + 1) * juce::MathConstants<float>::pi / 4);
