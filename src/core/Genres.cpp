@@ -275,7 +275,7 @@ const G::Spec kWake {
     // to the riff and the drone alone. Funeral pace, between the two songs.
     .bpmLo = 66, .bpmHi = 70, .mode = &kHarmonicMinor, .tonics = { 9, 4, 2, 7, 11 },
     .progs = { { { 0, 5, 3, 4 }, { 0, 1, 4, 0 }, { 5, 3, 4, 0 } } }, .preRoot = 4,
-    .form = { { { "Vigil", 6, .12f, "PTW" }, { "Salt", 8, .30f, "PRAFTW" }, { "Bearers", 10, .48f, "PRBUATGW" },
+    .form = { { { "Vigil", 6, .12f, "PATW" }, { "Salt", 8, .30f, "PRAFTW" }, { "Bearers", 10, .48f, "PRBUATGW" },
                 { "Pilgrims", 10, .66f, "PRBUATGYMW" }, { "Scourge", 12, .84f, "PRBUADCKSTGYMW" },
                 { "Requiem", 16, 1.0f, "PRBUDCKSTGYMAFIW" }, { "Martyr", 10, .80f, "PRBUDCTGYMAWh" },
                 { "Reliquary", 8, .60f, "PRBUTGYMAW" }, { "Candle", 6, .40f, "PAFTMW" }, { "Earth", 6, .20f, "RATW" } } },
@@ -293,7 +293,7 @@ const G::Spec kWake {
     // 2026-11-21 (Kerem: "the choir as a soloist, and a good synth with arpeggios to support the long drones"): the arp
     // track an arpeggio, not the hook (eighths in the calm, sixteenths as it drives, five to seven notes against the
     // bar, so it turns slowly under the held chords); the soloist a choir, long notes only
-    .arpRate = { 8, 16, 16 }, .arpLenLo = 5, .arpLenHi = 7, .arpDensLo = .7f, .arpDensHi = 1.0f, .arpGate = .8f,
+    .arpRate = { 16, 16, 16 }, .arpLenLo = 5, .arpLenHi = 7, .arpDensLo = 1.0f, .arpDensHi = 1.0f, .arpGate = .8f, // more of it (2026-11-21)
     .arpLo = 55, .arpHi = 79, .percLo = 33, .percHi = 48, .ext = 0, .hook = false,
     .riff = G::RiffStyle::Doom, .riffLo = 30, .summit = G::Summit::Pedal, .ends = false, .legato = true, .gaze = true,
     .sing = true, .pedal = true, .flow = true, .peakMode = &kPhrygianDominant,
