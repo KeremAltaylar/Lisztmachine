@@ -286,7 +286,7 @@ const G::Spec kWake {
     .mallet = part("", "1...............", "1.......3......."),
     .texture = part("x---------------", "x---------------", "x-------x-------"),
     .arpLo = 55, .arpHi = 79, .percLo = 33, .percHi = 48, .ext = 0,
-    .riff = G::RiffStyle::Doom, .riffLo = 30, .summit = G::Summit::Pedal, .legato = true, .gaze = true, .pedal = true,
+    .riff = G::RiffStyle::Doom, .riffLo = 30, .summit = G::Summit::Pedal, .legato = true, .gaze = true, .pedal = true, .flow = true,
 };
 
 const G::Spec kSaint {
@@ -311,7 +311,7 @@ const G::Spec kSaint {
     .mallet = part("", "1...............", "1.......3......."),
     .texture = part("x---------------", "x---------------", "x-------x-------"),
     .arpLo = 55, .arpHi = 79, .percLo = 33, .percHi = 48, .ext = 0,
-    .riff = G::RiffStyle::Doom, .riffLo = 31, .summit = G::Summit::Halftime, .legato = true, .gaze = true, .pedal = true,
+    .riff = G::RiffStyle::Doom, .riffLo = 31, .summit = G::Summit::Halftime, .legato = true, .gaze = true, .pedal = true, .flow = true,
 };
 
 const G::Spec kWolf {
@@ -336,7 +336,7 @@ const G::Spec kWolf {
     .mallet = part("", "", ""),
     .texture = part("x---------------", "x---------------", "x-------x-------"),
     .arpLo = 55, .arpHi = 79, .percLo = 33, .percHi = 48, .ext = 0,
-    .riff = G::RiffStyle::Tremolo, .riffLo = 33, .summit = G::Summit::NewTheme, .gaze = true, .pedal = true,
+    .riff = G::RiffStyle::Tremolo, .riffLo = 33, .summit = G::Summit::NewTheme, .gaze = true, .pedal = true, .flow = true,
 };
 
 bool is(const char* a, const char* b) { return std::strcmp(a, b) == 0; }
@@ -1582,7 +1582,9 @@ void GenreComposer::planEnds()
     // instruments leave one by one, or the low end leans on the next root (spec.pedal).
     std::vector<bool> stops(sections_.size(), false);
     for (size_t si = 1; si < sections_.size(); ++si) stops[si] = drives(int(si)) && sections_[si - 1].energy >= .45f;
-    const auto turns = planTurns(stops, spec_.pedal);
+    if (spec_.flow) stops.assign(stops.size(), false);
+    auto turns = planTurns(stops, spec_.pedal);
+    if (spec_.flow) for (auto& t : turns) if (t == Turn::Hole) t = Turn::Pickup; // a held part, the bass walking in: never all silent
     turn_.assign(size_t(totalBars()), Turn::None);
     pedal_.assign(size_t(totalBars()), -1);
     leadSix_ = 16 - 4 * int(std::ceil(0.5 * bpm_ / 60.0 - 1e-6));

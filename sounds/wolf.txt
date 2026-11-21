@@ -1,4 +1,6 @@
 # Lisztmachine sound palette: Wolf Hour (fast), in Doom's style with its own instruments (2026-11-21). Built from doom.txt;
+# 2026-11-21 (Kerem: "too messy, the feedbacks intersect and the instrument cannot be heard"): at 200 bpm Doom's echoes,
+# feedback bus, long releases and wet reverb smeared the riff: all cut back here (shorter, drier, the bus nearly off).
 # each swapped sound's gain set by --audition against the Doom sound it replaces (note comments).
 # Swapped (Doom's sound and gain on the right):
 #   sfz/Virtual-Playing-Orchestra3/Strings/all-strings-SEC-sustain.sfz  <- Doom's 3rd/Nick Moritz/Pads/Nightmare at -9.0
@@ -31,7 +33,7 @@ chord     6.5     268  sfz/vsco2/FHorn-sus.sfz
 arp        10.7    1807  sfz/Virtual-Playing-Orchestra3/Strings/1st-violin-SOLO-sustain.sfz
 
 # Echoes: beats, feedback, mix
-delay chord 1.5 0.40 0.20
+delay chord 0.5 0.20 0.12
 
 # Balance (to be measured in the mix)
 gain pulse   0.0
@@ -56,8 +58,8 @@ comp perc -22 4 5 80 0.4
 duck metal 0.15
 duck tick 0.2
 duck perc 0.25
-delay metal 0.75 0.55 0.35 throws
-delay perc  1.0 0.5 0.3 throws
+delay metal 0.5 0.30 0.20 throws
+delay perc  0.5 0.25 0.18 throws
 
 # 2026-10-29: the 808, the choir, deep metal, darker synths
 sub      0.0      60  internal/808
@@ -85,8 +87,8 @@ gain impact -4.0
 comp body -24 3 8 90 0.35
 duck body 0.2
 duck mallet 0.15
-delay mallet 0.75 0.4 0.25
-delay impact 1.5 0.55 0.4 throws
+delay mallet 0.5 0.25 0.15
+delay impact 1.0 0.35 0.25 throws
 
 # Sampled instruments (CC0: Karoryfer, D. Smolken, VSCO 2 CE; jSteelDrum: Unlicense), played by sfizz
 chord    21.8    1019  sfz/vsco2/TenorTrombone-sus.sfz
@@ -104,14 +106,14 @@ amp riff  0.70 2600 1.0 90 2 4800 3 1300  # Doom's: amp riff  0.70 1800 1.0 45 -
 # only (the synth basses out), the riff on the sampled guitars (both, left and right) an octave down
 # into the same fuzz and amp, the trombone held instead of staccato, every Surge sound's release at
 # least these seconds, every track into the reverb, and into it an octave up too (the shimmer)
-release pad   4.0
-release harm  4.0
-release chord 3.0
-release arp   2.5
-send all reverb 0.25
-shimmer 0.5
-return reverb 17.6  # 7.5 put the reverb 9.5 dB under the dry tracks (25 % wet); Kerem's mix +10.1 on it
-return delay 12  # Kerem's mix
+release pad   1.5
+release harm  1.5
+release chord 0.8
+release arp   0.5
+send all reverb 0.12
+shimmer 0.15
+return reverb 14.0  # 7.5 put the reverb 9.5 dB under the dry tracks (25 % wet); Kerem's mix +10.1 on it
+return delay 6  # Doom's (Kerem's mix) 12: drier at this tempo
 
 # 2026-10-31 night (Kerem: a little faster, every note ringing into the next, a feedback channel the
 # guitar and the bass feed whose amount he sets, "over exaggerate the feedback"; a second, drone guitar
@@ -119,17 +121,17 @@ return delay 12  # Kerem's mix
 # through each chord; the feedback bus = a ping-pong at a dotted eighth (beats, amount: over 1 it
 # swells and holds), fed by the guitars and the bass, set in the Doom Mixer
 drone     22.9    1000  sfz/Karoryfer_Black_And_Green_Guitars_1000/Programs/saint-drone.sfz
-gain drone   6.7  # Kerem's mix: +7.7
-feedback 0.75 0.99  # Kerem's mix
-feed riff   0.69
-feed bass   0.49
-feed drone  0.65
-return feedback 6.3
+gain drone   2.7  # Kerem's mix: +7.7
+feedback 0.5 0.45  # Kerem's mix
+feed riff   0.15
+feed bass   0.0
+feed drone  0.2
+return feedback 0.0
 
 # 2026-11-09 (Kerem: "a leading soloist instrument that connects parts as lead, continuous to play but changes
 # accordingly to the parts"): the soloist's own track. an octave down, beating 5 %.
 lead      17.1    2252  sfz/Virtual-Playing-Orchestra3/Strings/1st-violin-SOLO-sustain.sfz
-delay lead 0.75 0.35 0.22
+delay lead 0.5 0.15 0.10
 
 # 2026-11-09 (Kerem: "low kick percussion hits like a deep gong drum, organic sub hits, long sentences, not too
 # crowded"): the low hits, an eight-bar sentence (Sentence, Composer.h) on the engine's frame drum

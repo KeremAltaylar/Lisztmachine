@@ -93,6 +93,7 @@ public:
     int leadLo = 60, leadHi = 84;              // where its own track's line is written
     bool sing = false;                         // the soloist is a voice: long notes only
     bool pedal = false;                        // a change between parts of like energy leans on the next root (Turn::Pedal), not thinning
+    bool flow = false;                         // no hard stops (Kerem, 2026-11-21, the Doom-style songs): a stop or a hole becomes a pickup
     bool quietEdges = false;                   // Improvisation: the first and last parts are the changeover between songs, the soloist rests in them
     // Improvisation's harmony moves (Kerem, 2026-11-19): at the summit the key lifts this many semitones, or the mode
     // turns brighter or darker (peakMode); both return after it, so the song still ends where its Release pivots
