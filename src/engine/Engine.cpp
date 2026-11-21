@@ -327,7 +327,7 @@ public:
             anchor_ = now, lastPos_ = pos, anchorPpq_ = phrase_ * 32.0 + pos;
             const float v = float(m.getVelocity()) / 127.0f;
             loud_ = m.getVelocity() > 1;
-            player_.gen.chaos = v, player_.gen.density = .45f + .45f * v, player_.gen.rolls = .25f + .55f * v;
+            player_.gen.chaos = v, player_.gen.density = .45f + .45f * v, player_.gen.rolls = .06f + .14f * v; // Kerem: not too many rolls (was .25 + .55 v)
             player_.gen.reverse = .15f, player_.gen.pitch = .1f;
             if (note >= 68) player_.requestNew();
         }

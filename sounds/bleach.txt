@@ -86,5 +86,6 @@ gain body    0.0
 pan body     0
 lowcut body  30
 duck body    0
-drive body  0.35 7000
-comp body -22 4 2 60 0.5
+# Kerem (2026-11-21): "saturate the break rhythm and compress it a little"
+drive body  0.70 6500
+comp body -26 3 4 90 0.6
