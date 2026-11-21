@@ -259,84 +259,40 @@ const G::Spec kBlackgaze {
     .chordSweep = .30f, .riff = G::RiffStyle::Tremolo, .riffLo = 40, .summit = G::Summit::NewTheme, .ends = false, .pedal = true,
 };
 
-// ---- 2026-11-20 (Kerem: "3 new songs like the style in Doom, I like the sound there very much ... vary the tempo,
-// the darkness in the melodies and harmony is good ... one can be very fast but in that sound"; not in the concert
-// yet). Doom's palette whole (sounds/<scene>.txt is a copy of doom.txt), its legato, its open-interval choir and its
-// percussion; each its own tempo, mode, riff, form and summit.
+// ---- 2026-11-21 (Kerem: "combine the ideas in wake and saint into one song, remove the fast one, I don't want abrupt
+// part changes in that song, I want one good form song"; after 2026-11-20's "3 new songs in Doom's style ... vary the
+// tempo, the darkness in the melodies and harmony is good"). Not in the concert yet. Doom's style on its own sounds
+// (sounds/wake.txt): Lantern Wake's funeral doom and Hollow Saint's sludge as one song.
 
 const G::Spec kWake {
-    .scene = "wake", .title = "Lantern Wake",
-    // funeral doom, after Evoken, Mournful Congregation and Ahab: slower than Doom, harmonic minor (the raised
-    // seventh: the dominant a major chord that pulls home, the gothic of it), long power chords with the flat
-    // second around them; it opens on the organ-like pad alone, and the summit holds the tonic under moving chords.
-    .bpmLo = 58, .bpmHi = 62, .mode = &kHarmonicMinor, .tonics = { 9, 4, 2, 7, 11 },
+    .scene = "wake", .title = "Hollow Wake",
+    // one arc: from Lantern Wake's organ alone the band gathers part by part, each a small step up (a fifth of the
+    // range at most, so every change is a level turn: the low end leans into the next root, nothing stops, no end
+    // figures) to the summit, and down again the same way. Harmonic minor (Lantern Wake); Hollow Saint's phrygian
+    // dominant is its fifth mode, the same notes, and the summit turns to it on the home tonic (the major third
+    // over the flat second: the darkest colour of the song); the summit holds the tonic under moving chords
+    // (Lantern Wake), and after it the song falls into half time (Hollow Saint), twice the weight, before it thins
+    // to the riff and the drone alone. Funeral pace, between the two songs.
+    .bpmLo = 66, .bpmHi = 70, .mode = &kHarmonicMinor, .tonics = { 9, 4, 2, 7, 11 },
     .progs = { { { 0, 5, 3, 4 }, { 0, 1, 4, 0 }, { 5, 3, 4, 0 } } }, .preRoot = 4,
-    .form = { { { "Vigil", 8, .12f, "PTW" }, { "Bearers", 12, .40f, "PRBUTGW" }, { "Wake", 16, .68f, "PRBUDCKSTGYMW" },
-                { "Candle", 12, .30f, "PAFTW" },
-                { "Requiem", 20, 1.0f, "PRBUDCKSTGYMAFIW" }, { "Earth", 8, .12f, "RTW" } } },
-    .pulse = part("X...............", "X...............", "X.......X......."),
+    .form = { { { "Vigil", 6, .12f, "PTW" }, { "Salt", 8, .30f, "PRFTW" }, { "Bearers", 10, .48f, "PRBUTGW" },
+                { "Pilgrims", 10, .66f, "PRBUTGYMW" }, { "Scourge", 12, .84f, "PRBUDCKSTGYMW" },
+                { "Requiem", 16, 1.0f, "PRBUDCKSTGYMAFIW" }, { "Martyr", 10, .80f, "PRBUDCTGYMAWh" },
+                { "Reliquary", 8, .60f, "PRBUTGYMAW" }, { "Candle", 6, .40f, "PAFTMW" }, { "Earth", 6, .20f, "RTW" } } },
+    .pulse = part("X...............", "X.......X.......", "X.......X......."),
     .metal = part("", "..............1.", "......1.......2."), // a far bell, chains
     .tick = part("", "", ""),
-    .perc = part("", "........1.......", "....1.......2..."),
+    .perc = part("", "........1.......", "....1..1....1.2."), // struck iron on his backbeat's neighbours
     .bass = part("x---------------", "x---------------", "x-------x-------"),
-    .chord = part("", "x-------------------------------", "x-------------------------------"),
+    .chord = part("", "x-----------------------------..", "x-----------------------------.."), // a breath at the end: in half time a held note would run into the next
     .sub = part("x---------------", "x---------------", "x-------^-------"),
-    .ground = part("", "1...............", "1.......2.....1."),
-    .body = part("", "............o...", "....o.......o.o."),
+    .ground = part("", "1...............", "1.....1...1...2."),
+    .body = part("", "............o...", "..o...o...o.o..o"),
     .mallet = part("", "1...............", "1.......3......."),
     .texture = part("x---------------", "x---------------", "x-------x-------"),
     .arpLo = 55, .arpHi = 79, .percLo = 33, .percHi = 48, .ext = 0,
-    .riff = G::RiffStyle::Doom, .riffLo = 30, .summit = G::Summit::Pedal, .legato = true, .gaze = true, .pedal = true, .flow = true,
-};
-
-const G::Spec kSaint {
-    .scene = "saint", .title = "Hollow Saint",
-    // sludge, after Neurosis, Yob and Om: a walking-pace groove, phrygian dominant (the flat second under a major
-    // third: the darkest of the eastern scales), the riff in power chords that circle the flat second and the
-    // tritone; its summit falls into half time, twice the weight.
-    .bpmLo = 94, .bpmHi = 98, .mode = &kPhrygianDominant, .tonics = { 4, 2, 9, 11, 7 },
-    .progs = { { { 0, 1, 0, 6 }, { 0, 6, 5, 1 }, { 0, 3, 1, 0 } } }, .preRoot = 1,
-    .form = { { { "Salt", 8, .15f, "RFTW" }, { "Pilgrims", 16, .45f, "PRBUTGYW" }, { "Scourge", 24, .75f, "PRBUDCKSTGYMW" },
-                { "Reliquary", 16, .35f, "PAFTMW" },
-                { "Martyr", 32, 1.0f, "PRBUDCKSTGYMAFIW" }, { "Ash", 8, .15f, "RTW" } } },
-    .pulse = part("X...............", "X.......X.......", "X.....X...X....."),
-    .metal = part("", "..........1.....", "......1.......2."),
-    .tick = part("", "", ""),
-    .perc = part("", "....1.......1...", "....1..1....1.2."), // struck iron on his backbeat's neighbours
-    .bass = part("x---------------", "x-------x-------", "x-----x-..x-----"),
-    .chord = part("", "x-----------------------------..", "x-----------------------------.."), // a breath at the end: in the half-time summit a held note would run into the next
-    .sub = part("x---------------", "x---------------", "x-------^-------"),
-    .ground = part("", "1.......1.......", "1.....1...1...2."),
-    .body = part("", "..o.......o.....", "..o...o...o.o..o"),
-    .mallet = part("", "1...............", "1.......3......."),
-    .texture = part("x---------------", "x---------------", "x-------x-------"),
-    .arpLo = 55, .arpHi = 79, .percLo = 33, .percHi = 48, .ext = 0,
-    .riff = G::RiffStyle::Doom, .riffLo = 31, .summit = G::Summit::Halftime, .legato = true, .gaze = true, .pedal = true, .flow = true,
-};
-
-const G::Spec kWolf {
-    .scene = "wolf", .title = "Wolf Hour",
-    // very fast, in Doom's sound: the same baritone guitars tremolo-picked at a blast's tempo (Bell Witch's weight
-    // at Darkthrone's speed), hungarian minor (two augmented seconds: the darkest colour here), the percussion on a
-    // machine grid of eighths, the low end plain under it; the summit finds a theme of its own.
-    .bpmLo = 196, .bpmHi = 204, .mode = &kHungarianMinor, .tonics = { 4, 11, 2, 9, 1 },
-    .progs = { { { 0, 5, 1, 4 }, { 0, 3, 5, 4 }, { 5, 4, 0, 0 } } }, .preRoot = 4,
-    .form = { { { "Howl", 16, .20f, "RFTW" }, { "Hunt", 32, .55f, "PRBUTGYC" }, { "Blood Snow", 56, .85f, "PRBUKSCDTGYI" },
-                { "Clearing", 24, .35f, "PAFTW" }, { "Wolf Hour", 72, 1.0f, "PRBUKSCDTGYAFIW" },
-                { "Dawn", 16, .15f, "PRTW" } } },
-    .pulse = part("X.......X.......", "X...X...X...X...", "X.X.X.X.X.X.X.X."),
-    .metal = part("", "..............1.", "......1.......2."),
-    .tick = part("", "", ""),
-    .perc = part("", "......1.......1.", "1..1..1...1..1.."),
-    .bass = part("x---------------", "x---x---x---x---", "x---x---x---x---"),
-    .chord = part("", "x---------------", "x-------x-------"),
-    .sub = part("x---------------", "x---------------", "x-------x-------"),
-    .ground = part("1...............", "1.......1..1....", "1.1.1.1.1.1.1.1."),
-    .body = part("", "....o.......o...", "..o...o...o.o.o."),
-    .mallet = part("", "", ""),
-    .texture = part("x---------------", "x---------------", "x-------x-------"),
-    .arpLo = 55, .arpHi = 79, .percLo = 33, .percHi = 48, .ext = 0,
-    .riff = G::RiffStyle::Tremolo, .riffLo = 33, .summit = G::Summit::NewTheme, .gaze = true, .pedal = true, .flow = true,
+    .riff = G::RiffStyle::Doom, .riffLo = 30, .summit = G::Summit::Pedal, .ends = false, .legato = true, .gaze = true,
+    .pedal = true, .flow = true, .peakMode = &kPhrygianDominant,
 };
 
 bool is(const char* a, const char* b) { return std::strcmp(a, b) == 0; }
@@ -351,7 +307,7 @@ const std::vector<const G::Spec*>& GenreComposer::all()
 
 const std::vector<const G::Spec*>& GenreComposer::extra()
 {
-    static const std::vector<const Spec*> v = { &kWake, &kSaint, &kWolf };
+    static const std::vector<const Spec*> v = { &kWake };
     return v;
 }
 

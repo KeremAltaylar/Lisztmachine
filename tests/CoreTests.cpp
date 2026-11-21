@@ -141,7 +141,7 @@ int main()
                     CHECK(x.pitch >= r[0] && x.pitch <= r[1], "%s track %d pitch %d out of range", spec->scene, x.track, x.pitch);
                     const bool chromatic = (x.track == G::Bass && spec->walk) && nextOn[i] >= 0 && std::abs(nextOn[i] - x.pitch) == 1;
                     if (!(x.track == G::Tick && x.pitch >= 96) && !chromatic) // noise ticks have no pitch
-                        CHECK(inMode(*spec->mode, c.tonicAt(int(x.tick / kBarTicks)), x.pitch), "%s track %d pitch %d outside the key at bar %d tick %d next %d", spec->scene, x.track, x.pitch, int(x.tick / kBarTicks), int(x.tick % kBarTicks), nextOn[i]);
+                        CHECK(inMode(c.modeAt(int(x.tick / kBarTicks)), c.tonicAt(int(x.tick / kBarTicks)), x.pitch), "%s track %d pitch %d outside the key at bar %d tick %d next %d", spec->scene, x.track, x.pitch, int(x.tick / kBarTicks), int(x.tick % kBarTicks), nextOn[i]);
                     ++held[key];
                     ++notes[x.track];
                 }

@@ -104,9 +104,7 @@ nav button[aria-pressed="true"] { color: var(--ember); }
       <button class="go" id="piece-halftime" data-piece="halftime" disabled>Halftime</button>
       <button class="go" id="piece-doom" data-piece="doom" disabled>Doom</button>
       <button class="go" id="piece-blackgaze" data-piece="blackgaze" disabled>Blackgaze</button>
-      <button class="go" id="piece-wake" data-piece="wake" disabled>Lantern Wake</button>
-      <button class="go" id="piece-saint" data-piece="saint" disabled>Hollow Saint</button>
-      <button class="go" id="piece-wolf" data-piece="wolf" disabled>Wolf Hour</button>
+      <button class="go" id="piece-wake" data-piece="wake" disabled>Hollow Wake</button>
       <button class="go" id="piece-concert" data-piece="concert" disabled>The whole concert</button>
       <button class="go" id="piece-live" data-piece="live" disabled>Live from the app</button>
     </div>
@@ -202,18 +200,12 @@ const PIECES = {
     media: 'media/blackgaze1', ranges: [[36, 86], [22, 66], [42, 62], [64, 88]],
     world: { name: 'Sunbather', lo: [0.6, 0.15, 0.35], hi: [1.0, 0.8, 0.7],        // rose shadows on black, a pale gold dawn
       palette: [[1, 0.6, 0.65], [1, 0.85, 0.6], [0.9, 0.3, 0.5], [1, 1, 1], [0.7, 0.5, 1], [1, 0.45, 0.35]] } },
-  // 2026-11-20 (Kerem: three songs in Doom's sound, "the visual style should change for the new songs but the spooky
-  // images and the live visuals interact with them in terms of light is good"): each its own study and colour world,
-  // each its own old photographs or engravings for the image layer, lit by the music as Doom's are. Not in the concert.
-  wake: { name: 'Lantern Wake', study: 'form', strobeBeats: 2, media: 'media/wake1', ranges: [[36, 86], [22, 64], [33, 62], [55, 80]],
+  // 2026-11-20 (Kerem: songs in Doom's sound, "the visual style should change for the new songs but the spooky images
+  // and the live visuals interact with them in terms of light is good"); 2026-11-21 Lantern Wake and Hollow Saint as
+  // one song: its own study and colour world, both songs' photographs and engravings, lit by the music as Doom's are.
+  wake: { name: 'Hollow Wake', study: 'form', strobeBeats: 2, media: 'media/wake1', ranges: [[36, 86], [22, 64], [33, 62], [55, 80]],
     world: { name: 'Candle', lo: [0.22, 0.12, 0.06], hi: [1.0, 0.86, 0.62],         // tallow-black shadows, candlelight on bone
       palette: [[1, 0.8, 0.45], [1, 0.93, 0.8], [0.75, 0.4, 0.15], [1, 1, 0.95], [0.45, 0.2, 0.08], [1, 0.65, 0.3]] } },
-  saint: { name: 'Hollow Saint', study: 'horizon', strobeBeats: 2, media: 'media/saint1', ranges: [[36, 86], [22, 64], [33, 62], [55, 80]],
-    world: { name: 'Brine', lo: [0.04, 0.22, 0.2], hi: [0.78, 0.95, 0.86],          // drowned-green shadows, salt-white light
-      palette: [[0.55, 0.9, 0.75], [0.9, 1, 0.92], [0.2, 0.55, 0.5], [1, 1, 1], [0.7, 0.25, 0.15], [0.85, 0.8, 0.5]] } },
-  wolf: { name: 'Wolf Hour', study: 'tunnel', strobeBeats: 1, media: 'media/wolf1', ranges: [[36, 86], [22, 64], [33, 62], [55, 80]],
-    world: { name: 'Blood Moon', lo: [0.45, 0.0, 0.04], hi: [0.88, 0.9, 1.0],      // blood in the shadows, a cold moon's white
-      palette: [[0.95, 0.1, 0.1], [0.9, 0.92, 1], [0.6, 0.0, 0.08], [1, 1, 1], [0.3, 0.35, 0.5], [1, 0.3, 0.2]] } },
   // 2026-11-03 (Kerem: "a concert song that includes all 45 minutes, so I can practice the concert non stop"):
   // the eight songs back to back from tools/concert.py; each one switches in its own study, colours and tempo.
   concert: { name: 'The whole concert', concert: true, media: 'media/concert1' },
@@ -224,7 +216,7 @@ const PIECES = {
 };
 // 2026-11-05: each song's photographs for the image layer, public domain (Library of Congress FSA/OWI and
 // Gottlieb, NASA, NOAA, US Forest Service, the Met, old maps and prints, via Wikimedia Commons), one per story
-for (const [k, n] of Object.entries({ berlin: 4, jungle: 4, ecstatic: 4, noir: 4, deconstructed: 4, halftime: 4, doom: 4, blackgaze: 2, wake: 4, saint: 4, wolf: 3 }))
+for (const [k, n] of Object.entries({ berlin: 4, jungle: 4, ecstatic: 4, noir: 4, deconstructed: 4, halftime: 4, doom: 4, blackgaze: 2, wake: 8 }))
   PIECES[k].images = Array.from({ length: n }, (_, i) => `media/img/${k}/${i + 1}.jpg`);
 // Every song's body (2026-11-10, Kerem: "create these kind of interactivities for each song"), on Berlin's rule: one
 // voice owns one property. The main harmony the light, the second harmony the colour, the lead melody the camera,
@@ -239,8 +231,6 @@ const BODIES = {
   doom:          { pad: 'light', harm: 'colour', lead: 'camera', arp: 'glow', riff: 'speed', bass: 'size', sub: 'gravity', boom: 'shock' },
   blackgaze:     { pad: 'light', harm: 'colour', lead: 'camera', arp: 'glow', riff: 'speed', bass: 'size', sub: 'gravity', boom: 'shock' },   // the tremolo guitar is the speed
   wake:          { pad: 'light', harm: 'colour', lead: 'camera', arp: 'glow', riff: 'speed', bass: 'size', sub: 'gravity', boom: 'shock' },   // Doom's voices, Doom's body
-  saint:         { pad: 'light', harm: 'colour', lead: 'camera', arp: 'glow', riff: 'speed', bass: 'size', sub: 'gravity', boom: 'shock' },
-  wolf:          { pad: 'light', harm: 'colour', lead: 'camera', arp: 'glow', riff: 'speed', bass: 'size', sub: 'gravity', boom: 'shock' },
 };
 for (const k in BODIES) PIECES[k].body = BODIES[k];
 // Improvisation's looks (Kerem, 2026-11-14: "visuals in the same manner"), made as each generated song arrives live: for each generated song a study, a colour world and a way of moving,
@@ -2969,7 +2959,7 @@ registerProcessor('master-fx', MasterFx);`;
   });
   // a hue per song, for the concert's timeline (Kerem, 2026-11-04: "show some song colors ... so I can understand the
   // songs and transitions"); neighbours far apart on the wheel, each near its world's colour
-  const HUE = { berlin: 195, stoner: 70, jungle: 250, ecstatic: 310, noir: 25, deconstructed: 130, halftime: 275, doom: 50, blackgaze: 350, wake: 85, saint: 165, wolf: 15 };
+  const HUE = { berlin: 195, stoner: 70, jungle: 250, ecstatic: 310, noir: 25, deconstructed: 130, halftime: 275, doom: 50, blackgaze: 350, wake: 85 };
   const songCol = (k, l = 0.6, c = 0.13) => 'oklch(' + l + ' ' + c + ' ' + (HUE[songs[k].piece] ?? 75) + ')';
   const form = $('form');
   sec.forEach(s => {
@@ -3740,25 +3730,9 @@ registerProcessor('master-fx', MasterFx);`;
       [0.08, "In 1861 the photographer Nadar carried electric light into the catacombs under Paris.", 0, 0],
       [0.08, "Exposures took eighteen minutes. Where he needed a person, he used a mannequin. Nothing living could stay still that long.", 0, 10],
       [0.08, "Six million people lie down there, stacked into walls of their own bones.", 0, 20],
-      [0.6, "A lamplighter kept one lantern burning in the tunnels long after the city stopped paying him.", 0, 0],
-      [0.6, "When he died, nobody went down to put it out.", 0, 10],
-      [0.6, "Workers still find it lit.", 0, 20],
-    ],
-    saint: [
-      [0.08, "In the poem, a sailor kills an albatross for no reason at all.", 0, 0],
-      [0.08, "The wind dies. The crew die. He alone is kept alive, to tell it.", 0, 10],
-      [0.08, "Gustave Dore engraved every page of it, in 1876: the ice, the ghost ship, the sea of rotting light.", 0, 20],
       [0.6, "A village prayed to a saint whose name nobody could remember.", 0, 0],
       [0.6, "The statue was hollow. Every winter, something inside it moved.", 0, 10],
       [0.6, "They kept praying. It seemed to be listening.", 0, 20],
-    ],
-    wolf: [
-      [0.1, "The hour between night and dawn is called the hour of the wolf.", 0, 0],
-      [0.1, "They say more people die in it, and more are born, than in any other hour.", 0, 10],
-      [0.1, "It is when the sleepless are most afraid, and nightmares are most real.", 0, 20],
-      [0.6, "A shepherd swore the wolves had learned his whistle.", 0, 0],
-      [0.6, "One morning his dogs came home at the sound of it.", 0, 10],
-      [0.6, "He had not whistled.", 0, 20],
     ],
     blackgaze: [
       [0.12, "Up north, one winter refused to end.", 0, 0],

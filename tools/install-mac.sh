@@ -43,7 +43,7 @@ else echo "   vsco2: already there"; fi
 # this repo's own programs (tools/instruments/README.md says where each goes)
 I="$REPO/tools/instruments"
 cp "$I"/Bassoon-*.sfz "$I"/Clarinet-*.sfz "$I"/FHorn-*.sfz "$I"/TenorTrombone-*.sfz "$I"/Tuba-*.sfz "$LIB/vsco2/" 2>/dev/null
-cp "$I/doom-baritone.sfz" "$I/doom-drone.sfz" "$I/wake-baritone.sfz" "$I/wake-drone.sfz" "$I/saint-baritone.sfz" "$I/saint-drone.sfz" "$I/wolf-baritone.sfz" "$LIB/lib/Karoryfer_Black_And_Green_Guitars_1000/Programs/" 2>/dev/null
+cp "$I/doom-baritone.sfz" "$I/doom-drone.sfz" "$I/wake-baritone.sfz" "$I/wake-drone.sfz" "$I/saint-drone.sfz" "$LIB/lib/Karoryfer_Black_And_Green_Guitars_1000/Programs/" 2>/dev/null
 cp "$I/dc-erhu-trio.sfz" "$LIB/lib/aliexpress-erhu_v1000/Programs/" 2>/dev/null
 cp "$I/lm-cello.sfz" "$LIB/lib/Karoryfer_Bigcat_cello.v1.001/Karoryfer_Bigcat_cello/Programs/" 2>/dev/null
 cp "$I/noir-sax.sfz" "$I/wcc-bass-sax.sfz" "$LIB/lib/Weresax/Programs/" 2>/dev/null

@@ -176,9 +176,9 @@ inline const char* kScenes[] = { "berlin", "stoner", "jungle", "ecstatic", "noir
                                  "doom", "blackgaze" };
 inline const char* kSceneTitles[] = { "Berlin", "Working Class Curse", "Liquid", "Ecstatic Arpeggios", "Noir", "Deconstructed Club",
                                       "Halftime", "Doom", "Blackgaze" };
-// 2026-11-20: three songs in Doom's sound, playable on their own, not in the concert yet
-inline const char* kNewScenes[] = { "wake", "saint", "wolf" };
-inline const char* kNewTitles[] = { "Lantern Wake", "Hollow Saint", "Wolf Hour" };
+// 2026-11-21: a song in Doom's style (Lantern Wake and Hollow Saint as one), playable on its own, not in the concert yet
+inline const char* kNewScenes[] = { "wake" };
+inline const char* kNewTitles[] = { "Hollow Wake" };
 
 // Berlin-school scene: drone pad, sequenced bass, polymetric upper sequence and a
 // motif-based lead, over a slow modal progression shaped by a 10-minute energy arc.

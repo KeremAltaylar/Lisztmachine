@@ -1,5 +1,5 @@
-# Lisztmachine sound palette: Lantern Wake (funeral doom), in Doom's style with its own instruments (2026-11-21). Built from doom.txt;
-# each swapped sound's gain set by --audition against the Doom sound it replaces (note comments).
+# Lisztmachine sound palette: Hollow Wake (Lantern Wake and Hollow Saint as one song, 2026-11-21), in Doom's style with its own
+# instruments. Built from doom.txt: Lantern Wake's sounds, then Hollow Saint's below (each part rotates its sounds over the song).
 # Swapped (Doom's sound and gain on the right):
 #   sfz/Virtual-Playing-Orchestra3/Vocals/choir-MIXED-sustain.sfz  <- Doom's 3rd/Nick Moritz/Pads/Nightmare at -9.0
 #   sfz/Cowsynth/cowsynth_asthmatic_organ.sfz  <- Doom's 3rd/Databroth/Pads/Feed at -20.5
@@ -144,3 +144,17 @@ delay lead 0.75 0.35 0.22
 # crowded"): the low hits, an eight-bar sentence (Sentence, Composer.h) on the engine's frame drum
 boom    -1.0    1000  internal/boom  # about 4 dB under the 808, +3 under the guitars
 
+
+
+# Hollow Saint's sounds (its palette's gains: both songs' parts were matched to Doom's at the summit)
+pad        0.3     277  sfz/String_Cyborgs/Programs/Blackheart.sfz
+pad        1.7     654  sfz/Virtual-Playing-Orchestra3/Strings/all-strings-SEC-sustain.sfz
+chord     -10.0     268  sfz/Cowsynth/cowsynth_asthmatic_organ.sfz
+chord      4.4    1040  sfz/vsco2/Bassoon-sus.sfz
+arp       20.3    1807  sfz/vsco2/Clarinet-susLong.sfz
+arp       12.1     438  3rd/Malfunction/Leads/Ghost
+harm      -4.0     740  3rd/Giana Brotherz/Pads/Dark Whisper
+pad       19.9     720  sfz/vsco2/Bassoon-sus.sfz
+bass      17.9     900  sfz/Karoryfer.Growlybass.v1.002/Growlybass/growlybass_excessive.sfz
+drone     22.9    1000  sfz/Karoryfer_Black_And_Green_Guitars_1000/Programs/saint-drone.sfz
+lead      11.0    2252  3rd/Malfunction/Leads/Ghost
