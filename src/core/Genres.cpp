@@ -275,10 +275,10 @@ const G::Spec kWake {
     // to the riff and the drone alone. Funeral pace, between the two songs.
     .bpmLo = 66, .bpmHi = 70, .mode = &kHarmonicMinor, .tonics = { 9, 4, 2, 7, 11 },
     .progs = { { { 0, 5, 3, 4 }, { 0, 1, 4, 0 }, { 5, 3, 4, 0 } } }, .preRoot = 4,
-    .form = { { { "Vigil", 6, .12f, "PTW" }, { "Salt", 8, .30f, "PRFTW" }, { "Bearers", 10, .48f, "PRBUTGW" },
-                { "Pilgrims", 10, .66f, "PRBUTGYMW" }, { "Scourge", 12, .84f, "PRBUDCKSTGYMW" },
+    .form = { { { "Vigil", 6, .12f, "PTW" }, { "Salt", 8, .30f, "PRAFTW" }, { "Bearers", 10, .48f, "PRBUATGW" },
+                { "Pilgrims", 10, .66f, "PRBUATGYMW" }, { "Scourge", 12, .84f, "PRBUADCKSTGYMW" },
                 { "Requiem", 16, 1.0f, "PRBUDCKSTGYMAFIW" }, { "Martyr", 10, .80f, "PRBUDCTGYMAWh" },
-                { "Reliquary", 8, .60f, "PRBUTGYMAW" }, { "Candle", 6, .40f, "PAFTMW" }, { "Earth", 6, .20f, "RTW" } } },
+                { "Reliquary", 8, .60f, "PRBUTGYMAW" }, { "Candle", 6, .40f, "PAFTMW" }, { "Earth", 6, .20f, "RATW" } } },
     .pulse = part("X...............", "X.......X.......", "X.......X......."),
     .metal = part("", "..............1.", "......1.......2."), // a far bell, chains
     .tick = part("", "", ""),
@@ -290,9 +290,13 @@ const G::Spec kWake {
     .body = part("", "............o...", "..o...o...o.o..o"),
     .mallet = part("", "1...............", "1.......3......."),
     .texture = part("x---------------", "x---------------", "x-------x-------"),
-    .arpLo = 55, .arpHi = 79, .percLo = 33, .percHi = 48, .ext = 0,
+    // 2026-11-21 (Kerem: "the choir as a soloist, and a good synth with arpeggios to support the long drones"): the arp
+    // track an arpeggio, not the hook (eighths in the calm, sixteenths as it drives, five to seven notes against the
+    // bar, so it turns slowly under the held chords); the soloist a choir, long notes only
+    .arpRate = { 8, 16, 16 }, .arpLenLo = 5, .arpLenHi = 7, .arpDensLo = .7f, .arpDensHi = 1.0f, .arpGate = .8f,
+    .arpLo = 55, .arpHi = 79, .percLo = 33, .percHi = 48, .ext = 0, .hook = false,
     .riff = G::RiffStyle::Doom, .riffLo = 30, .summit = G::Summit::Pedal, .ends = false, .legato = true, .gaze = true,
-    .pedal = true, .flow = true, .peakMode = &kPhrygianDominant,
+    .sing = true, .pedal = true, .flow = true, .peakMode = &kPhrygianDominant,
 };
 
 bool is(const char* a, const char* b) { return std::strcmp(a, b) == 0; }
