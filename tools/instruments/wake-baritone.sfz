@@ -17,6 +17,7 @@ label_cc117=Vibrato humanize
 label_cc118=Tailpiece bends
 
 set_cc27=31
+set_cc29=110 //the amp's feedback (as the drone guitar): with the faster, louder feedback below, each hit sustains
 set_cc101=127
 set_cc114=40
 
@@ -25,7 +26,7 @@ set_cc114=40
 <global>
 transpose=-12
 #include "modules/controls/vibrato_c.sfz"
-ampeg_release=0.25
+ampeg_release=2.5 //Lantern Wake: each hit rings on (Kerem, 2026-11-21: "longer in envelope rather than plucks")
 ampeg_attack=0.01
 bend_smooth=40
 pan_oncc101=0
@@ -62,12 +63,12 @@ ampeg_releasecc29=0.5
 ampeg_attack_shape=3.7
 
 //Pitched component
-volume=-36 
+volume=-18 //Lantern Wake: the feedback loud enough to carry a hit on (was -36)
 amplitude_curvecc29=15
 amplitude_smoothcc29=110
 seq_length=1
-ampeg_attack=12
-ampeg_attackcc29=-11
+ampeg_attack=0.8 //Lantern Wake: the feedback swells in under a second (was 12 s less 11 with cc29), so a hit sustains
+ampeg_attackcc29=-0.4
 group=4
 off_by=4
 
