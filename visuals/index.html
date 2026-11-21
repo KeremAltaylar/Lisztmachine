@@ -209,6 +209,7 @@ const PIECES = {
       palette: [[1, 0.8, 0.45], [1, 0.93, 0.8], [0.75, 0.4, 0.15], [1, 1, 0.95], [0.45, 0.2, 0.08], [1, 0.65, 0.3]] } },
   // 2026-11-21 (Kerem: "like Ruby My Dear, Igorrr or Culprate"): breakcore under baroque; the tunnel at full speed,
   // a clinical white world with one chemical stain.
+  // Its photographs: Piranesi's Carceri d'invenzione (Imaginary Prisons, 1750/1761), baroque dungeons, public domain.
   bleach: { name: 'Bleach', study: 'tunnel', strobeBeats: 1, media: 'media/bleach1', ranges: [[36, 86], [22, 64], [33, 62], [60, 88]],
     world: { name: 'Bleach', lo: [0.4, 0.5, 0.55], hi: [1.0, 1.0, 1.0],              // bleached white, cold cyan shadows, a violet stain
       palette: [[1, 1, 1], [0.75, 0.95, 1], [0.85, 0.3, 1], [0.9, 0.9, 0.85], [0.3, 0.85, 0.9], [1, 0.4, 0.75]] } },
@@ -222,7 +223,7 @@ const PIECES = {
 };
 // 2026-11-05: each song's photographs for the image layer, public domain (Library of Congress FSA/OWI and
 // Gottlieb, NASA, NOAA, US Forest Service, the Met, old maps and prints, via Wikimedia Commons), one per story
-for (const [k, n] of Object.entries({ berlin: 4, jungle: 4, ecstatic: 4, noir: 4, deconstructed: 4, halftime: 4, doom: 4, blackgaze: 2, wake: 8 }))
+for (const [k, n] of Object.entries({ berlin: 4, jungle: 4, ecstatic: 4, noir: 4, deconstructed: 4, halftime: 4, doom: 4, blackgaze: 2, wake: 8, bleach: 8 }))
   PIECES[k].images = Array.from({ length: n }, (_, i) => `media/img/${k}/${i + 1}.jpg`);
 // Every song's body (2026-11-10, Kerem: "create these kind of interactivities for each song"), on Berlin's rule: one
 // voice owns one property. The main harmony the light, the second harmony the colour, the lead melody the camera,

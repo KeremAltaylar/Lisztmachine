@@ -94,10 +94,17 @@ public:
     bool sing = false;                         // the soloist is a voice: long notes only
     bool pedal = false;                        // a change between parts of like energy leans on the next root (Turn::Pedal), not thinning
     bool flow = false;                         // no hard stops (Kerem, 2026-11-21, the Doom-style songs): a stop or a hole becomes a pickup
-    bool quietEdges = false;
+    bool quietEdges = false;                   // Improvisation: the first and last parts are the changeover between songs, the soloist rests in them
     // recorded breaks (Kerem, 2026-11-21, Bleach only: real breaks, the KAN amen, BreakMachine's design): the body track
     // plays BreakInstrument (Engine.cpp), driven by a note a beat (emitBreaks); every other song keeps no kick, snare or hats
-    bool breaks = false;                   // Improvisation: the first and last parts are the changeover between songs, the soloist rests in them
+    bool breaks = false;
+    // Bleach's round 2 (Kerem, 2026-11-21, "do all of these"): in the driving parts the soloist and the arpeggio trade
+    // two-bar phrases (trade); the bass's filter wobbles, a cycle every `wobble` sixteenths at the summit, twice that in
+    // the other driving parts; and once every sixteen bars of the loudest parts the band drops out for a bar of the
+    // harpsichord and the choir alone (flip)
+    bool trade = false;
+    int wobble = 0;
+    bool flip = false;
     // Improvisation's harmony moves (Kerem, 2026-11-19): at the summit the key lifts this many semitones, or the mode
     // turns brighter or darker (peakMode); both return after it, so the song still ends where its Release pivots
     int lift = 0;
@@ -127,6 +134,8 @@ public:
     int tonicAt(int bar) const { return (tonicPc_ + (atPeak(bar) ? spec_.lift + 12 : 0)) % 12; }
     const Mode& modeAt(int bar) const { return spec_.peakMode && atPeak(bar) ? *spec_.peakMode : *spec_.mode; }
     int rootAt(int bar) const { return rootOfBar_[size_t(bar)]; }
+    int tradeTurn(int bar) const; // 0: both play; 1: the soloist sings, the arpeggio rests; 2: the arpeggio answers
+    bool flipBar(int bar) const;  // a bar of the harpsichord and the choir alone
     const std::array<int, 4>& homeProgression() const { return home_; }
     bool active(int track, int bar) const;
     std::array<int, 2> range(int track) const;

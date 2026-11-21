@@ -304,8 +304,12 @@ public:
         auto run = [&](int upTo) { // the player from `done` to `upTo`, at the beat position the notes keep
             if (upTo <= done) return;
             const bool playing = loud_ && anchor_ >= 0 && double(clock_ + done - anchor_) < 1.5 * quarter_;
-            const double ppq = anchorPpq_ + double(clock_ + done - anchor_) / quarter_;
-            player_.render(L + done, R + done, upTo - done, ppq, 1.0 / quarter_, playing);
+            const double real = anchorPpq_ + double(clock_ + done - anchor_) / quarter_;
+            // a dive: over its bar the speed falls from 1 to a quarter, the pattern and the hits slowing together
+            player_.speed = diveBeat_ >= 0 ? std::max(0.25, 1.0 - 0.75 * (real - diveFrom_) / 4.0) : 1.0;
+            const double ppq = diveBeat_ >= 0 ? playPpq_ : real;
+            player_.render(L + done, R + done, upTo - done, ppq, player_.speed / quarter_, playing);
+            playPpq_ = ppq + double(upTo - done) * player_.speed / quarter_;
             done = upTo;
         };
         for (const auto meta : midi)
@@ -316,8 +320,10 @@ public:
             const int at = juce::jlimit(0, n, meta.samplePosition);
             run(at);
             const int note = m.getNoteNumber();
-            if (note < 36 || note > 99) continue;
-            const int pos = (note - 36) % 32;
+            if (note < 36 || note > 103) continue;
+            const bool dive = note >= 100; // a tape stop: this beat (0-3 of the bar) slows the break toward a stop
+            const int pos = dive ? (lastPos_ + 1) % 32 : (note - 36) % 32;
+            diveBeat_ = dive ? note - 100 : -1;
             const int64_t now = clock_ + at;
             if (anchor_ >= 0)
             {
@@ -326,6 +332,7 @@ public:
                 if (pos < lastPos_) phrase_ += 1;
             }
             anchor_ = now, lastPos_ = pos, anchorPpq_ = phrase_ * 32.0 + pos;
+            if (diveBeat_ == 0) diveFrom_ = playPpq_ = anchorPpq_;
             const float v = float(m.getVelocity()) / 127.0f;
             loud_ = m.getVelocity() > 1;
             player_.gen.chaos = v, player_.gen.density = .45f + .45f * v, player_.gen.rolls = .06f + .14f * v; // Kerem: not too many rolls (was .25 + .55 v)
@@ -357,8 +364,9 @@ private:
     juce::String name_;
     double sr_ = 48000, quarter_ = 48000 * 60.0 / 170, anchorPpq_ = 0;
     int64_t clock_ = 0, anchor_ = -1;
-    int lastPos_ = 0;
+    int lastPos_ = 0, diveBeat_ = -1;
     int64_t phrase_ = 0;
+    double diveFrom_ = 0, playPpq_ = 0;
     bool loud_ = false;
 };
 } // namespace
@@ -792,6 +800,8 @@ juce::String Palette::load(const juce::File& file, const std::string& sceneName)
     for (auto& d : pan) d = -9;
     for (auto& d : delays) d = {};
     for (auto& r : releaseS) r = 0;
+    for (auto& g : glideS) g = 0.25f;
+    for (auto& w : wobbleHz) w[0] = w[1] = 0;
     for (auto& t : sends) t[0] = t[1] = -1;
     shimmer = 0;
     padPatch = {};
@@ -826,7 +836,7 @@ juce::String Palette::load(const juce::File& file, const std::string& sceneName)
         if (tokens[0] == "return" && tokens.size() >= 3 && (tokens[1] == "delay" || tokens[1] == "reverb" || tokens[1] == "feedback"))
         { returnDb[tokens[1] == "reverb" ? 1 : tokens[1] == "feedback" ? 2 : 0] = tokens[2].getFloatValue(); continue; }
         if (tokens[0] == "feedback" && tokens.size() >= 3) { fbBeats = tokens[1].getFloatValue(); fbAmount = tokens[2].getFloatValue(); continue; }
-        if (tokens[0] == "gain" || tokens[0] == "delay" || tokens[0] == "drive" || tokens[0] == "crush" || tokens[0] == "comp" || tokens[0] == "duck" || tokens[0] == "lowcut" || tokens[0] == "pan" || tokens[0] == "amp" || tokens[0] == "release" || tokens[0] == "feed")
+        if (tokens[0] == "gain" || tokens[0] == "delay" || tokens[0] == "drive" || tokens[0] == "crush" || tokens[0] == "comp" || tokens[0] == "duck" || tokens[0] == "lowcut" || tokens[0] == "pan" || tokens[0] == "glide" || tokens[0] == "wobble" || tokens[0] == "amp" || tokens[0] == "release" || tokens[0] == "feed")
         {
             const int t = info->trackOf(tokens[1].toStdString());
             if (t < 0) return where + "no track '" + tokens[1] + "' in the " + juce::String(scene) + " scene";
@@ -837,6 +847,8 @@ juce::String Palette::load(const juce::File& file, const std::string& sceneName)
             else if (tokens[0] == "feed") feeds[t] = juce::jmax(0.0f, tokens[2].getFloatValue());
             else if (tokens[0] == "release") releaseS[t] = juce::jmax(0.0f, tokens[2].getFloatValue());
             else if (tokens[0] == "lowcut") lowCutHz[t] = juce::jmax(0.0f, tokens[2].getFloatValue());
+            else if (tokens[0] == "wobble" && tokens.size() >= 4) { wobbleHz[t][0] = tokens[2].getFloatValue(); wobbleHz[t][1] = tokens[3].getFloatValue(); }
+            else if (tokens[0] == "glide") glideS[t] = juce::jlimit(0.002f, 2.0f, tokens[2].getFloatValue());
             else if (tokens[0] == "pan") pan[t] = juce::jlimit(-1.0f, 1.0f, tokens[2].getFloatValue());
             else if (tokens[0] == "amp" && tokens.size() >= 5) amps[t] = { juce::jlimit(0.0f, 1.0f, tokens[2].getFloatValue()), tokens[3].getFloatValue(), juce::jlimit(0.0f, 1.0f, tokens[4].getFloatValue()),
                                                                      tokens.size() >= 6 ? tokens[5].getFloatValue() : 110.0f, tokens.size() >= 7 ? tokens[6].getFloatValue() : 7.0f,
@@ -1033,6 +1045,9 @@ juce::String Engine::load(double sampleRate, int maxBlock, const Palette& palett
         const auto& first = palette.parts[i].front().patch;
         t.internal = isEngineSound(first);
         t.trim = juce::Decibels::decibelsToGain(palette.trackGainDb[i]);
+        t.glide = palette.glideS[i];
+        t.wobLo = palette.wobbleHz[i][0], t.wobHi = palette.wobbleHz[i][1], t.wobCut = t.wobHi;
+        t.wobS1[0] = t.wobS1[1] = t.wobS2[0] = t.wobS2[1] = 0;
         t.echo.prepare(sampleRate);
         auto m = mixFor(palette.info->trackNames[i]);
         if (palette.pan[i] >= -1) m.pan = palette.pan[i];
@@ -1622,6 +1637,20 @@ void Engine::renderChunk(float* const* out, int numChannels, int offset, int len
                 if (t.amp.on()) t.amp.process(l, r);
                 if (t.crush.on()) t.crush.process(l, r);
                 if (t.comp.on()) t.comp.process(l, r);
+                if (t.wobLo > 0) // the wobble (Bleach's growl): a resonant low-pass whose cutoff rides the track's filter, after the amp,
+                {                // low to high on an exponential scale, smoothed over 3 ms; a state-variable filter (TPT)
+                    const float want = t.wobLo * std::pow(t.wobHi / t.wobLo, juce::jlimit(0.0f, 1.0f, 0.5f * (t.filterNow + 1)));
+                    t.wobCut += (want - t.wobCut) * float(1.0 - std::exp(-1.0 / (0.003 * sampleRate_)));
+                    const float g = std::tan(juce::MathConstants<float>::pi * juce::jmin(t.wobCut, float(0.45 * sampleRate_)) / float(sampleRate_));
+                    const float k = 0.6f, a1 = 1 / (1 + g * (g + k)), a2 = g * a1, a3 = g * a2;
+                    float* io[2] = { &l, &r };
+                    for (int c = 0; c < 2; ++c)
+                    {
+                        const float v3 = *io[c] - t.wobS2[c], v1 = a1 * t.wobS1[c] + a2 * v3, v2 = t.wobS2[c] + a2 * t.wobS1[c] + a3 * v3;
+                        t.wobS1[c] = 2 * v1 - t.wobS1[c], t.wobS2[c] = 2 * v2 - t.wobS2[c];
+                        *io[c] = v2;
+                    }
+                }
                 if (t.lowCut) { l = t.hp[0].process(l); r = t.hp[1].process(r); }
                 const float mid = (l + r) * 0.5f;
                 float side = (l - r) * 0.5f * juce::jmin(1.0f, t.width);
@@ -1657,8 +1686,8 @@ void Engine::renderChunk(float* const* out, int numChannels, int offset, int len
     for (int i = 0; i < numTracks_; ++i)
     {
         auto& t = tracks_[i];
-        // Glide the filter towards its target over about a quarter second.
-        t.filterNow += (t.filterTarget - t.filterNow) * juce::jmin(1.0f, float(len / (0.25 * sampleRate_)));
+        // Glide the filter towards its target over about a quarter second (a wobbling bass: its own `glide`).
+        t.filterNow += (t.filterTarget - t.filterNow) * juce::jmin(1.0f, float(len / (t.glide * sampleRate_)));
         // A kept track sounds on through a silence, 7 dB down (14 in a soft one, the hole); where the tails ring,
         // a track's own echo is silenced at its input instead of its output, so what it already holds rings on.
         const bool kept = (hushKeep_ >> i) & 1, preEcho = hushTails_ && t.hasEcho && !kept;

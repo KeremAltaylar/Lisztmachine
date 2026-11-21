@@ -59,6 +59,8 @@ struct Palette
     float duckDepth[kMaxTracks];        // "duck <track> depth": over the mix stage's own; -1 keeps it
     float lowCutHz[kMaxTracks];         // "lowcut <track> Hz": over the mix stage's own; -1 keeps it
     float pan[kMaxTracks];              // "pan <track> -1..1": over the mix stage's own; below -1 keeps it
+    float wobbleHz[kMaxTracks][2] = {}; // "wobble <track> lowHz highHz": the engine's own resonant low-pass, its cutoff the track's filter
+    float glideS[kMaxTracks];           // "glide <track> seconds": how fast its filter follows the music (0.25 unless said)
     float releaseS[kMaxTracks] = {};    // "release <track> seconds": a Surge sound's amp envelope lets go at least this slowly
     float sends[kMaxTracks][2];         // "send <track>|all delay|reverb amount": over the scene's sends; -1 keeps them
     float shimmer = 0;                  // "shimmer amount": the reverb also fed an octave up
@@ -480,7 +482,8 @@ private:
     {
         Slot slots[2];
         std::atomic<int> live { 0 };
-        float filterTarget = 0, filterNow = 0;
+        float filterTarget = 0, filterNow = 0, glide = 0.25f;
+        float wobLo = 0, wobHi = 0, wobCut = 0, wobS1[2] {}, wobS2[2] {}; // the wobble filter (palette `wobble`), its state
         juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> gain;
         juce::AudioBuffer<float> buffer;
         float held[128] = {}; // velocity of each note sounding now, 0 when off

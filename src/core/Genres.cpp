@@ -309,7 +309,7 @@ const G::Spec kBleach {
     .bpmLo = 168, .bpmHi = 172, .mode = &kHarmonicMinor, .tonics = { 4, 11, 9, 2, 7 },
     .progs = { { { 0, 3, 4, 0 }, { 5, 1, 4, 0 }, { 0, 5, 3, 4 } } }, .preRoot = 4,
     .form = { { { "Lye", 16, .15f, "PAT" }, { "Starch", 24, .40f, "PADBUHTGYM" }, { "Bleach", 48, .85f, "PKSHCBUADTGYMIR" },
-                { "Linen", 24, .35f, "PAFTM" },
+                { "Linen", 24, .35f, "PAFTM" }, { "Rinse", 8, .60f, "KYBU" }, // the break and the bass alone before the drop
                 { "Burn", 64, 1.0f, "PKSHCBUADFTGYMIR" }, { "White", 16, .15f, "PAT" } } },
     // 2026-11-21 (Kerem: "more rhythm and percussion like dnb or hard jungle and breakcore", the high rhythms too loud):
     // the low log and the hand drum play a break (the amen's shape: the low on 1, the and of 1, the and of 3; the skin
@@ -331,6 +331,7 @@ const G::Spec kBleach {
     .riff = G::RiffStyle::Chug, .riffLo = 33, .summit = G::Summit::Halftime, .build = true,
     .leadLo = 67, .leadHi = 84, .sing = true, // the soprano (samples G4-C6)
     .breaks = true, // the KAN amen chopped by BreakMachine's player (Kerem's exception for this song)
+    .trade = true, .wobble = 2, .flip = true,
 };
 
 bool is(const char* a, const char* b) { return std::strcmp(a, b) == 0; }
@@ -637,7 +638,7 @@ bool GenreComposer::active(int track, int bar) const
 
 std::array<int, 2> GenreComposer::range(int track) const
 {
-    if (spec_.breaks && track == Body) return { 36, 99 };
+    if (spec_.breaks && track == Body) return { 36, 103 };
     switch (track)
     {
         case Pad: return { 36, 76 };
@@ -708,6 +709,14 @@ void GenreComposer::emitAutomation(int bar, std::vector<Event>& out)
     const float e0 = energyAt(bar), e1 = bar + 1 < totalBars() ? energyAt(bar + 1) : e0;
     const bool next = bar + 1 < totalBars();
     const bool rise = next && sectionAt(bar + 1).energy > sec.energy;
+    const bool wobbles = spec_.wobble > 0 && sec.energy >= .6f && active(Bass, bar) && !attackBar(bar);
+    if (wobbles) // Culprate's growl: the bass's filter opening and closing on the grid
+    {
+        const int cycle = spec_.wobble * (sec.energy >= .95f ? 1 : 2);
+        for (int s = 0; s < 16; ++s)
+            out.push_back({ t0 + s * kSixteenth, Event::Filter, uint8_t(Bass), 0,
+                            float(std::clamp(-0.3 + 0.5 * e0 + 0.9 * std::cos(kTwoPi * s / cycle), -1.0, 1.0)) });
+    }
     for (int beat = 0; beat < 4; ++beat)
     {
         const double e = e0 + (e1 - e0) * beat / 4.0;
@@ -717,7 +726,7 @@ void GenreComposer::emitAutomation(int bar, std::vector<Event>& out)
         put(Pad, -0.6 + 0.8 * e + .15 * std::sin(kTwoPi * pos / 128 + 1.1));
         put(Chord, -0.5 + 0.9 * e + spec_.chordSweep * std::sin(kTwoPi * pos / 96 + 2.0));
         put(Arp, -0.7 + 1.3 * e + .25 * std::sin(kTwoPi * pos / 64));
-        put(Bass, -0.3 + 0.5 * e);
+        if (!wobbles) put(Bass, spec_.wobble > 0 ? 1.0 : -0.3 + 0.5 * e); // a wobbling bass is open between its wobbles
         put(Fx, rise ? -1.0 + 2.0 * ramp : -0.4 + .25 * std::sin(kTwoPi * pos / 64));
     }
 }
@@ -1127,6 +1136,7 @@ void GenreComposer::emitArp(int bar, std::vector<Event>& out)
         const int64_t next = j + 1 < notes.size() ? notes[j + 1].first : t0 + kBarTicks;
         const int64_t len = std::min<int64_t>(int64_t(spec_.arpGate * stepT), next - notes[j].first - 10);
         const float vel = (notes[j].first - t0) % kPPQ == 0 ? .9f : .7f;
+        if (tradeTurn(bar) == 1) break; // the soloist's two bars: the harpsichord listens
         out.push_back({ notes[j].first, Event::NoteOn, Arp, uint8_t(notes[j].second), vel });
         out.push_back({ notes[j].first + len, Event::NoteOff, Arp, uint8_t(notes[j].second), 0 });
     }
@@ -1204,7 +1214,9 @@ void GenreComposer::emitLead(int bar, std::vector<Event>& out)
     const bool theme = spec_.hook && spec_.lead != Arp && active(Arp, bar); // the hook plays: the soloist sings long notes under it
     // where it falls silent: the stop's hit, a fall's cut (its last note into the echoes), all of the hole's bar
     const Turn tn = turn_[size_t(bar)];
-    const int64_t stopAt = tn == Turn::Stop ? t0 + 4 * kSixteenth : tn == Turn::Echo ? t0 + leadSix_ * kSixteenth : tn == Turn::Hole ? t0 : -1;
+    int64_t stopAt = tn == Turn::Stop ? t0 + 4 * kSixteenth : tn == Turn::Echo ? t0 + leadSix_ * kSixteenth : tn == Turn::Hole ? t0 : -1;
+    // the arpeggio's answer, or a part of the break and the bass alone: the soloist listens
+    if ((tradeTurn(bar) == 2 || (spec_.breaks && !(sec.layers & (bit(Pad) | bit(Arp)))))) stopAt = t0;
     solo_.play({ t0, energyAt(bar), sectionOfBar_[size_t(bar)], bar - sec.startBar, sec.bars, sec.restoreTheme, awayBar_[size_t(bar)], theme,
                  bar + 1 == totalBars(), chordTones(bar, false), chordTones(std::min(bar + 1, totalBars() - 1), false),
                  [&](int p) { return inMode(bar, p); }, stopAt },
@@ -1828,6 +1840,29 @@ void GenreComposer::generateBar(int bar, std::vector<Event>& out)
             return e.track == Body && (e.type == Event::NoteOn || e.type == Event::NoteOff); }), out.end());
         emitBreaks(bar, out);
     }
+    if (flipBar(bar)) // the harpsichord and the choir alone for a bar: everything else cut, the rooms ringing on
+    {
+        const int64_t t0 = int64_t(bar) * kBarTicks;
+        for (int k : { int(Arp), int(Harm) }) out.push_back({ t0, Event::Hush, uint8_t(k), uint8_t(1 | 2), 0 });
+        out.push_back({ t0 + kBarTicks, Event::Hush, 0, 0, 1 });
+    }
+}
+
+int GenreComposer::tradeTurn(int bar) const
+{
+    if (!spec_.trade || bar < 0 || bar >= totalBars()) return 0;
+    auto& sec = sectionAt(bar);
+    const int in = bar - sec.startBar, left = sec.startBar + sec.bars - bar;
+    if (sec.energy < .6f || !active(Arp, bar) || attackBar(bar) || in < 2 || left <= 2) return 0;
+    return (in / 2) % 2 == 0 ? 1 : 2;
+}
+
+bool GenreComposer::flipBar(int bar) const
+{
+    if (!spec_.flip || bar < 0 || bar >= totalBars()) return false;
+    auto& sec = sectionAt(bar);
+    const int in = bar - sec.startBar, left = sec.startBar + sec.bars - bar;
+    return sec.energy >= .8f && in % 16 == 11 && left > 2 && tradeTurn(bar) == 2;
 }
 
 // The break's beat notes (BreakInstrument, Engine.cpp): every beat of the song, pitch 36 + its place in the eight-bar
@@ -1837,12 +1872,17 @@ void GenreComposer::emitBreaks(int bar, std::vector<Event>& out)
 {
     const int si = sectionOfBar_[size_t(bar)];
     const bool first = bar == 0 || sectionOfBar_[size_t(bar - 1)] != si;
-    const bool loud = active(Body, bar) && !attackBar(bar);
+    // the part's own layers, not active(): the subtraction before a big arrival never takes the break
+    // it plays through the builds and falls silent only in a part's last bar (the band's figure, the stop)
+    auto lastOfPart = [&](int b) { return b + 1 >= totalBars() || sectionOfBar_[size_t(b + 1)] != sectionOfBar_[size_t(b)]; };
+    const bool loud = (sectionAt(bar).layers & bit(Body)) && bar >= sections_[0].bars && !lastOfPart(bar) && !flipBar(bar);
     const float wild = std::clamp(.15f + .75f * energyAt(bar), .1f, .95f);
+    // the bar before a driving part's last bar: a tape stop, the break slowing to a quarter over the bar
+    const bool dive = loud && bar + 2 < totalBars() && lastOfPart(bar + 1) && drives(sectionOfBar_[size_t(bar + 2)]);
     for (int b = 0; b < 4; ++b)
     {
         const int64_t t = int64_t(bar) * kBarTicks + b * kPPQ;
-        const int pitch = (first && b == 0 ? 68 : 36) + (bar % 8) * 4 + b;
+        const int pitch = dive ? 100 + b : (first && b == 0 ? 68 : 36) + (bar % 8) * 4 + b;
         out.push_back({ t, Event::NoteOn, uint8_t(Body), uint8_t(pitch), loud ? wild : .005f });
         out.push_back({ t + kPPQ / 2, Event::NoteOff, uint8_t(Body), uint8_t(pitch), 0 });
     }

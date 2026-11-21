@@ -159,7 +159,15 @@ int main()
                         if (x.tick % kBarTicks >= 3 * kPPQ) ++run[size_t(x.tick / kBarTicks)];
                     }
                 int silent = 0, walks = 0;
-                for (int b = 4; b < c.totalBars(); ++b) silent += lead[size_t(b)] == 0;
+                int listens = 0; // where it rests on purpose: the arpeggio's answer (trade), a part of the break and the bass alone
+                for (int b = 4; b < c.totalBars(); ++b)
+                {
+                    const bool rests = c.tradeTurn(b) == 2 || (spec->breaks && !(c.sectionAt(b).layers & ((1u << G::Pad) | (1u << G::Arp))));
+                    listens += rests;
+                    silent += lead[size_t(b)] == 0 && !rests;
+                    if (rests) CHECK(lead[size_t(b)] == 0 || b == 4, "%s: the soloist sings over the answer at bar %d", spec->scene, b);
+                }
+                if (spec->trade) CHECK(listens > 8, "%s: the soloist never listens (%d bars)", spec->scene, listens);
                 for (auto& s : c.sections()) if (s.startBar > 4) walks += run[size_t(s.startBar - 1)] > 0;
                 CHECK(silent <= 1, "%s: the soloist is silent in %d bars", spec->scene, silent);
                 CHECK(walks >= 1, "%s: the soloist never walks into a part", spec->scene);

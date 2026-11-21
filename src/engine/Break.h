@@ -555,6 +555,7 @@ public:
     Env env;
     float gainTarget = 1;
     int evolve = 1;            // phrases (8 bars) between new bases; 0 = hold the current one
+    double speed = 1;          // Lisztmachine: how fast the sounding hits play (a tape stop glides it down); 1 = as recorded
     // Form: Loop is the 8-bar phrase above. Song is 4 parts of 32 bars, looping every 128; Endless is the same
     // parts, a new one every 32 bars forever. In both, each part replays its own pattern and its last bar is
     // the attack, a whole-bar roll into the next part. Both are tied to the bar number and the song seed, so
@@ -704,7 +705,7 @@ private:
         const float e = envAt(src, s.len - 1, v.e) * v.gain * v.fade;
         l += (brk->l[a] + (brk->l[b2] - brk->l[a]) * fr) * e;
         r += (brk->r[a] + (brk->r[b2] - brk->r[a]) * fr) * e;
-        v.pos += v.rate;
+        v.pos += v.rate * speed;
         if (v.dying) v.fade -= float(1000.0 / (3.0 * sr));
     }
 };
