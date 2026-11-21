@@ -15,3 +15,4 @@ lm-cello.sfz: Bigcat cello "01- Bowed (velocity layer)" with note_offset=12, bec
 
 - `noir-sax.sfz` (Weresax/Programs): Sax.sfz with its vibrato on (cc111 55, unsteady 40, uneven pitch 20), for the Noir solo.
 - `wcc-bass-sax.sfz` (Weresax/Programs): Sax.sfz an octave down (note_offset=-12 plus transpose=-12: each key plays the sample an octave above, pitched down), no vibrato: the low saxophone of Working Class Curse. Measured pitch-true from E2 (40) to E4 (64), beating 2-8 %.
+- `wake-baritone.sfz`, `wake-drone.sfz` (black guitar alone), `saint-baritone.sfz`, `saint-drone.sfz` (green guitar alone; the baritone's amp feedback cc29 at 35), `wolf-baritone.sfz` (11-combo_staccato an octave down, for tremolo) (Black And Green Guitars Programs, 2026-11-21): the three songs in Doom's style, each its own guitar. Pitch-true within 10 cents.

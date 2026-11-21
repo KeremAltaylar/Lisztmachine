@@ -1,4 +1,20 @@
-# Lisztmachine sound palette: Doom (after Sleep, Electric Wizard, Sunn O))) and Bell Witch: the riff is the song).
+# Lisztmachine sound palette: Lantern Wake (funeral doom), in Doom's style with its own instruments (2026-11-21). Built from doom.txt;
+# each swapped sound's gain set by --audition against the Doom sound it replaces (note comments).
+# Swapped (Doom's sound and gain on the right):
+#   sfz/Virtual-Playing-Orchestra3/Vocals/choir-MIXED-sustain.sfz  <- Doom's 3rd/Nick Moritz/Pads/Nightmare at -9.0
+#   sfz/Cowsynth/cowsynth_asthmatic_organ.sfz  <- Doom's 3rd/Databroth/Pads/Feed at -20.5
+#   3rd/Dan Maurer/Pads/Dark Friday  <- Doom's 3rd/Luna/Brass/Brassy Sync at -5.6
+#   sfz/Virtual-Playing-Orchestra3/Brass/french-horn-SEC-sustain.sfz  <- Doom's Brass/Reso Brassy at -3.0
+#   sfz/Karoryfer.Scarypiano.v1.002/Scarypiano/Programs/Scarypiano.sfz  <- Doom's 3rd/Rozzer/Leads/Dark Heart at -8.5
+#   sfz/Karoryfer_Bigcat_cello.v1.001/Karoryfer_Bigcat_cello/Programs/lm-cello.sfz  <- Doom's 3rd/Nick Moritz/Synths/Mystery Grotto at 8.5
+#   sfz/vsco2/FHorn-sus.sfz  <- Doom's 3rd/Emu/Synths/Disto Brass Pass at -7.1
+#   3rd/Giana Brotherz/Pads/OAH Choir  <- Doom's 3rd/Giana Brotherz/Pads/Deep Choir at -3.2
+#   3rd/Giana Brotherz/Pads/Dub Choir  <- Doom's 3rd/Bluelight/Vox/Gregorian Rant Poly at -10.6
+#   sfz/Virtual-Playing-Orchestra3/Brass/french-horn-SEC-sustain.sfz  <- Doom's sfz/vsco2/Tuba-sus.sfz at 21.9
+#   sfz/Karoryfer.Growlybass.v1.002/Growlybass/growlybass_vicious.sfz  <- Doom's sfz/Karoryfer.Growlybass.v1.002/Growlybass/growlybass_angry.sfz at 24.5
+#   sfz/Karoryfer_Black_And_Green_Guitars_1000/Programs/wake-baritone.sfz  <- Doom's sfz/Karoryfer_Black_And_Green_Guitars_1000/Programs/doom-baritone.sfz at 19.0
+#   sfz/Karoryfer_Black_And_Green_Guitars_1000/Programs/wake-drone.sfz  <- Doom's sfz/Karoryfer_Black_And_Green_Guitars_1000/Programs/doom-drone.sfz at 19.0
+#   sfz/Karoryfer_Bigcat_cello.v1.001/Karoryfer_Bigcat_cello/Programs/lm-cello.sfz  <- Doom's 3rd/Rozzer/Leads/Dark Heart at 2.0
 # Tracks: pad pulse metal tick perc bass sub arp chord fx harm.
 # Patches from the earlier palettes, re-measured held at C4 (basses C3) with pure tuning, 2026-10-26: beating 1-15 %
 # (Semihaunt left out: 39 %, EP 1 left out: 43-51 %). Gain: a held note to -22 dB RMS (pads and chords -27, they play 3-4 notes).
@@ -13,14 +29,13 @@ perc     8.4     431  3rd/Emu/Drums/Mort Noisey Drum
 fx       -5.7     286  FX/Unsettler
 
 # 2026-10-29 evening: this song's own synths (pitch-true, beating <= 15 %, none shared with another song)
-pad      -9.0     277  3rd/Nick Moritz/Pads/Nightmare
-pad     -20.5     654  3rd/Databroth/Pads/Feed
-chord    -5.6     268  3rd/Luna/Brass/Brassy Sync
-chord    -3.0    1040  Brass/Reso Brassy
-arp      -8.5    1807  3rd/Rozzer/Leads/Dark Heart
-arp       8.5     438  3rd/Nick Moritz/Synths/Mystery Grotto
-arp      -5.2     163  3rd/Nick Moritz/Synths/Regressive Notes
-chord    -7.1     879  3rd/Emu/Synths/Disto Brass Pass
+pad        7.6     277  sfz/Virtual-Playing-Orchestra3/Vocals/choir-MIXED-sustain.sfz
+pad       -5.9     654  sfz/Cowsynth/cowsynth_asthmatic_organ.sfz
+chord     -13.4     268  3rd/Dan Maurer/Pads/Dark Friday
+chord      -1.9    1040  sfz/Virtual-Playing-Orchestra3/Brass/french-horn-SEC-sustain.sfz
+arp        5.0    1807  sfz/Karoryfer.Scarypiano.v1.002/Scarypiano/Programs/Scarypiano.sfz
+arp       17.6     438  sfz/Karoryfer_Bigcat_cello.v1.001/Karoryfer_Bigcat_cello/Programs/lm-cello.sfz
+chord     11.5     879  sfz/vsco2/FHorn-sus.sfz
 
 # Echoes: beats, feedback, mix
 delay chord 1.5 0.40 0.20
@@ -55,8 +70,8 @@ delay perc  1.0 0.5 0.3 throws
 sub      0.0      60  internal/808
 metal    6.9     783  3rd/Malfunction/Drums/Gong
 perc     -0.6     287  3rd/Vospi/Drums/Modular Drum
-harm     -3.2     740  3rd/Giana Brotherz/Pads/Deep Choir
-harm    -10.6    3541  3rd/Bluelight/Vox/Gregorian Rant Poly
+harm      -5.3     740  3rd/Giana Brotherz/Pads/OAH Choir
+harm       4.1    3541  3rd/Giana Brotherz/Pads/Dub Choir
 gain harm    -0.1  # Kerem's mix: +4.1
 amp harm  0.40 2200 0.35
 drive sub  0.55 2500
@@ -82,15 +97,15 @@ delay impact 1.5 0.55 0.4 throws
 
 # Sampled instruments (CC0: Karoryfer, D. Smolken, VSCO 2 CE; jSteelDrum: Unlicense), played by sfizz
 chord    21.8    1019  sfz/vsco2/TenorTrombone-sus.sfz
-pad      21.9     720  sfz/vsco2/Tuba-sus.sfz
-bass     24.5     900  sfz/Karoryfer.Growlybass.v1.002/Growlybass/growlybass_angry.sfz
+pad       12.2     720  sfz/Virtual-Playing-Orchestra3/Brass/french-horn-SEC-sustain.sfz
+bass      27.7     900  sfz/Karoryfer.Growlybass.v1.002/Growlybass/growlybass_vicious.sfz
 arp      13.5    2290  sfz/Karoryfer_Bigcat_cello.v1.001/Karoryfer_Bigcat_cello/Programs/02- Bowed (mod wheel).sfz
 
 # 2026-10-30: the riff (the engine's guitar: two takes, left and right, the fifths pure) into a fuzz and a cabinet
-riff    19.0    1000  sfz/Karoryfer_Black_And_Green_Guitars_1000/Programs/doom-baritone.sfz
+riff      22.0    1000  sfz/Karoryfer_Black_And_Green_Guitars_1000/Programs/wake-baritone.sfz
 gain riff    5.5  # Kerem's mixes: +6.3, then +7.3
-drive riff 0.85 2500
-amp riff  0.70 1800 1.0 45 -2 3600 6 1100
+drive riff 0.90 1800  # Doom's: drive riff 0.85 2500
+amp riff  0.70 1200 1.0 40 -1 2800 8 900  # Doom's: amp riff  0.70 1800 1.0 45 -2 3600 6 1100
 
 # 2026-10-31 (Kerem: the bass guitar's low hits are the tone, "Gnarly bassy guitar tone"; the other
 # tones' envelopes too short, long sustains and releases; a glue reverb for all, shimmerish, 25 % wet;
@@ -112,7 +127,7 @@ return delay 12  # Kerem's mix
 # for long chords, a third effect): the drone = the same guitars with their pitched feedback up, held
 # through each chord; the feedback bus = a ping-pong at a dotted eighth (beats, amount: over 1 it
 # swells and holds), fed by the guitars and the bass, set in the Doom Mixer
-drone   19.0    1000  sfz/Karoryfer_Black_And_Green_Guitars_1000/Programs/doom-drone.sfz
+drone     22.0    1000  sfz/Karoryfer_Black_And_Green_Guitars_1000/Programs/wake-drone.sfz
 gain drone   6.7  # Kerem's mix: +7.7
 feedback 0.75 0.99  # Kerem's mix
 feed riff   0.69
@@ -122,7 +137,7 @@ return feedback 6.3
 
 # 2026-11-09 (Kerem: "a leading soloist instrument that connects parts as lead, continuous to play but changes
 # accordingly to the parts"): the soloist's own track. an octave down, beating 5 %.
-lead      2.0    2252  3rd/Rozzer/Leads/Dark Heart
+lead      25.5    2252  sfz/Karoryfer_Bigcat_cello.v1.001/Karoryfer_Bigcat_cello/Programs/lm-cello.sfz
 delay lead 0.75 0.35 0.22
 
 # 2026-11-09 (Kerem: "low kick percussion hits like a deep gong drum, organic sub hits, long sentences, not too
