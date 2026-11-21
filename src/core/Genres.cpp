@@ -299,6 +299,36 @@ const G::Spec kWake {
     .sing = true, .pedal = true, .flow = true, .peakMode = &kPhrygianDominant,
 };
 
+// ---- 2026-11-21 (Kerem: "one song like Ruby My Dear, Igorrr or Culprate", named Bleach). Not in the concert yet.
+// Breakcore under baroque: a harpsichord running sixteenths and string stabs on a baroque harmonic-minor cadence
+// (Igorrr), the electronic percussion chopped, gapped and stuttered into 64ths (Ruby My Dear; still no kick,
+// snare or hats: his kit plays those), a growling synth bass (Culprate), a soprano soloist, the doom guitar
+// chugging metal under it; the summit falls into half time, twice the weight. Sharp part changes (build).
+const G::Spec kBleach {
+    .scene = "bleach", .title = "Bleach",
+    .bpmLo = 168, .bpmHi = 172, .mode = &kHarmonicMinor, .tonics = { 4, 11, 9, 2, 7 },
+    .progs = { { { 0, 3, 4, 0 }, { 5, 1, 4, 0 }, { 0, 5, 3, 4 } } }, .preRoot = 4,
+    .form = { { { "Lye", 16, .15f, "PAT" }, { "Starch", 24, .40f, "PADBUHTGM" }, { "Bleach", 48, .85f, "PKSHCBUADTGYMIR" },
+                { "Linen", 24, .35f, "PAFTM" },
+                { "Burn", 64, 1.0f, "PKSHCBUADFTGYMIR" }, { "White", 16, .15f, "PAT" } } },
+    .pulse = part("X.........X.....", "X.....X...X.....", "X..X..X...X..X.."),
+    .metal = part("", "....1.....2...1.", "..1.2..1.3.2..1."),
+    .tick = part("x...x...x...x...", "x.xgx.oxx.xgx.ox", "xgoxxgo2xgoxxgo2"),
+    .perc = part("", "......1.........", "...1..1....2.1.."), // iron, off his backbeat
+    .bass = part("x---------------", "x-----x---x-----", "x--x--x-..x-5-8-"), // the growl's wobble rhythm
+    .chord = part("", "x.....x...x.....", "x..x..x.x.x..x.."), // string stabs
+    .sub = part("x---------------", "x-------x-------", "x-----x-x---^---"),
+    .ground = part("", "1.........2.....", "1..2......2..1.."),
+    .body = part("", "..o...o...o.o...", ".o.o..o.o..o..o."),
+    .mallet = part("", "1.....2.........", "1..3..2..4.1..3."),
+    .texture = part("x---------------", "x-------x-------", "x---x---x---x---"),
+    .arpRate = { 16, 16, 16 }, .arpLenLo = 6, .arpLenHi = 8, .arpDensLo = .9f, .arpDensHi = 1.0f, .arpGate = .6f,
+    .arpLo = 60, .arpHi = 86, .percLo = 36, .percHi = 52, .harmLo = 45, .harmHi = 64, .ext = 0, .hook = false, // the male choir: G2-F4
+    .chop = .25f, .gap = .12f, .stutter = .30f, .stutterTrack = G::Tick, .stutterDiv = 64,
+    .riff = G::RiffStyle::Chug, .riffLo = 33, .summit = G::Summit::Halftime, .build = true,
+    .leadLo = 67, .leadHi = 84, .sing = true, // the soprano (samples G4-C6)
+};
+
 bool is(const char* a, const char* b) { return std::strcmp(a, b) == 0; }
 
 } // namespace
@@ -311,7 +341,7 @@ const std::vector<const G::Spec*>& GenreComposer::all()
 
 const std::vector<const G::Spec*>& GenreComposer::extra()
 {
-    static const std::vector<const Spec*> v = { &kWake };
+    static const std::vector<const Spec*> v = { &kWake, &kBleach };
     return v;
 }
 

@@ -1,0 +1,84 @@
+# Lisztmachine sound palette: Bleach (2026-11-21, Kerem: "like Ruby My Dear, Igorrr or Culprate"): breakcore under
+# baroque. A harpsichord in sixteenths, string stabs, a soprano soloist, a male choir, a growling synth bass, the doom
+# guitar chugging, chopped electronic percussion. Sounds measured with --audition --pure: Digi Harpsi beating 2 %
+# (an octave down), Altenberg Neuro 3 %, Cybersoda Growl 5 % (both an octave down). None shared with another song.
+# part   gain   bright  patch
+
+pulse    0.0      60  internal/none
+metal    0.0    1000  internal/metal
+tick     0.0    6000  internal/click
+perc     0.0    1000  internal/deep
+fx       -5.7     286  FX/Unsettler
+sub      0.0      60  internal/808
+drone    0.0       0  internal/none
+
+# the baroque: strings held and stabbed, the harpsichord running, the choir
+pad      13.0    1000  sfz/Virtual-Playing-Orchestra3/Strings/all-strings-SEC-sustain-panned.sfz
+chord    10.0    1000  sfz/Virtual-Playing-Orchestra3/Strings/all-strings-SEC-staccato-panned.sfz
+arp      -6.0    1000  Keys/Digi Harpsi
+harm     12.0    1000  sfz/Virtual-Playing-Orchestra3/Vocals/choir-MALE-sustain.sfz
+lead     18.0    1000  sfz/Virtual-Playing-Orchestra3/Vocals/choir-FEMALE-sustain.sfz
+
+# the growl (Culprate): the reese-like Neuro in the calm, the Growl at the top
+bass     -8.0     400  3rd/Altenberg/Basses/Neuro
+bass     -4.0    1500  3rd/Cybersoda/Basses/Growl
+
+# the metal: Doom's guitars, chugging, into Doom's fuzz and amp
+riff    19.0    1000  sfz/Karoryfer_Black_And_Green_Guitars_1000/Programs/doom-baritone.sfz
+drive riff 0.85 2500
+amp riff  0.70 1800 1.0 45 -2 3600 6 1100
+
+# Echoes: beats, feedback, mix
+delay arp  0.75 0.35 0.18
+delay lead 1.5 0.45 0.30
+send lead reverb 0.60
+send harm reverb 0.40
+send pad reverb 0.30
+
+# Balance
+gain pulse   0.0
+gain metal   -8.0
+gain tick    8.0
+gain perc    -6.0
+gain pad     -3.0
+gain bass    5.0
+gain sub     -4.0
+gain arp     0.0
+gain chord   0.0
+gain harm    4.0
+gain riff    0.0
+gain fx     -9.0
+master 6.0
+amp bass  0.60 2500 0.70
+drive metal 0.30 4500
+drive perc  0.30 6000
+crush tick  8 3 0.3
+comp perc -22 4 5 80 0.4
+duck metal 0.15
+duck tick 0.2
+duck perc 0.25
+delay metal 0.75 0.55 0.35 throws
+delay perc  1.0 0.5 0.3 throws
+drive sub  0.55 2500
+duck sub 0.30
+lowcut bass 90
+lowcut chord 150
+
+# The percussion section (modal: struck and shaken objects, tuned to the chords)
+ground   0.0    1000  internal/modal-log
+body     0.0    1000  internal/modal-block
+mallet   0.0    1000  internal/modal-kalimba
+texture  0.0    1000  internal/modal-crackle
+impact   0.0    1000  internal/modal-plate
+gain ground  -23.0
+gain body    -15.0
+gain mallet  -28.0
+gain texture -25.0
+gain impact -6.0
+comp body -24 3 8 90 0.35
+duck body 0.2
+duck mallet 0.15
+delay mallet 0.75 0.4 0.25
+delay impact 1.5 0.55 0.4 throws
+
+boom    -3.0    1000  internal/boom

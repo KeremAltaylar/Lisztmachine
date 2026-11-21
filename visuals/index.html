@@ -105,6 +105,7 @@ nav button[aria-pressed="true"] { color: var(--ember); }
       <button class="go" id="piece-doom" data-piece="doom" disabled>Doom</button>
       <button class="go" id="piece-blackgaze" data-piece="blackgaze" disabled>Blackgaze</button>
       <button class="go" id="piece-wake" data-piece="wake" disabled>Hollow Wake</button>
+      <button class="go" id="piece-bleach" data-piece="bleach" disabled>Bleach</button>
       <button class="go" id="piece-concert" data-piece="concert" disabled>The whole concert</button>
       <button class="go" id="piece-live" data-piece="live" disabled>Live from the app</button>
     </div>
@@ -206,6 +207,11 @@ const PIECES = {
   wake: { name: 'Hollow Wake', study: 'form', strobeBeats: 2, media: 'media/wake1', ranges: [[36, 86], [22, 64], [33, 62], [55, 80]],
     world: { name: 'Candle', lo: [0.22, 0.12, 0.06], hi: [1.0, 0.86, 0.62],         // tallow-black shadows, candlelight on bone
       palette: [[1, 0.8, 0.45], [1, 0.93, 0.8], [0.75, 0.4, 0.15], [1, 1, 0.95], [0.45, 0.2, 0.08], [1, 0.65, 0.3]] } },
+  // 2026-11-21 (Kerem: "like Ruby My Dear, Igorrr or Culprate"): breakcore under baroque; the tunnel at full speed,
+  // a clinical white world with one chemical stain.
+  bleach: { name: 'Bleach', study: 'tunnel', strobeBeats: 1, media: 'media/bleach1', ranges: [[36, 86], [22, 64], [33, 62], [60, 88]],
+    world: { name: 'Bleach', lo: [0.4, 0.5, 0.55], hi: [1.0, 1.0, 1.0],              // bleached white, cold cyan shadows, a violet stain
+      palette: [[1, 1, 1], [0.75, 0.95, 1], [0.85, 0.3, 1], [0.9, 0.9, 0.85], [0.3, 0.85, 0.9], [1, 0.4, 0.75]] } },
   // 2026-11-03 (Kerem: "a concert song that includes all 45 minutes, so I can practice the concert non stop"):
   // the eight songs back to back from tools/concert.py; each one switches in its own study, colours and tempo.
   concert: { name: 'The whole concert', concert: true, media: 'media/concert1' },
@@ -231,6 +237,7 @@ const BODIES = {
   doom:          { pad: 'light', harm: 'colour', lead: 'camera', arp: 'glow', riff: 'speed', bass: 'size', sub: 'gravity', boom: 'shock' },
   blackgaze:     { pad: 'light', harm: 'colour', lead: 'camera', arp: 'glow', riff: 'speed', bass: 'size', sub: 'gravity', boom: 'shock' },   // the tremolo guitar is the speed
   wake:          { pad: 'light', harm: 'colour', lead: 'camera', arp: 'glow', riff: 'speed', bass: 'size', sub: 'gravity', boom: 'shock' },   // Doom's voices, Doom's body
+  bleach:        { pad: 'light', harm: 'colour', lead: 'camera', chord: 'glow', arp: 'speed', bass: 'size', sub: 'gravity', boom: 'shock' },   // the harpsichord runs, the soprano steers
 };
 for (const k in BODIES) PIECES[k].body = BODIES[k];
 // Improvisation's looks (Kerem, 2026-11-14: "visuals in the same manner"), made as each generated song arrives live: for each generated song a study, a colour world and a way of moving,
@@ -2959,7 +2966,7 @@ registerProcessor('master-fx', MasterFx);`;
   });
   // a hue per song, for the concert's timeline (Kerem, 2026-11-04: "show some song colors ... so I can understand the
   // songs and transitions"); neighbours far apart on the wheel, each near its world's colour
-  const HUE = { berlin: 195, stoner: 70, jungle: 250, ecstatic: 310, noir: 25, deconstructed: 130, halftime: 275, doom: 50, blackgaze: 350, wake: 85 };
+  const HUE = { berlin: 195, stoner: 70, jungle: 250, ecstatic: 310, noir: 25, deconstructed: 130, halftime: 275, doom: 50, blackgaze: 350, wake: 85, bleach: 185 };
   const songCol = (k, l = 0.6, c = 0.13) => 'oklch(' + l + ' ' + c + ' ' + (HUE[songs[k].piece] ?? 75) + ')';
   const form = $('form');
   sec.forEach(s => {
@@ -3733,6 +3740,15 @@ registerProcessor('master-fx', MasterFx);`;
       [0.6, "A village prayed to a saint whose name nobody could remember.", 0, 0],
       [0.6, "The statue was hollow. Every winter, something inside it moved.", 0, 10],
       [0.6, "They kept praying. It seemed to be listening.", 0, 20],
+    ],
+    bleach: [
+      [0.08, "Naples, 1590. The prince Carlo Gesualdo comes home early and finds his wife with her lover.", 0, 0],
+      [0.08, "He kills them both, and has the bodies left on the palace steps.", 0, 10],
+      [0.08, "No court will try a prince. He goes back to writing madrigals.", 0, 20],
+      [0.08, "His harmonies are so strange that for three hundred years nobody writes anything like them.", 0, 30],
+      [0.6, "A laundress washed the same white sheet every morning for forty years.", 0, 0],
+      [0.6, "Nobody ever slept in it. It came back stained every night.", 0, 10],
+      [0.6, "When she died, they found it folded on her bed. Perfectly clean.", 0, 20],
     ],
     blackgaze: [
       [0.12, "Up north, one winter refused to end.", 0, 0],
