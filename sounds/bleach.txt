@@ -82,10 +82,10 @@ boom    -3.0    1000  internal/boom
 pulse    0.0      60  internal/none
 tick     0.0      60  internal/none
 body     0.0    1000  sfz/KAN Amen Break Tribute/Drum Loops/bleach.breaks
-gain body    0.0
+gain body    2.0
 pan body     0
 lowcut body  30
 duck body    0
 # Kerem (2026-11-21): "saturate the break rhythm and compress it a little"
-drive body  0.70 6500
-comp body -26 3 4 90 0.6
+drive body  0.55 6500
+comp body -26 3 15 90 0.6  # Kerem: sharper transients: a slow attack lets each hit through before it squeezes

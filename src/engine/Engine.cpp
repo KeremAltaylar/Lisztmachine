@@ -292,7 +292,8 @@ public:
         return true;
     }
     const juce::String getName() const override { return "breaks " + name_; }
-    void prepareToPlay(double sr, int) override { sr_ = sr; player_.prepare(sr); player_.setBreak(&kit_); player_.seed(1); player_.evolve = 1; }
+    void prepareToPlay(double sr, int) override { sr_ = sr; player_.prepare(sr); player_.setBreak(&kit_); player_.seed(1); player_.evolve = 1;
+        player_.gainTarget = .4f; } // under the player's own limiter, which flattened the hits (the track gain makes it up)
     void releaseResources() override {}
     void processBlock(juce::AudioBuffer<float>& buf, juce::MidiBuffer& midi) override
     {
