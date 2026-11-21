@@ -259,6 +259,86 @@ const G::Spec kBlackgaze {
     .chordSweep = .30f, .riff = G::RiffStyle::Tremolo, .riffLo = 40, .summit = G::Summit::NewTheme, .ends = false, .pedal = true,
 };
 
+// ---- 2026-11-20 (Kerem: "3 new songs like the style in Doom, I like the sound there very much ... vary the tempo,
+// the darkness in the melodies and harmony is good ... one can be very fast but in that sound"; not in the concert
+// yet). Doom's palette whole (sounds/<scene>.txt is a copy of doom.txt), its legato, its open-interval choir and its
+// percussion; each its own tempo, mode, riff, form and summit.
+
+const G::Spec kWake {
+    .scene = "wake", .title = "Lantern Wake",
+    // funeral doom, after Evoken, Mournful Congregation and Ahab: slower than Doom, harmonic minor (the raised
+    // seventh: the dominant a major chord that pulls home, the gothic of it), long power chords with the flat
+    // second around them; it opens on the organ-like pad alone, and the summit holds the tonic under moving chords.
+    .bpmLo = 58, .bpmHi = 62, .mode = &kHarmonicMinor, .tonics = { 9, 4, 2, 7, 11 },
+    .progs = { { { 0, 5, 3, 4 }, { 0, 1, 4, 0 }, { 5, 3, 4, 0 } } }, .preRoot = 4,
+    .form = { { { "Vigil", 8, .12f, "PTW" }, { "Bearers", 12, .40f, "PRBUTGW" }, { "Wake", 16, .68f, "PRBUDCKSTGYMW" },
+                { "Candle", 12, .30f, "PAFTW" },
+                { "Requiem", 20, 1.0f, "PRBUDCKSTGYMAFIW" }, { "Earth", 8, .12f, "RTW" } } },
+    .pulse = part("X...............", "X...............", "X.......X......."),
+    .metal = part("", "..............1.", "......1.......2."), // a far bell, chains
+    .tick = part("", "", ""),
+    .perc = part("", "........1.......", "....1.......2..."),
+    .bass = part("x---------------", "x---------------", "x-------x-------"),
+    .chord = part("", "x-------------------------------", "x-------------------------------"),
+    .sub = part("x---------------", "x---------------", "x-------^-------"),
+    .ground = part("", "1...............", "1.......2.....1."),
+    .body = part("", "............o...", "....o.......o.o."),
+    .mallet = part("", "1...............", "1.......3......."),
+    .texture = part("x---------------", "x---------------", "x-------x-------"),
+    .arpLo = 55, .arpHi = 79, .percLo = 33, .percHi = 48, .ext = 0,
+    .riff = G::RiffStyle::Doom, .riffLo = 30, .summit = G::Summit::Pedal, .legato = true, .gaze = true, .pedal = true,
+};
+
+const G::Spec kSaint {
+    .scene = "saint", .title = "Hollow Saint",
+    // sludge, after Neurosis, Yob and Om: a walking-pace groove, phrygian dominant (the flat second under a major
+    // third: the darkest of the eastern scales), the riff in power chords that circle the flat second and the
+    // tritone; its summit falls into half time, twice the weight.
+    .bpmLo = 94, .bpmHi = 98, .mode = &kPhrygianDominant, .tonics = { 4, 2, 9, 11, 7 },
+    .progs = { { { 0, 1, 0, 6 }, { 0, 6, 5, 1 }, { 0, 3, 1, 0 } } }, .preRoot = 1,
+    .form = { { { "Salt", 8, .15f, "RFTW" }, { "Pilgrims", 16, .45f, "PRBUTGYW" }, { "Scourge", 24, .75f, "PRBUDCKSTGYMW" },
+                { "Reliquary", 16, .35f, "PAFTMW" },
+                { "Martyr", 32, 1.0f, "PRBUDCKSTGYMAFIW" }, { "Ash", 8, .15f, "RTW" } } },
+    .pulse = part("X...............", "X.......X.......", "X.....X...X....."),
+    .metal = part("", "..........1.....", "......1.......2."),
+    .tick = part("", "", ""),
+    .perc = part("", "....1.......1...", "....1..1....1.2."), // struck iron on his backbeat's neighbours
+    .bass = part("x---------------", "x-------x-------", "x-----x-..x-----"),
+    .chord = part("", "x-----------------------------..", "x-----------------------------.."), // a breath at the end: in the half-time summit a held note would run into the next
+    .sub = part("x---------------", "x---------------", "x-------^-------"),
+    .ground = part("", "1.......1.......", "1.....1...1...2."),
+    .body = part("", "..o.......o.....", "..o...o...o.o..o"),
+    .mallet = part("", "1...............", "1.......3......."),
+    .texture = part("x---------------", "x---------------", "x-------x-------"),
+    .arpLo = 55, .arpHi = 79, .percLo = 33, .percHi = 48, .ext = 0,
+    .riff = G::RiffStyle::Doom, .riffLo = 31, .summit = G::Summit::Halftime, .legato = true, .gaze = true, .pedal = true,
+};
+
+const G::Spec kWolf {
+    .scene = "wolf", .title = "Wolf Hour",
+    // very fast, in Doom's sound: the same baritone guitars tremolo-picked at a blast's tempo (Bell Witch's weight
+    // at Darkthrone's speed), hungarian minor (two augmented seconds: the darkest colour here), the percussion on a
+    // machine grid of eighths, the low end plain under it; the summit finds a theme of its own.
+    .bpmLo = 196, .bpmHi = 204, .mode = &kHungarianMinor, .tonics = { 4, 11, 2, 9, 1 },
+    .progs = { { { 0, 5, 1, 4 }, { 0, 3, 5, 4 }, { 5, 4, 0, 0 } } }, .preRoot = 4,
+    .form = { { { "Howl", 16, .20f, "RFTW" }, { "Hunt", 32, .55f, "PRBUTGYC" }, { "Blood Snow", 56, .85f, "PRBUKSCDTGYI" },
+                { "Clearing", 24, .35f, "PAFTW" }, { "Wolf Hour", 72, 1.0f, "PRBUKSCDTGYAFIW" },
+                { "Dawn", 16, .15f, "PRTW" } } },
+    .pulse = part("X.......X.......", "X...X...X...X...", "X.X.X.X.X.X.X.X."),
+    .metal = part("", "..............1.", "......1.......2."),
+    .tick = part("", "", ""),
+    .perc = part("", "......1.......1.", "1..1..1...1..1.."),
+    .bass = part("x---------------", "x---x---x---x---", "x---x---x---x---"),
+    .chord = part("", "x---------------", "x-------x-------"),
+    .sub = part("x---------------", "x---------------", "x-------x-------"),
+    .ground = part("1...............", "1.......1..1....", "1.1.1.1.1.1.1.1."),
+    .body = part("", "....o.......o...", "..o...o...o.o.o."),
+    .mallet = part("", "", ""),
+    .texture = part("x---------------", "x---------------", "x-------x-------"),
+    .arpLo = 55, .arpHi = 79, .percLo = 33, .percHi = 48, .ext = 0,
+    .riff = G::RiffStyle::Tremolo, .riffLo = 33, .summit = G::Summit::NewTheme, .gaze = true, .pedal = true,
+};
+
 bool is(const char* a, const char* b) { return std::strcmp(a, b) == 0; }
 
 } // namespace
@@ -269,9 +349,16 @@ const std::vector<const G::Spec*>& GenreComposer::all()
     return v;
 }
 
+const std::vector<const G::Spec*>& GenreComposer::extra()
+{
+    static const std::vector<const Spec*> v = { &kWake, &kSaint, &kWolf };
+    return v;
+}
+
 const G::Spec* GenreComposer::find(const std::string& scene)
 {
     for (auto* s : all()) if (scene == s->scene) return s;
+    for (auto* s : extra()) if (scene == s->scene) return s;
     return nullptr;
 }
 
@@ -281,7 +368,9 @@ const SceneInfo* genreSceneInfo(const std::string& scene)
     // arpeggio and the chords into the echo, the low end dry.
     static const std::vector<SceneInfo> infos = [] {
         std::vector<SceneInfo> v;
-        for (auto* s : G::all())
+        std::vector<const G::Spec*> songs = G::all();
+        songs.insert(songs.end(), G::extra().begin(), G::extra().end());
+        for (auto* s : songs)
             v.push_back({ s->scene, 20, { "pad", "pulse", "metal", "tick", "perc", "bass", "sub", "arp", "chord", "fx", "harm",
                                           "ground", "body", "mallet", "texture", "impact", "riff", "drone", "lead", "boom" },
                           { 0, 1, 2, 2, 2, 1, 1, 3, 0, 0, 0, 1, 2, 2, 2, 1, 1, 0, 3, 1 },
@@ -821,6 +910,14 @@ void GenreComposer::emitPart(int track, const Part& part, int bar, std::vector<E
     // half time doubles a note's length; when the next bar changes tier its own pattern takes over at the bar line
     const bool capBar = cutHold || (halfT && bar + 1 < totalBars() && tier(bar + 1) != tier(bar));
     auto cap = [&](int64_t t, int64_t l) { return capBar ? std::min(l, t0 + kBarTicks - t - 10) : l; };
+    // a half-time note held over several bars (2026-11-20, Hollow Saint): it stops before a later bar that plays its own
+    // low notes (the part's end figure, a unison) or another part, which cap only checks for the next bar
+    auto capHalf = [&](int64_t t, int64_t l) {
+        if (!halfT) return l;
+        for (int b = bar + 2; b < totalBars() && int64_t(b) * kBarTicks < t + l; ++b)
+            if (attackBar(b) || summitUnison(b) || sectionOfBar_[size_t(b)] != si) return std::max<int64_t>(10, int64_t(b) * kBarTicks - 10 - t);
+        return l;
+    };
 
     // The drums in phrases of sixteen bars: a turn at the end of every fourth bar, a fill at the
     // eighth, a bigger one at the sixteenth (and into a section that rises), the last hit of each
@@ -938,7 +1035,7 @@ void GenreComposer::emitPart(int track, const Part& part, int bar, std::vector<E
             hit(t, drumPitch(c, i), vel, std::min<int64_t>(stepT / 2, kPPQ - 20)); // short: the swing must not reach the next hit
             continue;
         }
-        const int64_t noteLen = cap(t0 + i * stepT, int64_t(double(stepT * hm * (1 + holds)) * (spec_.legato ? 1.0 : holds ? .95 : .7)) - (spec_.legato ? 10 : 0));
+        const int64_t noteLen = capHalf(t, cap(t0 + i * stepT, int64_t(double(stepT * hm * (1 + holds)) * (spec_.legato ? 1.0 : holds ? .95 : .7)) - (spec_.legato ? 10 : 0)));
         if (track == Sub)
         {
             // Legato into a different note: the next one starts before this one ends, and the 808 slides.

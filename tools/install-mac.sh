@@ -111,6 +111,26 @@ if [ ! -f "$REPO/visuals/media/code.json" ]; then
     mkdir -p "$REPO/visuals/media" && cp -Rn "$tmp"/visuals/media/ "$REPO/visuals/media/" && echo "   visuals media: installed" || { echo "   visuals media: could not unpack"; fail=1; }
   else echo "   visuals media: could not download"; fail=1; fi
 else echo "   visuals media: already there"; fi
+# a song's photographs the release zip predates (2026-11-20: the three new songs): each one fetched from Wikimedia
+# Commons by its name in visuals/image-sources.json, resized there to 2048 px, one at a time (Commons limits the rate)
+python3 - "$REPO" <<'PY' || fail=1
+import json, os, subprocess, sys, time, urllib.parse
+repo = sys.argv[1]
+songs = json.load(open(os.path.join(repo, "visuals", "image-sources.json")))["songs"]
+bad = 0
+for song, titles in songs.items():
+    for n, title in enumerate(titles, 1):
+        out = os.path.join(repo, "visuals", "media", "img", song, f"{n}.jpg")
+        if os.path.exists(out) and os.path.getsize(out) > 0:
+            continue
+        os.makedirs(os.path.dirname(out), exist_ok=True)
+        url = "https://commons.wikimedia.org/wiki/Special:FilePath/" + urllib.parse.quote(title) + "?width=2048"
+        ok = subprocess.run(["curl", "-fsL", "--retry", "3", "-A", "LisztmachineInstall/1.0 (personal art project)", "-o", out + ".part", url]).returncode == 0
+        if ok: os.replace(out + ".part", out); print(f"   photo {song}/{n}: installed")
+        else: bad = 1; print(f"   photo {song}/{n}: could not download {title}")
+        time.sleep(1.5)
+sys.exit(bad)
+PY
 
 say "Check: every sound the songs name"
 missing=0

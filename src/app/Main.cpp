@@ -59,6 +59,12 @@ public:
             sceneBox.addItem(kSceneTitles[i], i + 1);
             if (scene == kScenes[i]) sceneBox.setSelectedId(i + 1, juce::dontSendNotification);
         }
+        sceneBox.addSeparator(); // 2026-11-20: the new songs, on their own (not in the concert yet)
+        for (int i = 0; i < int(std::size(kNewScenes)); ++i)
+        {
+            sceneBox.addItem(kNewTitles[i], kNewId + i);
+            if (scene == kNewScenes[i]) sceneBox.setSelectedId(kNewId + i, juce::dontSendNotification);
+        }
         // 2026-11-14 (Kerem): Improvisation, endless generated songs (src/core/Improv.cpp), after the songs
         sceneBox.addSeparator();
         sceneBox.addItem("Improvisation", kImprovId);
@@ -68,7 +74,7 @@ public:
         if (sceneBox.getSelectedId() == 0) { scene = "berlin"; sceneBox.setSelectedId(1, juce::dontSendNotification); }
         sceneBox.onChange = [this] {
             scene = sceneBox.getSelectedId() == kImprovId ? std::string("improv") : sceneBox.getSelectedId() == kConcertId ? std::string("concert")
-                  : std::string(kScenes[sceneBox.getSelectedId() - 1]);
+                  : std::string(sceneOfId(sceneBox.getSelectedId()));
             props.getUserSettings()->setValue("scene", juce::String(scene));
             reload();
             preview();
@@ -291,7 +297,7 @@ public:
         const juce::String head = chained() ? juce::String(improv() ? "Improvisation" : "The whole concert") + dot + "song " + juce::String(improvK + 1)
                                                   + (concert() ? juce::String("/") + juce::String(int(std::size(kScenes))) : juce::String())
                                               + (oldEngine ? dot + "changing over" : nextEngine || starting ? dot + "next song ready" : loader ? dot + "writing the next song" : juce::String())
-                                           : juce::String(kSceneTitles[sceneBox.getSelectedId() - 1]);
+                                           : juce::String(titleOfId(sceneBox.getSelectedId()));
         g.drawText("LISZTMACHINE" + dot + head.toUpperCase(), r.removeFromTop(16), juce::Justification::left);
         r.removeFromTop(tok::s2);
 
@@ -628,6 +634,9 @@ private:
     // A quarter of the way into song k's Release, song k+1 starts (its Seed: the drone alone, inside k's last chord,
     // src/core/Improv.cpp) and song k rings out under it in `oldEngine` until it has finished. Endless; the seed is the chain.
     static constexpr int kImprovId = 1000;
+    static constexpr int kNewId = 101; // the new songs' menu ids (kNewScenes), apart from the concert's 1..9
+    static const char* sceneOfId(int id) { return id >= kNewId && id < kNewId + int(std::size(kNewScenes)) ? kNewScenes[id - kNewId] : kScenes[juce::jlimit(1, int(std::size(kScenes)), id) - 1]; }
+    static const char* titleOfId(int id) { return id >= kNewId && id < kNewId + int(std::size(kNewScenes)) ? kNewTitles[id - kNewId] : kSceneTitles[juce::jlimit(1, int(std::size(kScenes)), id) - 1]; }
     static constexpr int kConcertId = 1001;
     bool improv() const { return scene == "improv"; }
     bool concert() const { return scene == "concert"; }   // the nine songs in order, each loaded while the one before plays
@@ -788,6 +797,7 @@ private:
             const auto id = c.fromFirstOccurrenceOf("scene/", false, false);
             int sel = id == "improv" ? kImprovId : id == "concert" ? kConcertId : 0;
             for (int i = 0; i < int(std::size(kScenes)); ++i) if (id == kScenes[i]) sel = i + 1;
+            for (int i = 0; i < int(std::size(kNewScenes)); ++i) if (id == kNewScenes[i]) sel = kNewId + i;
             if (sel && sel != sceneBox.getSelectedId()) sceneBox.setSelectedId(sel, juce::sendNotificationSync);
         }
         else if (c.startsWith("earmusic/")) earMusic.setValue(c.fromFirstOccurrenceOf("earmusic/", false, false).getDoubleValue(), juce::sendNotificationSync);
@@ -838,6 +848,7 @@ private:
                        + ",\"inputs\":" + juce::String(numInputs.load()) + ",\"inDev\":" + juce::JSON::toString(inputName) + ",\"version\":\"" LISZT_COMMIT "\",\"padSound\":" + juce::JSON::toString(engine ? engine->padInfo() : juce::String())
                        + ",\"error\":" + juce::JSON::toString(error) + ",\"scenes\":[";
         for (int i = 0; i < int(std::size(kScenes)); ++i) j << "[\"" << kScenes[i] << "\"," << juce::JSON::toString(juce::String::fromUTF8(kSceneTitles[i])) << "],";
+        for (int i = 0; i < int(std::size(kNewScenes)); ++i) j << "[\"" << kNewScenes[i] << "\"," << juce::JSON::toString(juce::String::fromUTF8(kNewTitles[i])) << "],";
         j << "[\"improv\",\"Improvisation\"],[\"concert\",\"The whole concert\"]]}";
         live.state(j);
     }

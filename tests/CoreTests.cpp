@@ -103,7 +103,9 @@ int main()
     CHECK(descriptions.size() > 10, "only %zu distinct concerts over 40 seeds", descriptions.size());
 
     // ---- the genre songs
-    for (auto* spec : GenreComposer::all())
+    std::vector<const GenreComposer::Spec*> genreSongs = GenreComposer::all();
+    genreSongs.insert(genreSongs.end(), GenreComposer::extra().begin(), GenreComposer::extra().end());
+    for (auto* spec : genreSongs)
     {
         using G = GenreComposer;
         for (auto* p : { &spec->pulse, &spec->metal, &spec->tick, &spec->perc, &spec->bass, &spec->chord, &spec->sub, &spec->ground, &spec->body, &spec->mallet, &spec->texture })

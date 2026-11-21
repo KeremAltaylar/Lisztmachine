@@ -109,7 +109,8 @@ public:
     const std::vector<Note>& homeHook() const { return hookHome_; }
 
     static const Spec* find(const std::string& scene);
-    static const std::vector<const Spec*>& all();
+    static const std::vector<const Spec*>& all();   // the concert's genre songs (Improvisation's donors, in this order)
+    static const std::vector<const Spec*>& extra(); // songs not in the concert (nor Improvisation) yet
 
     GenreComposer(const Spec& spec, uint64_t seed);
     void generateBar(int bar, std::vector<Event>& out) override;
