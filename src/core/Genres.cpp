@@ -330,6 +330,7 @@ const G::Spec kBleach {
     .chop = .35f, .gap = .10f, .stutter = .35f, .stutterTrack = G::Body, .stutterDiv = 32,
     .riff = G::RiffStyle::Chug, .riffLo = 33, .summit = G::Summit::Halftime, .build = true,
     .leadLo = 67, .leadHi = 84, .sing = true, // the soprano (samples G4-C6)
+    .kit = true, // real breaks: kick, snare, hats (Kerem's exception for this song)
 };
 
 bool is(const char* a, const char* b) { return std::strcmp(a, b) == 0; }
@@ -636,6 +637,9 @@ bool GenreComposer::active(int track, int bar) const
 
 std::array<int, 2> GenreComposer::range(int track) const
 {
+    if (spec_.kit && track == Pulse) return { 36, 36 };
+    if (spec_.kit && track == Body) return { 38, 38 };
+    if (spec_.kit && track == Tick) return { 42, 46 };
     switch (track)
     {
         case Pad: return { 36, 76 };
@@ -1820,6 +1824,15 @@ void GenreComposer::generateBar(int bar, std::vector<Event>& out)
     emitAttack(bar, out);
     emitTurn(bar, from, out);
     emitHeld(Fx, bar, out, fxHeld_, active(Fx, bar) ? foldInto(48 + tonicAt(bar), 48, 59) : -1);
+    if (spec_.kit)
+        for (size_t i = from; i < out.size(); ++i)
+        {
+            auto& ev = out[i];
+            if (ev.type != Event::NoteOn && ev.type != Event::NoteOff) continue;
+            if (ev.track == Pulse) ev.pitch = 36;
+            else if (ev.track == Body) ev.pitch = 38;
+            else if (ev.track == Tick) ev.pitch = ev.pitch >= 96 ? 46 : 42;
+        }
 }
 
 std::string GenreComposer::describe() const

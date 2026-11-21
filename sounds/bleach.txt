@@ -4,9 +4,7 @@
 # (an octave down), Altenberg Neuro 3 %, Cybersoda Growl 5 % (both an octave down). None shared with another song.
 # part   gain   bright  patch
 
-pulse    0.0      60  internal/none
 metal    0.0    1000  internal/metal
-tick     0.0    6000  internal/click
 perc     0.0    1000  internal/deep
 fx       -5.7     286  FX/Unsettler
 sub      0.0      60  internal/808
@@ -36,9 +34,7 @@ send harm reverb 0.40
 send pad reverb 0.30
 
 # Balance
-gain pulse   0.0
 gain metal   -12.0
-gain tick    -6.0  # Kerem 2026-11-21: the high rhythms too loud (was 8.0)
 gain perc    -6.0
 gain pad     -3.0
 gain bass    5.0
@@ -52,7 +48,6 @@ master 6.0
 amp bass  0.60 2500 0.70
 drive metal 0.30 4500
 drive perc  0.30 6000
-crush tick  8 3 0.3
 comp perc -22 4 5 80 0.4
 duck metal 0.15
 duck tick 0.2
@@ -66,12 +61,10 @@ lowcut chord 150
 
 # The percussion section (modal: struck and shaken objects, tuned to the chords)
 ground   0.0    1000  internal/modal-log
-body     0.0    1000  internal/modal-skin
 mallet   0.0    1000  internal/modal-kalimba
 texture  0.0    1000  internal/modal-crackle
 impact   0.0    1000  internal/modal-plate
-gain ground  -16.0
-gain body    -8.0
+gain ground  -22.0
 gain mallet  -28.0
 gain texture -25.0
 gain impact -6.0
@@ -82,3 +75,18 @@ delay mallet 0.75 0.4 0.25
 delay impact 1.5 0.55 0.4 throws
 
 boom    -3.0    1000  internal/boom
+
+# 2026-11-21 (Kerem: "yeah I want it": real breaks in this song only): a CC0 acoustic kit (Karoryfer Big Rusty Drums,
+# on the Mac from the Improvisation install) chopped and stuttered by the composer, crushed and driven like a breakcore
+# break; the hats kept low (he found the high rhythms too loud)
+pulse    0.0    1000  sfz/Big_Rusty_Drums_1100/Programs/03-kick.sfz
+body     0.0    1000  sfz/Big_Rusty_Drums_1100/Programs/04-snare.sfz
+tick     0.0    1000  sfz/Big_Rusty_Drums_1100/Programs/06-hihat.sfz
+gain pulse   18.0
+gain body    12.0
+gain tick   16.0
+drive pulse 0.40 4000
+drive body  0.55 6000
+crush body  10 2 0.35
+comp body -20 4 2 60 0.5
+crush tick  10 2 0.3
