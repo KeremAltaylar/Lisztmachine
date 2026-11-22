@@ -1120,12 +1120,17 @@ juce::String Engine::load(double sampleRate, int maxBlock, const Palette& palett
             p->prepareToPlay(sampleRate, maxBlock);
             if (e = loadSurgePatch(*p, findSurgePatch(pad_.patch)); e.isNotEmpty()) { pad_.info = " · " + e; return; }
             purify(*p, true); // in tune with the song: no detune
-            // struck: a fast attack that rings away over about two seconds, no held sustain (2026-11-20)
+            // struck: no attack at all (Kerem, 2026-11-22: "shortest attack possible"), rings away over about two seconds,
+            // no held sustain; the filter opens at once too
             for (auto sc : { "A", "B" })
-                for (auto [name, value] : { std::pair<const char*, const char*> { "Attack", "2.00 ms" }, { "Decay", "2.00 s" },
+            {
+                for (auto [name, value] : { std::pair<const char*, const char*> { "Attack", "0.00 ms" }, { "Decay", "2.00 s" },
                                             { "Sustain", "0.00 %" }, { "Release", "2.00 s" } })
                     if (auto err = setParameterText(*p, juce::String(sc) + " Amp EG " + name, value); err.isNotEmpty())
                         pad_.info << " · " << err.substring(0, 100);
+                if (auto err = setParameterText(*p, juce::String(sc) + " Filter EG Attack", "0.00 ms"); err.isNotEmpty())
+                    pad_.info << " · " << err.substring(0, 100);
+            }
             p->reset();
             pad_.buf.setSize(juce::jmax(2, p->getTotalNumInputChannels(), p->getTotalNumOutputChannels()), maxBlock);
             pad_.plugin = std::move(p);

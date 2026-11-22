@@ -286,6 +286,7 @@ static juce::String masterFx;                  // --master-fx Name=value,...: th
 static float feedbackBus = -1;                 // --feedback-bus 0..0.8: the feedback bus's amount (the app's slider)
 static bool gRaw = false;                      // --raw: without the mix stage (ducking, low cuts, width, glue)
 static double gPadEvery = 0;                   // --pad-every <beats>: a drum-pad hit that often (testing the pad's sound)
+static int gBlock = 512;                       // --block <samples>
 static bool gStems = false;                  // --stems: also <out>.<track>.wav per track and <out>.delay/.reverb.wav, before the glue
 
 // Improvisation as the app plays it (src/app/Main.cpp): song k in one engine, song k+1 made ready silent beside it and
@@ -383,7 +384,7 @@ static int renderConcert(uint64_t seed, double seconds, const juce::File& out, i
                          const juce::String& from, int bars)
 {
     const double sr = 48000;
-    const int block = 512;
+    const int block = gBlock; // --block <samples>: the app's buffer (CPU at a small buffer)
     Palette palette;
     if (auto e = palette.load(paletteFile.existsAsFile() ? paletteFile : findPalette(paletteName), sceneName); e.isNotEmpty()) { std::cerr << e << "\n"; return 1; }
     const auto& info = *palette.info;
@@ -528,6 +529,7 @@ int main(int argc, char** argv)
     gRaw = args.contains("--raw");
     gStems = args.contains("--stems");
     if (int i = args.indexOf("--pad-every"); i >= 0) gPadEvery = args[i + 1].getDoubleValue();
+    if (int i = args.indexOf("--block"); i >= 0) gBlock = juce::jlimit(32, 4096, args[i + 1].getIntValue());
     if (args[0] == "--probe") return probe(args[1], args[2], args[3]); // --probe <vst3> [names,to,match] [Category/Patch]
     if (args[0] == "--test-echo") // one impulse through a track's echo: where each repeat lands and how loud
     {

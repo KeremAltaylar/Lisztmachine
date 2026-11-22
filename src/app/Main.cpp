@@ -85,10 +85,25 @@ public:
         levelThread.hit = [this] { sendHits(); };
         onset.thr = float(props.getUserSettings()->getDoubleValue("padThr", 0.02));
         pad2.thr = float(props.getUserSettings()->getDoubleValue("pad2Thr", 0.02));
+        pad2.holdS = 0.001;
         padDb = props.getUserSettings()->getDoubleValue("padVol", 0.0);
         levelThread.startThread();
         auto saved = props.getUserSettings()->getXmlValue("audio");
         deviceManager.initialise(2, 4, saved.get(), true);
+        // Kerem (2026-11-22): a delay between his drum pad hit and its note. The buffer is most of it (JUCE's Core Audio
+        // default 512 = 10.7 ms in + 10.7 ms out at 48 kHz): ask once for 128 (2.7 + 2.7 ms); Audio settings can raise it
+        // again if the Mac crackles, and that choice is kept
+        if (!props.getUserSettings()->getBoolValue("buffer128", false))
+        {
+            props.getUserSettings()->setValue("buffer128", true);
+            auto setup = deviceManager.getAudioDeviceSetup();
+            if (auto* d = deviceManager.getCurrentAudioDevice(); d && d->getCurrentBufferSizeSamples() > 128 && d->getAvailableBufferSizes().contains(128))
+            {
+                setup.bufferSize = 128;
+                deviceManager.setAudioDeviceSetup(setup, true);
+                if (auto xml = deviceManager.createStateXml()) props.getUserSettings()->setValue("audio", xml.get());
+            }
+        }
         kickIn = props.getUserSettings()->getIntValue("kickIn", 0);
         padIn = props.getUserSettings()->getIntValue("padIn", 1);
         allInputs();
@@ -941,6 +956,7 @@ private:
         float hp = 0, px = 0, lp = 0, fast = 0, slow = 0, peak = 0, meter = 0;
         double hi = 0, lo = 0;
         int hold = 0, refr = 0;
+        double holdS = 0.006; // the wait for the true peak: the kick 6 ms, the pad 1 ms (Kerem, 2026-11-22: "shortest delay")
         std::atomic<float> thr { 0.02f }, meterOut { 0 }, lastPeak { 0 }, lastRatio { 0 };
         std::atomic<int> hits { 0 };
         void process(const float* x, int n, double sr) // audio thread
@@ -955,7 +971,7 @@ private:
                 fast = juce::jmax(a, fast * 0.9985f);
                 slow += (fast - slow) * 0.0004f;
                 meter = juce::jmax(meter * 0.99995f, a);
-                if (hold > 0) // 6 ms after the onset: the true peak and the brightness
+                if (hold > 0) // holdS after the onset: the true peak and the brightness
                 {
                     peak = juce::jmax(peak, a); hi += double(d) * d; lo += double(hp) * hp;
                     if (--hold == 0) { lastPeak = peak; lastRatio = float(hi / (lo + 1e-12)); hits.fetch_add(1); }
@@ -963,7 +979,7 @@ private:
                 if (refr > 0) --refr;
                 else if (fast > t && fast > slow * 2.2f)
                 {
-                    hold = int(0.006 * sr); peak = a; hi = lo = 0; refr = int(0.045 * sr);
+                    hold = juce::jmax(1, int(holdS * sr)); peak = a; hi = lo = 0; refr = int(0.045 * sr);
                 }
             }
             meterOut = meter;
