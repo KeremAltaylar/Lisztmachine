@@ -128,7 +128,7 @@ drone     22.0    1000  sfz/Karoryfer_Black_And_Green_Guitars_1000/Programs/wake
 gain drone   6.7  # Kerem's mix: +7.7
 feedback 0.75 0.99  # Kerem's mix
 feed riff   0.69
-feed bass   0.49
+feed bass   0.0   # 2026-11-22 (Kerem: the feedback "loses the pitch, at a noise"): the Growlybass's grit was the loop's noise (Requiem: flatness .136 -> .053, level -0.4 dB)
 feed drone  0.65
 return feedback 6.3
 

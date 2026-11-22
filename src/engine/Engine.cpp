@@ -2719,6 +2719,8 @@ void FeedbackBus::prepare(double sr)
     lpA_ = 1.0f - std::exp(-juce::MathConstants<float>::twoPi * 3500.0f / float(sr));
     hpA_ = 1.0f - std::exp(-juce::MathConstants<float>::twoPi * 70.0f / float(sr));
     lpL_ = lpR_ = hpL_ = hpR_ = 0;
+    env_ = 0;
+    envRel_ = std::exp(-1.0f / (0.5f * float(sr)));
 }
 
 void FeedbackBus::process(float* left, float* right, int n)
@@ -2731,8 +2733,13 @@ void FeedbackBus::process(float* left, float* right, int n)
         const float el = l_[size_t(rd)], er = r_[size_t(rd)];
         lpL_ += (er - lpL_) * lpA_;  lpR_ += (el - lpR_) * lpA_;
         hpL_ += (lpL_ - hpL_) * hpA_; hpR_ += (lpR_ - hpR_) * hpA_;
-        l_[size_t(w_)] = 0.5f * (left[i] + right[i]) + clip(fb_ * (lpL_ - hpL_)); // ping-pong: left feeds right feeds left
-        r_[size_t(w_)] = clip(fb_ * (lpR_ - hpR_));
+        // Kerem (2026-11-22): in Hollow Wake the feedback "loses the pitch, feedback at a noise": at 0.99 the loop sat in
+        // the clip at every peak, and the clip's distortion, fed back again and again, became noise. A limiter in the
+        // loop keeps it under the clip (0.2, where the tanh is still nearly straight): as long, but pitched.
+        env_ = juce::jmax(std::abs(el), std::abs(er), env_ * envRel_);
+        const float g = fb_ * (env_ > 0.2f ? 0.2f / env_ : 1.0f);
+        l_[size_t(w_)] = 0.5f * (left[i] + right[i]) + clip(g * (lpL_ - hpL_)); // ping-pong: left feeds right feeds left
+        r_[size_t(w_)] = clip(g * (lpR_ - hpR_));
         left[i] = el;
         right[i] = er;
         w_ = (w_ + 1) % size;

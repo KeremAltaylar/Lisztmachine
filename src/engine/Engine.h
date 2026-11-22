@@ -177,6 +177,7 @@ private:
     double sr_ = 48000;
     int w_ = 0, d_ = 1;
     float fb_ = 0, lpL_ = 0, lpR_ = 0, hpL_ = 0, hpR_ = 0, lpA_ = 0.4f, hpA_ = 0.02f;
+    float env_ = 0, envRel_ = 0.9999f; // the loop's level (peak, half-second release): the in-loop limiter
 };
 
 // The shared buses. Delay times are set from the tempo when a concert starts.
