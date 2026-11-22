@@ -156,3 +156,6 @@ drone     22.9    1000  sfz/Karoryfer_Black_And_Green_Guitars_1000/Programs/sain
 # the arpeggio on Surge Harmonics 1 (held C4: pitch 4 cents, beating 10 %), the soloist the orchestra's choir
 arp      12.0    1004  Plucks/Harmonics 1  # Kerem 2026-11-21: louder (was 7.0, -25.5 dB rms over the song)
 lead     21.0    1812  sfz/Virtual-Playing-Orchestra3/Vocals/choir-MIXED-sustain.sfz  # Kerem 2026-11-21: louder (was 17.0, -17.8 dB rms over the song)
+
+# the drum pad (input 2): its own voice at this song's level, 5 dB under the summit's mix (2026-11-22)
+drumpad -0.6

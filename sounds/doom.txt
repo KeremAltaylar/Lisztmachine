@@ -129,3 +129,6 @@ delay lead 0.75 0.35 0.22
 # crowded"): the low hits, an eight-bar sentence (Sentence, Composer.h) on the engine's frame drum
 boom    -1.0    1000  internal/boom  # about 4 dB under the 808, +3 under the guitars
 
+
+# the drum pad (input 2): its own voice at this song's level, 5 dB under the summit's mix (2026-11-22)
+drumpad -1.7

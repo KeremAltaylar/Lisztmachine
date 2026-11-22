@@ -91,15 +91,15 @@ public:
         auto saved = props.getUserSettings()->getXmlValue("audio");
         deviceManager.initialise(2, 4, saved.get(), true);
         // Kerem (2026-11-22): a delay between his drum pad hit and its note. The buffer is most of it (JUCE's Core Audio
-        // default 512 = 10.7 ms in + 10.7 ms out at 48 kHz): ask once for 128 (2.7 + 2.7 ms); Audio settings can raise it
-        // again if the Mac crackles, and that choice is kept
-        if (!props.getUserSettings()->getBoolValue("buffer128", false))
+        // default 512 = 10.7 ms in + 10.7 ms out at 48 kHz). 128 (2026-11-22) left the Mac crackling ("clipping in Hollow
+        // Wake"): ask once for 256 (5.3 + 5.3 ms); Audio settings can change it, and that choice is kept
+        if (!props.getUserSettings()->getBoolValue("buffer256", false))
         {
-            props.getUserSettings()->setValue("buffer128", true);
+            props.getUserSettings()->setValue("buffer256", true);
             auto setup = deviceManager.getAudioDeviceSetup();
-            if (auto* d = deviceManager.getCurrentAudioDevice(); d && d->getCurrentBufferSizeSamples() > 128 && d->getAvailableBufferSizes().contains(128))
+            if (auto* d = deviceManager.getCurrentAudioDevice(); d && d->getCurrentBufferSizeSamples() != 256 && d->getAvailableBufferSizes().contains(256))
             {
-                setup.bufferSize = 128;
+                setup.bufferSize = 256;
                 deviceManager.setAudioDeviceSetup(setup, true);
                 if (auto xml = deviceManager.createStateXml()) props.getUserSettings()->setValue("audio", xml.get());
             }
@@ -861,6 +861,7 @@ private:
                        + ",\"padThr\":" + juce::String(onset.thr.load(), 5) + ",\"pad2Thr\":" + juce::String(pad2.thr.load(), 5)
                        + ",\"padVol\":" + juce::String(padDb, 1) + ",\"kickIn\":" + juce::String(kickIn.load()) + ",\"padIn\":" + juce::String(padIn.load())
                        + ",\"inputs\":" + juce::String(numInputs.load()) + ",\"inDev\":" + juce::JSON::toString(inputName) + ",\"version\":\"" LISZT_COMMIT "\",\"padSound\":" + juce::JSON::toString(engine ? engine->padInfo() : juce::String())
+                       + ",\"buffer\":" + juce::String(loadedBlock) + ",\"xruns\":" + juce::String(deviceManager.getXRunCount())
                        + ",\"error\":" + juce::JSON::toString(error) + ",\"scenes\":[";
         for (int i = 0; i < int(std::size(kScenes)); ++i) j << "[\"" << kScenes[i] << "\"," << juce::JSON::toString(juce::String::fromUTF8(kSceneTitles[i])) << "],";
         for (int i = 0; i < int(std::size(kNewScenes)); ++i) j << "[\"" << kNewScenes[i] << "\"," << juce::JSON::toString(juce::String::fromUTF8(kNewTitles[i])) << "],";

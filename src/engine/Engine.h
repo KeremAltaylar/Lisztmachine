@@ -65,7 +65,8 @@ struct Palette
     float sends[kMaxTracks][2];         // "send <track>|all delay|reverb amount": over the scene's sends; -1 keeps them
     float shimmer = 0;                  // "shimmer amount": the reverb also fed an octave up
     juce::String padPatch;              // "drumpad gainDb Category/Patch": the Surge sound the drum pad (input 2) plays;
-    float padGainDb = 0;                // none: one of the song's own keys, bells or plucks (Engine::load)
+    float padGainDb = 0;
+    bool padGainSet = false;            // a 'drumpad' line set the level (with or without a patch)                // none: one of the song's own keys, bells or plucks (Engine::load)
     // Lines: "part gain bright Category/Patch" (a Surge patch, or internal/click|blip|sub),
     // "voices ..." for every track of the voice group, "gain ...", "delay ...".
     juce::String load(const juce::File& file, const std::string& scene = "berlin"); // returns an error or empty

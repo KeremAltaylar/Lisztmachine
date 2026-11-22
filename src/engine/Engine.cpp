@@ -806,6 +806,7 @@ juce::String Palette::load(const juce::File& file, const std::string& sceneName)
     shimmer = 0;
     padPatch = {};
     padGainDb = 0;
+    padGainSet = false;
     if (!file.existsAsFile()) return "no palette at " + file.getFullPathName();
 
     juce::StringArray lines;
@@ -818,9 +819,10 @@ juce::String Palette::load(const juce::File& file, const std::string& sceneName)
         tokens.removeEmptyStrings();
         const auto where = file.getFileName() + " line " + juce::String(n + 1) + ": ";
         if (tokens[0] == "master" && tokens.size() >= 2) { masterDb = tokens[1].getFloatValue(); continue; }
-        if (tokens[0] == "drumpad" && tokens.size() >= 3)
+        if (tokens[0] == "drumpad" && tokens.size() >= 2) // "drumpad <dB>": the pad's own voice at this song's level
         {
             padGainDb = tokens[1].getFloatValue();
+            padGainSet = true;
             padPatch = line.trim().fromFirstOccurrenceOf(" ", false, false).trim().fromFirstOccurrenceOf(" ", false, false).trim();
             continue;
         }
@@ -1110,7 +1112,7 @@ juce::String Engine::load(double sampleRate, int maxBlock, const Palette& palett
     // song, so it stands apart from the song's synths (2026-11-20; measured in tune, pitch spread 6 cents)
     pad_ = {};
     pad_.patch = palette.padPatch.isNotEmpty() ? palette.padPatch : juce::String(kPadVoice);
-    float padDb = palette.padPatch.isNotEmpty() ? palette.padGainDb : kPadVoiceDb;
+    float padDb = palette.padGainSet ? palette.padGainDb : kPadVoiceDb;
     if (pad_.patch.isNotEmpty())
     {
         guarded([&] {
@@ -1814,9 +1816,7 @@ void Engine::renderChunk(float* const* out, int numChannels, int offset, int len
         {
             const float* x = view.getReadPointer(juce::jmin(c, view.getNumChannels() - 1));
             for (int n = 0; n < len; ++n) sq += double(x[n] * g) * double(x[n] * g);
-            juce::FloatVectorOperations::addWithMultiply(pa[c], x, g, len);
-            juce::FloatVectorOperations::addWithMultiply(reverbIn.getWritePointer(c), x, 0.5f * g, len); // no delay (Kerem, 2026-11-20)
-        }
+        } // mixed in after the master effects, below
         padSq = padSq.load() + sq;
         padN = padN.load() + 2 * len;
     }
@@ -1880,6 +1880,12 @@ void Engine::renderChunk(float* const* out, int numChannels, int offset, int len
     }
 
     if (numChannels > 1) masterFx.process(pa[0], pa[1], len, composer_ ? composer_->bpm() : 120.0);
+    // the drum pad straight to the master, dry: no song echo, reverb or feedback, no master drive or delay (Kerem,
+    // 2026-11-22: "I don't want the drum hits to be affected by the general feedback")
+    if (pad_.plugin)
+        for (int c = 0; c < 2; ++c)
+            juce::FloatVectorOperations::addWithMultiply(pa[c], pad_.buf.getReadPointer(juce::jmin(c, pad_.buf.getNumChannels() - 1)),
+                                                         pad_.gain * padLevel.load(), len);
     if (mixStage && numChannels > 1) glue.process(pa[0], pa[1], len);
     float pre = 0;
     for (int c = 0; c < 2; ++c)

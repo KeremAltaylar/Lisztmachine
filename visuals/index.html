@@ -3231,7 +3231,7 @@ registerProcessor('master-fx', MasterFx);`;
     if (!pad.on) return;
     const kin = LIVE?.app?.kickIn ?? 0, pin = LIVE?.app?.padIn ?? 1;
     if (LIVE?.app && !LIVE.app.inputs) { el.textContent = 'App ' + (LIVE.app.version || 'old') + ' · the app has no input device: in its Audio settings, set Input to the Apollo'; return; }
-    el.textContent = (LIVE ? 'App ' + (LIVE.app?.version || 'old') + ' · ' : '') + (LIVE?.app?.inDev ? LIVE.app.inDev + ' · ' : '') + (LIVE ? (kin < 0 ? 'Kick off' : 'Kick on input ' + (kin + 1)) + ' · ' : 'On · input ') + dB(pad.meter).toFixed(0) + ' dB · threshold ' + dB(pad.thr).toFixed(0) + ' dB ( [ ] )' + (pad.lit > 0 ? '  ●' : '')
+    el.textContent = (LIVE ? 'App ' + (LIVE.app?.version || 'old') + ' · ' : '') + (LIVE?.app?.buffer ? 'buffer ' + LIVE.app.buffer + ' · dropouts ' + (LIVE.app.xruns ?? '?') + ' · ' : '') + (LIVE?.app?.inDev ? LIVE.app.inDev + ' · ' : '') + (LIVE ? (kin < 0 ? 'Kick off' : 'Kick on input ' + (kin + 1)) + ' · ' : 'On · input ') + dB(pad.meter).toFixed(0) + ' dB · threshold ' + dB(pad.thr).toFixed(0) + ' dB ( [ ] )' + (pad.lit > 0 ? '  ●' : '')
       + (LIVE && pad.in2 != null ? '   |   ' + (pin < 0 ? 'Drum pad off' : 'Drum pad on input ' + (pin + 1)) + ' · ' + dB(pad.in2).toFixed(0) + ' dB · threshold ' + dB(LIVE.app?.pad2Thr ?? 0.02).toFixed(0) + ' dB ( { } )' + (pad.lit2 > 0 ? '  ●' : '') : '');
     if (pad.lit2 > 0) pad.lit2--;
     if (pad.lit > 0) pad.lit--;

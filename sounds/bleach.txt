@@ -91,3 +91,6 @@ duck body    0
 # Kerem (2026-11-21): "saturate the break rhythm and compress it a little"
 drive body  0.55 6500
 comp body -26 3 15 90 0.6  # Kerem: sharper transients: a slow attack lets each hit through before it squeezes
+
+# the drum pad (input 2): its own voice at this song's level, 5 dB under the summit's mix (2026-11-22)
+drumpad 1.1
