@@ -885,7 +885,10 @@ fn padLayer(uv: vec2f) -> vec4f {
   c = mix(c, vec3f(l) * tone / max(luma(tone), 1e-3), post.lo.w);
   let nl = luma(c);                                                          // the pad's note: its colour in the picture's own light
   c = mix(c, nl * hueOf(post.note.z) * 1.6, rg.z);
-  c = aces(c);
+  // the highlights keep their colour: the curve on the brightness, the hue carried (per channel alone, every bright
+  // colour went to the same white; Kerem 2026-11-22: "crowded, they lose their details, to white")
+  let lc = luma(c);
+  c = mix(aces(c), min(c * (aces(vec3f(lc)).x / max(lc, 1e-4)), vec3f(1.0)), 0.6);
   let q = i.uv - 0.5;
   c *= 1.0 - dot(q, q) * 0.55;
   c = oetf(c);
@@ -3442,6 +3445,16 @@ registerProcessor('master-fx', MasterFx);`;
       WB.busy = false;
     }).catch(() => { WB.busy = false; });
   }
+  // Exposure follows the frame (Kerem, 2026-11-22: crowded frames went white): above an average light of 0.12 it comes
+  // down, gliding over about a second (a cut does not pump); the dark stays as dark, nothing is brightened
+  const AE = { gain: 1, target: 0.12 };
+  function autoExposure(dt) {
+    const a = WB.avg, l = 0.2126 * a[0] + 0.7152 * a[1] + 0.0722 * a[2];
+    const want = l > AE.target ? Math.max(0.3, Math.pow(AE.target / l, 0.8)) : 1;
+    AE.gain += (want - AE.gain) * (1 - Math.exp(-dt / (want < AE.gain ? 0.6 : 1.5)));
+    return AE.gain;
+  }
+  window.__ae = () => ({ ...AE });
   function whiteBalance(dt) {
     const a = WB.avg, l = 0.2126 * a[0] + 0.7152 * a[1] + 0.0722 * a[2], amt = LOOK.wb / 100;
     const k = 1 - Math.exp(-dt / 1.2);
@@ -3855,10 +3868,10 @@ registerProcessor('master-fx', MasterFx);`;
     device.queue.writeBuffer(postIn, 0, Udata);
     device.queue.writeBuffer(mixU, 0, M);
     const b = next ?? study;
-    const W = piece.world, wb = whiteBalance(dt);
+    const W = piece.world, wb = whiteBalance(dt), ae = autoExposure(dt);
     const on = bodyNow[8], warm = bodyNow[5], hot = W.palette[2];
     const hi = W.hi.map((x, k) => x + (hot[k] - x) * warm), lo = W.lo.map((x, k) => x + (hot[k] * 0.6 - x) * warm * 0.5);
-    device.queue.writeBuffer(postU, 0, new Float32Array([on ? (bodyNow[11] ? 0.55 + 0.7 * bodyNow[0] + 0.25 * bodyNow[9] : 0.35 + 1.15 * bodyNow[0] + 0.4 * bodyNow[9]) : 1.0,   // the whole-frame studies are bright already: a narrower range
+    device.queue.writeBuffer(postU, 0, new Float32Array([on ? (bodyNow[11] ? 0.55 + 0.7 * bodyNow[0] + 0.25 * bodyNow[9] : 0.35 + 1.15 * bodyNow[0] + 0.4 * bodyNow[9]) * ae : ae,   // the whole-frame studies are bright already: a narrower range
       study.bloom + (b.bloom - study.bloom) * blend + (bodyNow[11] ? 0.15 : 0.3) * bodyNow[10], 0.05, 1,
       ...wb, 0, ...lo, 0.85 * LOOK.colour / 100 + 0.5 * warm, ...hi, 0, ...padNote()]));
     fbi = 1 - fbi;
