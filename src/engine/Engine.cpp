@@ -999,9 +999,9 @@ juce::String Palette::load(const juce::File& file, const std::string& sceneName)
 
 // What the visuals follow, for a song (the renderer's show.json without its levels; the app sends it live): its tempo,
 // key, sections, voices and every note with its role.
-juce::String showHead(const std::string& sceneName, uint64_t seed, double blockRate)
+juce::String showHead(const std::string& sceneName, uint64_t seed, double blockRate, double silence, double seedSeconds)
 {
-    auto cp = makeComposer(sceneName, seed);
+    auto cp = makeComposer(sceneName, seed, silence, seedSeconds);
     auto& c = *cp;
     std::vector<Event> ev;
     for (int b = 0; b < c.totalBars(); ++b) c.generateBar(b, ev);
@@ -1376,7 +1376,7 @@ juce::String Engine::currentPatch(int track) const
 
 void Engine::start(uint64_t seed, int startBar, bool play)
 {
-    auto next = makeComposer(scene, seed);
+    auto next = makeComposer(scene, seed, silence, seedSeconds);
     startBar = juce::jlimit(0, next->totalBars() - 1, startBar);
 
     // Starting later: compose the bars before it silently (the sequences mutate as they go,
@@ -2009,6 +2009,12 @@ void Engine::renderChunk(float* const* out, int numChannels, int offset, int len
     peakPre = juce::jmax(peakPre.load(), pre);
 
     if (numChannels > 1) limiter.process(pa[0], pa[1], len);
+    if (const float r = fadeStep_.load(); r > 0) // fadeOut(): an exponential fall, then silence
+        for (int n = 0; n < len; ++n)
+        {
+            fade_ = fade_ * r < 0.001f ? 0.0f : fade_ * r;
+            for (int c = 0; c < juce::jmin(2, numChannels); ++c) pa[c][n] *= fade_;
+        }
     float post = 0;
     for (int c = 0; c < juce::jmin(2, numChannels); ++c)
         post = juce::jmax(post, juce::FloatVectorOperations::findMaximum(pa[c], len), -juce::FloatVectorOperations::findMinimum(pa[c], len));

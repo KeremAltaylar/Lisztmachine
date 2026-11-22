@@ -294,21 +294,26 @@ static bool gStems = false;                  // --stems: also <out>.<track>.wav 
 // started at k's Release so that the click, gliding over 24-40 s, lands on its first beat after its Seed; k rings out
 // under it in a second engine until it finishes. Writes the whole chain to one WAV, the click to <out>.click.wav and
 // <out>.chain.json (each song's start in the file, its plan), for checking the changeovers.
-static int renderChain(uint64_t seed, int songs, const juce::File& out)
-{
+static int renderChain(uint64_t seed, int songs, const juce::File& out, bool concert)
+{   // concert: the whole concert as the app plays it (kConcert, its solo and its long changes), else Improvisation's chain
     const double sr = 48000;
     const int block = 512;
     auto build = [&](int k) -> std::unique_ptr<Engine> {
         Palette palette;
-        const auto sc = "improv/" + std::to_string(k);
-        if (auto e = palette.load(writeImprovPalette(seed, k), sc); e.isNotEmpty()) { std::cerr << e << "\n"; return nullptr; }
+        const std::string sc = concert ? kConcert[k].scene : "improv/" + std::to_string(k);
+        if (auto e = palette.load(concert ? findPalette(sc) : writeImprovPalette(seed, k), sc); e.isNotEmpty()) { std::cerr << e << "\n"; return nullptr; }
         auto e = std::make_unique<Engine>();
+        e->parallel = !gSerial;
         e->scene = sc;
+        if (concert && k == 0) e->silence = kConcertSolo;
+        if (concert && kConcert[k].longIn) e->seedSeconds = kLongChange;
         if (auto err = e->load(sr, block, palette); err.isNotEmpty()) { std::cerr << err << "\n"; return nullptr; }
         e->start(seed, 0, false);
         return e;
     };
-    auto changeTime = [](const Composer& c) { return c.sections().back().startBar * 240.0 / c.bpm(); };
+    int k = 0;
+    auto overlap = [&] { return !concert || (k + 1 < songs && kConcert[k + 1].longIn); }; // into the next song: a long change
+    auto changeTime = [&](const Composer& c) { return overlap() ? c.sections().back().startBar * 240.0 / c.bpm() : c.totalBars() * 240.0 / c.bpm() + 2.0; };
     auto seedSeconds = [](const Composer& c) { return c.sections().front().bars * 240.0 / c.bpm(); };
 
     out.deleteFile();
@@ -328,12 +333,13 @@ static int renderChain(uint64_t seed, int songs, const juce::File& out)
     cur->go();
     juce::String json = "{\"seed\":" + juce::String(int64_t(seed)) + ",\"songs\":[";
     auto note = [&](int k, int64_t at) {
-        json << (k ? "," : "") << "{\"t\":" << juce::String(double(at) / sr, 3) << ",\"plan\":" << juce::String(improvJson(improvSong(seed, k))) << "}";
+        json << (k ? "," : "") << "{\"t\":" << juce::String(double(at) / sr, 3) << ",\"plan\":" << (concert ? juce::JSON::toString(kConcert[k].title) : juce::String(improvJson(improvSong(seed, k)))) << "}";
         std::cout << juce::String(double(at) / sr, 1) << " s  song " << k << ": " << cur->composer()->describe() << "\n";
     };
     note(0, 0);
     juce::AudioBuffer<float> buf(3, block), tmp(3, block);
-    int k = 0;
+    if (concert && cur->composer()->sections().size() > 1) // the solo: the click counts in on its last bar
+        cur->clickFrom = std::llround((cur->composer()->sections()[1].startBar - 1) * 240.0 / cur->composer()->bpm() * sr);
     int64_t done = 0, startAt = 0;
     float peak = 0;
     bool armed = false;
@@ -342,10 +348,11 @@ static int renderChain(uint64_t seed, int songs, const juce::File& out)
         if (!next && k + 1 < songs && cur->seconds.load() > 2.0) next = build(k + 1);   // the app does this on a thread
         if (next && !armed && cur->isPlaying()) // the glide, and where the next song starts (the app's improvise())
         {
-            const double seed = seedSeconds(*next->composer());
-            cur->glideClick(next->composer()->bpm(), changeTime(*cur->composer()) + seed, 24, 40);
+            const double seed = overlap() ? seedSeconds(*next->composer()) : 0.0;
+            if (overlap()) cur->glideClick(next->composer()->bpm(), changeTime(*cur->composer()) + seed, 24, 40);
+            else cur->glideClick(next->composer()->bpm(), changeTime(*cur->composer()));
             const int64_t seedSamples = std::llround(seed * sr);
-            next->clickFrom = seedSamples - 16;
+            next->clickFrom = seedSamples > 0 ? seedSamples - 16 : 0;
             startAt = cur->landing() - seedSamples - next->preRollSamples();
             armed = true;
         }
@@ -353,6 +360,7 @@ static int renderChain(uint64_t seed, int songs, const juce::File& out)
         {
             next->goIn(cur->isPlaying() ? juce::jmax<int64_t>(0, startAt - cur->position()) : 0);
             if (!cur->gliding()) cur->clickLevel = 0;
+            if (concert && overlap()) cur->fadeOut(12); // as the app: a long change, the old song fades from under the Seed
             old = cur->isFinished() ? nullptr : std::move(cur);
             cur = std::move(next);
             armed = false;
@@ -547,6 +555,19 @@ int main(int argc, char** argv)
     gStems = args.contains("--stems");
     if (int i = args.indexOf("--pad-every"); i >= 0) gPadEvery = args[i + 1].getDoubleValue();
     if (int i = args.indexOf("--block"); i >= 0) gBlock = juce::jlimit(32, 4096, args[i + 1].getIntValue());
+    if (args[0] == "--plan") // --plan <scene>...: each song's parts and length, no sound (planning the concert)
+    {
+        const uint64_t seed = args.contains("--seed") ? uint64_t(args[args.indexOf("--seed") + 1].getLargeIntValue()) : 1;
+        for (int i = 1; i < args.size(); ++i)
+        {
+            if (args[i] == "--seed") { ++i; continue; }
+            auto c = makeComposer(args[i].toStdString(), seed);
+            std::cout << args[i] << " | " << c->describe() << " |";
+            for (auto& s : c->sections()) std::cout << " " << s.name << " " << s.bars;
+            std::cout << "\n";
+        }
+        return 0;
+    }
     if (args[0] == "--probe") return probe(args[1], args[2], args[3]); // --probe <vst3> [names,to,match] [Category/Patch]
     if (args[0] == "--test-echo") // one impulse through a track's echo: where each repeat lands and how loud
     {
@@ -618,6 +639,7 @@ int main(int argc, char** argv)
         out.withFileExtension("plan.json").replaceWithText(improvJson(song));
         std::cout << improvJson(song) << "\n";
     }
-    if (int i = args.indexOf("--chain"); i >= 0) return renderChain(seed, args[i + 1].getIntValue(), out); // with --scene improv
+    if (int i = args.indexOf("--chain"); i >= 0) // with --scene improv, or --scene concert (the whole set, at most its length)
+        return renderChain(seed, sceneName == "concert" ? juce::jmin(args[i + 1].getIntValue(), int(std::size(kConcert))) : args[i + 1].getIntValue(), out, sceneName == "concert");
     return renderConcert(seed, seconds, out, solo, patches, args.contains("--dry"), from, bars);
 }

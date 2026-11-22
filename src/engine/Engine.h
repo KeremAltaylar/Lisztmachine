@@ -83,7 +83,7 @@ inline float ceilingClip(float x)
     return a <= k ? x : std::copysign(k + (top - k) * std::tanh((a - k) / (top - k)), x);
 }
 // A song's show for the visuals, through its notes (JSON without the closing brace): what liszt_render writes, and the app sends live
-juce::String showHead(const std::string& scene, uint64_t seed, double levelRate);
+juce::String showHead(const std::string& scene, uint64_t seed, double levelRate, double silence = 0, double seedSeconds = 0);
 
 // When each part changes sound, and to which palette entry.
 struct SoundChange { int bar, track, entry; };
@@ -394,6 +394,11 @@ public:
     // play = false: everything made ready (the composer, the first sounds loaded) but silent until go()
     void start(uint64_t seed, int startBar = 0, bool play = true);
     void go() { panic_ = true; playing_ = true; }
+    // Any thread: the whole song fades to silence over that many seconds (the concert's long change: the old song leaves
+    // the bed to the new one's Seed and Kerem's drums; both at full level summed into the ceiling, 2026-11-22)
+    // -60 dB over `seconds`, exponential: down 10 dB in its first sixth (an equal-power fall stayed full too long, and the
+    // two songs still touched the ceiling)
+    void fadeOut(double seconds) { fadeStep_ = float(std::exp(std::log(0.001) / juce::jmax(0.01, seconds * sampleRate_))); }
     // Audio thread: go(), `delay` samples into the coming block (the whole concert starts each song on the sample its
     // click lands on)
     void goIn(int64_t delay) { pos_ -= delay; go(); }
@@ -419,6 +424,8 @@ public:
     // Audio threads: the tracks render on a few realtime threads besides the audio thread (2026-11-22: one core was not
     // enough for Hollow Wake on the Mac mini, 13 dropouts); false: all on the calling thread (the renderer's --serial)
     bool parallel = true;
+    // Message thread, before start(): the concert's options for this song's composer (makeComposer)
+    double silence = 0, seedSeconds = 0;
     // Message thread: the audio device's workgroup, which the helper threads join (Apple Silicon schedules them with the
     // audio thread, on the performance cores)
     static void setAudioWorkgroup(juce::AudioWorkgroup workgroup);
@@ -576,6 +583,8 @@ private:
         juce::String patch, info;
     } pad_;
     std::atomic<float> padHit_ { 0 };
+    std::atomic<float> fadeStep_ { 0 }; // the fade's factor per sample (0: none)
+    float fade_ = 1;
     int padMask_ = 0; // the chord's pitch classes, bit per class: the last one heard (the key's tonic and fifth before any)
 
     int kickTrack_ = -1;           // its notes duck the others

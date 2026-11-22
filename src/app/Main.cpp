@@ -68,7 +68,7 @@ public:
         // 2026-11-14 (Kerem): Improvisation, endless generated songs (src/core/Improv.cpp), after the songs
         sceneBox.addSeparator();
         sceneBox.addItem("Improvisation", kImprovId);
-        sceneBox.addItem("The whole concert", kConcertId); // 2026-11-14 (Kerem): the nine songs back to back, live
+        sceneBox.addItem("The whole concert", kConcertId); // 2026-11-14 (Kerem): the songs back to back, live (kConcert: the running order of 2026-11-22)
         if (scene == "improv") sceneBox.setSelectedId(kImprovId, juce::dontSendNotification);
         if (scene == "concert") sceneBox.setSelectedId(kConcertId, juce::dontSendNotification);
         if (sceneBox.getSelectedId() == 0) { scene = "berlin"; sceneBox.setSelectedId(1, juce::dontSendNotification); }
@@ -310,7 +310,7 @@ public:
         g.setColour(tok::faint);
         g.setFont(juce::FontOptions(11.0f).withStyle("Bold"));
         const juce::String head = chained() ? juce::String(improv() ? "Improvisation" : "The whole concert") + dot + "song " + juce::String(improvK + 1)
-                                                  + (concert() ? juce::String("/") + juce::String(int(std::size(kScenes))) : juce::String())
+                                                  + (concert() ? juce::String("/") + juce::String(int(std::size(kConcert))) : juce::String())
                                               + (oldEngine ? dot + "changing over" : nextEngine || starting ? dot + "next song ready" : loader ? dot + "writing the next song" : juce::String())
                                            : juce::String(titleOfId(sceneBox.getSelectedId()));
         g.drawText("LISZTMACHINE" + dot + head.toUpperCase(), r.removeFromTop(16), juce::Justification::left);
@@ -475,6 +475,9 @@ private:
             if (chained() && (improvK != 0 || chainSeed != seed || engine->isFinished())) { reload(); if (!engine) return; }
             engine->limiter.maxReductionDb = 0;
             engine->start(uint64_t(seed));
+            // the concert's drum solo: no click until its last bar, which counts him in
+            if (concert() && engine->composer()->sections().size() > 1)
+                engine->clickFrom = std::llround((engine->composer()->sections()[1].startBar - 1) * 240.0 / engine->composer()->bpm() * loadedRate);
             if (chained()) changeAt = changeTime(*engine->composer());
             announce(*engine, improvK);
         }
@@ -655,20 +658,22 @@ private:
     static const char* titleOfId(int id) { return id >= kNewId && id < kNewId + int(std::size(kNewScenes)) ? kNewTitles[id - kNewId] : kSceneTitles[juce::jlimit(1, int(std::size(kScenes)), id) - 1]; }
     static constexpr int kConcertId = 1001;
     bool improv() const { return scene == "improv"; }
-    bool concert() const { return scene == "concert"; }   // the nine songs in order, each loaded while the one before plays
+    bool concert() const { return scene == "concert"; }   // the set (kConcert) in order, each loaded while the one before plays
     bool chained() const { return improv() || concert(); }
     std::string songScene(int k) const
     {
-        return improv() ? "improv/" + std::to_string(k) : concert() ? std::string(kScenes[size_t(k) % std::size(kScenes)]) : scene;
+        return improv() ? "improv/" + std::to_string(k) : concert() ? std::string(kConcert[size_t(k) % std::size(kConcert)].scene) : scene;
     }
     // seconds into a song where the next one begins: Improvisation at its Release (the next song's Seed, ~30 s, sounds
     // under it; Kerem 2026-11-18: "30 seconds or so between songs that they can intersect"); the concert when the song's
     // last bar has ended and two seconds of its tail have rung
     double changeTime(const Composer& c) const
     {
-        if (concert()) return c.totalBars() * 240.0 / c.bpm() + 2.0;
+        if (concert() && !longNext()) return c.totalBars() * 240.0 / c.bpm() + 2.0;
         return c.sections().back().startBar * 240.0 / c.bpm();
     }
+    // the concert's next song comes in by a long change (kConcert: a minute for Kerem's drums, Improvisation's way)
+    bool longNext() const { return concert() && improvK + 1 < int(std::size(kConcert)) && kConcert[size_t(improvK + 1)].longIn; }
     // how long a song's Seed is (Improvisation): its first beat after it is where the click's glide lands
     static double seedSeconds(const Composer& c) { return c.sections().front().bars * 240.0 / c.bpm(); }
     std::unique_ptr<Engine> build(int k, juce::String& err, bool offThread)
@@ -686,6 +691,8 @@ private:
                     const_cast<void*>(static_cast<const void*>(&f)));
             };
         e->scene = sc;
+        if (concert() && k == 0) e->silence = kConcertSolo;                     // the drum solo before Berlin
+        if (concert() && kConcert[size_t(k) % std::size(kConcert)].longIn) e->seedSeconds = kLongChange; // a long change in
         err = e->load(loadedRate, juce::jmax(512, loadedBlock), palette);
         if (err.isNotEmpty()) return nullptr;
         return e;
@@ -732,15 +739,16 @@ private:
         if (loader && !loader->isThreadRunning()) loader.reset();
         graveyard.erase(std::remove_if(graveyard.begin(), graveyard.end(), [](auto& t) { return !t->isThreadRunning(); }), graveyard.end());
         const bool going = engine->isPlaying() || engine->isFinished();
-        const bool more = !concert() || improvK + 1 < int(std::size(kScenes)); // the concert ends after its ninth song
+        const bool more = !concert() || improvK + 1 < int(std::size(kConcert)); // the concert ends after its last song
         if (going && more && !loader && !nextEngine && !starting && engine->seconds.load() > 2.0) prepareNext();
         // the click glides into the next song's tempo and the audio thread starts that song so the glide lands on its
         // first beat: the concert's at its bar 0, over 12-24 s; Improvisation's after its Seed, which starts at this song's
         // Release, over 24-40 s while the two songs overlap (the new song's own click waits for the end of its Seed)
         if (nextEngine && !starting && engine->isPlaying())
         {
-            const double seed = improv() ? seedSeconds(*nextEngine->composer()) : 0.0;
-            if (improv()) engine->glideClick(nextEngine->composer()->bpm(), changeAt + seed, 24, 40);
+            const bool overlap = improv() || longNext();
+            const double seed = overlap ? seedSeconds(*nextEngine->composer()) : 0.0;
+            if (overlap) engine->glideClick(nextEngine->composer()->bpm(), changeAt + seed, 24, 40);
             else engine->glideClick(nextEngine->composer()->bpm(), changeAt);
             const int64_t seedSamples = std::llround(seed * loadedRate);
             nextEngine->clickFrom = seedSamples > 0 ? seedSamples - 16 : 0;
@@ -765,6 +773,7 @@ private:
         std::unique_ptr<Engine> gone;
         const bool started = starting != nullptr; // already started by the audio thread
         if (!started || !engine->gliding()) engine->clickLevel = 0; // else its glide clicks on into the new song's first beat
+        if (started && longNext()) engine->fadeOut(12); // a long change: the old song leaves the bed to the new one's Seed
         {
             const juce::SpinLock::ScopedLockType sl(audioLock);
             gone = std::move(oldEngine);
@@ -883,7 +892,7 @@ private:
         if (!e.composer()) return;
         const double at = LiveLink::now() + (head < 1e8 ? -head : double(e.preRollSamples()) / loadedRate) + outLatency();
         juce::MemoryOutputStream j;
-        j << showHead(e.scene, uint64_t(improv() ? chainSeed : seed), 20.0) << ",\"at\":" << juce::String(at, 4) << ",\"now\":" << juce::String(LiveLink::now(), 4) << ",\"k\":" << k
+        j << showHead(e.scene, uint64_t(improv() ? chainSeed : seed), 20.0, e.silence, e.seedSeconds) << ",\"at\":" << juce::String(at, 4) << ",\"now\":" << juce::String(LiveLink::now(), 4) << ",\"k\":" << k
           << ",\"piece\":\"" << (improv() ? juce::String("improv") : juce::String(e.scene)) << "\"";
         if (improv()) j << ",\"plan\":" << juce::String(improvJson(improvSong(uint64_t(chainSeed), k)));
         j << "}";

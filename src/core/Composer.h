@@ -171,11 +171,24 @@ private:
 
 // A scene by name (kScenes); anything else is Berlin. The genre songs are named for their genre
 // until Kerem names them.
-std::unique_ptr<Composer> makeComposer(const std::string& scene, uint64_t seed);
+// silence: that many seconds of silent bars before the song (the concert's drum solo); seedSeconds: a genre song's
+// first part stretched to about that long (the concert's long changes)
+std::unique_ptr<Composer> makeComposer(const std::string& scene, uint64_t seed, double silence = 0, double seedSeconds = 0);
 inline const char* kScenes[] = { "berlin", "stoner", "jungle", "ecstatic", "noir", "deconstructed", "halftime",
                                  "doom", "blackgaze" };
 inline const char* kSceneTitles[] = { "Berlin", "Working Class Curse", "Liquid", "Ecstatic Arpeggios", "Noir", "Deconstructed Club",
                                       "Halftime", "Doom", "Blackgaze" };
+// The whole concert (Kerem, 2026-11-22): Deconstructed Club out, Hollow Wake in after Liquid, 45 minutes. It opens with
+// two minutes of his drums alone on Berlin's visuals; a long change (longIn) gives him about a minute to improvise:
+// the song begins under the last part of the one before, its first part stretched to a minute (Improvisation's Seed),
+// the click gliding into its tempo. The others change as before.
+struct ConcertSong { const char* scene; const char* title; bool longIn; };
+inline const ConcertSong kConcert[] = { { "berlin", "Berlin", false }, { "stoner", "Working Class Curse", false },
+                                        { "jungle", "Liquid", false }, { "wake", "Hollow Wake", true },
+                                        { "ecstatic", "Ecstatic Arpeggios", false }, { "noir", "Noir", false },
+                                        { "halftime", "Halftime", true }, { "doom", "Doom", true }, { "blackgaze", "Blackgaze", true } };
+constexpr double kConcertSolo = 120;  // seconds of drums alone before Berlin
+constexpr double kLongChange = 60;    // seconds of a long change
 // 2026-11-21: a song in Doom's style (Lantern Wake and Hollow Saint as one), playable on its own, not in the concert yet
 inline const char* kNewScenes[] = { "wake", "bleach" };
 inline const char* kNewTitles[] = { "Hollow Wake", "Bleach" };

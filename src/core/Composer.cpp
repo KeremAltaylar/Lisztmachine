@@ -869,11 +869,65 @@ const SceneInfo& sceneInfo(const std::string& scene)
     return berlin;
 }
 
-std::unique_ptr<Composer> makeComposer(const std::string& scene, uint64_t seed)
+namespace {
+// A song after bars of silence at its own tempo, a part called Solo (the concert's opening: the drums alone, the
+// visuals already the song's). The song itself is composed exactly as without it.
+class AfterSilence : public Composer
 {
-    if (int k; improvScene(scene, k)) return std::make_unique<GenreComposer>(improvSong(seed, k).spec, seed * 7919 + uint64_t(k) + 1);
-    if (auto* g = GenreComposer::find(scene)) return std::make_unique<GenreComposer>(*g, seed);
-    return std::make_unique<BerlinComposer>(seed);
+public:
+    AfterSilence(std::unique_ptr<Composer> song, double seconds) : Composer(0), song_(std::move(song))
+    {
+        bpm_ = song_->bpm();
+        n_ = std::max(1, int(std::lround(seconds * bpm_ / 240.0)));
+        sections_.push_back({ "Solo", 0, n_, 0.0f, 0u, false });
+        for (auto sec : song_->sections()) { sec.startBar += n_; sections_.push_back(sec); }
+        sectionOfBar_.assign(size_t(n_), 0);
+        energyOfBar_.assign(size_t(n_), 0.0f);
+        for (int b = 0; b < song_->totalBars(); ++b)
+        {
+            sectionOfBar_.push_back(1 + int(&song_->sectionAt(b) - song_->sections().data()));
+            energyOfBar_.push_back(song_->energyAt(b));
+        }
+    }
+    void generateBar(int bar, std::vector<Event>& out) override
+    {
+        if (bar < n_) return;
+        const size_t from = out.size();
+        song_->generateBar(bar - n_, out);
+        for (size_t k = from; k < out.size(); ++k) out[k].tick += int64_t(n_) * kBarTicks;
+    }
+    std::string describe() const override { return song_->describe() + " · after " + std::to_string(n_) + " bars of solo"; }
+
+private:
+    std::unique_ptr<Composer> song_;
+    int n_ = 1;
+};
+// A genre song with its own copy of the table (the composer keeps a reference to it): the concert's stretched Seed.
+struct SpecHolder { GenreComposer::Spec spec; };
+class StretchedSeed : private SpecHolder, public GenreComposer
+{
+public:
+    StretchedSeed(const GenreComposer::Spec& s, uint64_t seed) : SpecHolder { s }, GenreComposer(SpecHolder::spec, seed) {}
+};
+} // namespace
+
+std::unique_ptr<Composer> makeComposer(const std::string& scene, uint64_t seed, double silence, double seedSeconds)
+{
+    std::unique_ptr<Composer> c;
+    if (int k; improvScene(scene, k)) c = std::make_unique<GenreComposer>(improvSong(seed, k).spec, seed * 7919 + uint64_t(k) + 1);
+    else if (auto* g = GenreComposer::find(scene))
+    {
+        if (seedSeconds > 0) // the first part about that long, at the song's middle tempo (its own is drawn within a few %)
+        {
+            auto spec = *g;
+            spec.form[0].bars = std::max(spec.form[0].bars, int(std::lround(seedSeconds * 0.5 * (spec.bpmLo + spec.bpmHi) / 240.0)));
+            c = std::make_unique<StretchedSeed>(spec, seed);
+        }
+        else c = std::make_unique<GenreComposer>(*g, seed);
+    }
+    else c = std::make_unique<BerlinComposer>(seed);
+    if (silence > 0) c = std::make_unique<AfterSilence>(std::move(c), silence);
+    return c;
 }
 
 } // namespace liszt
