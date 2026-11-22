@@ -416,6 +416,12 @@ public:
     std::atomic<int> padStruckNote { 60 };
     juce::String padInfo() const { return pad_.patch.isEmpty() ? juce::String("no sound") : pad_.patch + pad_.info + (pad_.plugin ? "" : " (not loaded)"); } // which sound, and anything its envelope refused
     std::atomic<float> padLevel { 1.0f }; // the app's pad volume (gain)
+    // Audio threads: the tracks render on a few realtime threads besides the audio thread (2026-11-22: one core was not
+    // enough for Hollow Wake on the Mac mini, 13 dropouts); false: all on the calling thread (the renderer's --serial)
+    bool parallel = true;
+    // Message thread: the audio device's workgroup, which the helper threads join (Apple Silicon schedules them with the
+    // audio thread, on the performance cores)
+    static void setAudioWorkgroup(juce::AudioWorkgroup workgroup);
     double trackMaxMs[kMaxTracks] = {};   // audio thread: each track's slowest block in ms (read after a render)
     std::atomic<double> padSq { 0 };      // the pad's sum of squares, both channels, for measuring its level
     std::atomic<int64_t> padN { 0 };
@@ -510,7 +516,10 @@ private:
         std::vector<float> wide;
         int wideAt = 0;
         float wideAmount = 0, wideLp = 0;
-        juce::AudioBuffer<float> mix; // the track's slots summed, before the mix stage
+        juce::AudioBuffer<float> mix; // the track's slots summed, before the mix stage; after it, what goes to the buses
+        std::vector<float> gains;     // this block's gain curve (each track its own: the tracks render in parallel)
+        bool out = false;             // this block's sound is in `mix`, ready to be summed
+        float cost = 0;               // how long it takes, smoothed (the heaviest are started first)
     };
     juce::String loadInto(Slot& slot, int track, int entry);
     void guarded(const std::function<void()>& f) { if (onMessageThread) onMessageThread(f); else f(); }
@@ -524,7 +533,6 @@ private:
     int maxBlock_ = 512;
     TrackState tracks_[kMaxTracks];
     int numTracks_ = 4;
-    std::vector<float> gains_;
     Palette palette_;
     std::vector<SoundChange> plan_;
     std::unique_ptr<juce::AudioPluginInstance> delay_, reverb_;

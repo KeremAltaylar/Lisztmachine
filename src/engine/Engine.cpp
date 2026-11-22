@@ -173,6 +173,101 @@ juce::File findSfz(const juce::String& patch)
 }
 
 static std::atomic<bool> offlineRendering { false };
+
+// The track pool: a few realtime threads that render tracks beside the audio thread. The audio thread hands out the
+// block's tracks (the heaviest first), takes some itself, and waits for the rest; nothing allocates or locks on it.
+namespace {
+class TrackPool
+{
+public:
+    static TrackPool& get() { static TrackPool p; return p; }
+    void setWorkgroup(juce::AudioWorkgroup w)
+    {
+        const juce::SpinLock::ScopedLockType sl(wgLock_);
+        wg_ = std::move(w);
+        ++wgGen_;
+    }
+    // Audio thread: job(ctx, order[k]) for k in [0, n), on every thread; returns when all are done.
+    void run(int n, const int* order, void (*job)(void*, int), void* ctx)
+    {
+        start();
+        if (workers_.empty() || n < 2) { for (int k = 0; k < n; ++k) job(ctx, order[k]); return; }
+        job_ = job; ctx_ = ctx; order_ = order; n_ = n;
+        done_.store(0);
+        next_.store(0);
+        gen_.fetch_add(1);
+        gen_.notify_all();
+        drain();
+        while (done_.load() < n) juce::Thread::yield(); // only the tracks another thread has started are left
+    }
+    ~TrackPool()
+    {
+        stop_ = true;
+        gen_.fetch_add(1);
+        gen_.notify_all();
+        for (auto& w : workers_) w->stopThread(2000);
+    }
+
+private:
+    struct Worker : juce::Thread
+    {
+        TrackPool& pool;
+        Worker(TrackPool& p, int k) : juce::Thread("liszt tracks " + juce::String(k)), pool(p) {}
+        void run() override
+        {
+            juce::WorkgroupToken token;
+            int joined = -1;
+            unsigned seen = pool.gen_.load();
+            while (!pool.stop_)
+            {
+                pool.gen_.wait(seen);
+                seen = pool.gen_.load();
+                if (pool.stop_) break;
+                if (const int g = pool.wgGen_.load(); g != joined)
+                {
+                    const juce::SpinLock::ScopedLockType sl(pool.wgLock_);
+                    token.reset();
+                    if (pool.wg_) pool.wg_.join(token);
+                    joined = g;
+                }
+                pool.drain();
+            }
+        }
+    };
+    void start()
+    {
+        if (started_) return;
+        started_ = true; // once, on the first block
+        const int helpers = juce::jlimit(0, 3, juce::SystemStats::getNumPhysicalCpus() - 1);
+        for (int k = 0; k < helpers; ++k)
+        {
+            auto w = std::make_unique<Worker>(*this, k);
+            if (!w->startRealtimeThread(juce::Thread::RealtimeOptions {}.withPriority(10).withApproximateAudioProcessingTime(256, 48000.0)))
+                w->startThread(juce::Thread::Priority::highest);
+            workers_.push_back(std::move(w));
+        }
+    }
+    void drain()
+    {
+        for (int k; (k = next_.fetch_add(1)) < n_.load();)
+        {
+            job_.load()(ctx_.load(), order_.load()[k]);
+            done_.fetch_add(1);
+        }
+    }
+    std::vector<std::unique_ptr<Worker>> workers_;
+    bool started_ = false;
+    std::atomic<bool> stop_ { false };
+    std::atomic<unsigned> gen_ { 0 };
+    std::atomic<int> next_ { 1 << 30 }, done_ { 0 }, n_ { 0 }, wgGen_ { 0 };
+    std::atomic<void (*)(void*, int)> job_ { nullptr };
+    std::atomic<void*> ctx_ { nullptr };
+    std::atomic<const int*> order_ { nullptr };
+    juce::SpinLock wgLock_;
+    juce::AudioWorkgroup wg_;
+};
+} // namespace
+void Engine::setAudioWorkgroup(juce::AudioWorkgroup workgroup) { TrackPool::get().setWorkgroup(std::move(workgroup)); }
 void setOfflineRendering(bool offline) { offlineRendering = offline; }
 
 namespace {
@@ -1036,7 +1131,6 @@ juce::String Engine::load(double sampleRate, int maxBlock, const Palette& palett
     sampleRate_ = sampleRate;
     maxBlock_ = maxBlock;
     palette_ = palette;
-    gains_.assign(size_t(maxBlock), 0);
 
     numTracks_ = palette.info->numTracks;
     scene = palette.scene;
@@ -1061,6 +1155,7 @@ juce::String Engine::load(double sampleRate, int maxBlock, const Palette& palett
         t.lowCut = cut > 0;
         for (auto& f : t.hp) f.highpass(sampleRate, juce::jmax(10.0f, cut));
         t.mix.setSize(2, maxBlock);
+        t.gains.assign(size_t(maxBlock), 0);
         t.drive.prepare(sampleRate, palette.drives[i]);
         t.amp.prepare(sampleRate, palette.amps[i]);
         t.crush.prepare(palette.crushes[i]);
@@ -1628,16 +1723,15 @@ void Engine::renderChunk(float* const* out, int numChannels, int offset, int len
         hushAt_.clear();
     }
 
-    // One track's sound into the mix and the sends: its low cut, width, pan and duck, then its gain.
+    // One track's mix stage: its low cut, width, pan and duck, then its gain, into its own `mix` (summed into the mix and
+    // the sends below, in track order, once every track is done)
     auto mixTrack = [&](int i, const float* L, const float* R) {
         auto& t = tracks_[i];
-        const float sends[2] = { palette_.sends[i][0] >= 0 ? palette_.sends[i][0] : palette_.info->sends[i][0],
-                                 palette_.sends[i][1] >= 0 ? palette_.sends[i][1] : palette_.info->sends[i][1] };
         float peak = 0;
         double sq = 0;
         for (int n = 0; n < len; ++n)
         {
-            float l = L[n], r = R[n], g = gains_[size_t(n)] * t.trim;
+            float l = L[n], r = R[n], g = t.gains[size_t(n)] * t.trim;
             if (mixStage)
             {
                 if (t.drive.on()) { l = t.drive.process(l, 0); r = t.drive.process(r, 1); }
@@ -1677,10 +1771,7 @@ void Engine::renderChunk(float* const* out, int numChannels, int offset, int len
             if (stemOut) { st[2 * i][n] = x[0]; st[2 * i + 1][n] = x[1]; }
             for (int c = 0; c < 2; ++c)
             {
-                pa[c][n] += x[c];
-                delayIn.getWritePointer(c)[n] += x[c] * sends[0];
-                reverbIn.getWritePointer(c)[n] += x[c] * sends[1];
-                fbIn[c][n] += x[c] * palette_.feeds[i];
+                t.mix.getWritePointer(c)[n] = x[c]; // L, R may be this buffer: sample n is read above, before it is written
                 peak = juce::jmax(peak, std::abs(x[c]));
                 sq += double(x[c]) * x[c];
             }
@@ -1688,20 +1779,21 @@ void Engine::renderChunk(float* const* out, int numChannels, int offset, int len
         meters[i].peak = juce::jmax(meters[i].peak.load(), peak);
         meters[i].sumSquares = meters[i].sumSquares.load() + sq;
         meters[i].samples = meters[i].samples.load() + 2 * len;
+        t.out = true;
     };
 
-    for (int i = 0; i < numTracks_; ++i)
-    {
-        struct Timed { double& worst; int64_t t0 = juce::Time::getHighResolutionTicks();   // each track's slowest block (the renderer's --live)
-                       ~Timed() { worst = juce::jmax(worst, juce::Time::highResolutionTicksToSeconds(juce::Time::getHighResolutionTicks() - t0) * 1000.0); } } timed { trackMaxMs[i] };
+    auto renderTrack = [&](int i) {
         auto& t = tracks_[i];
+        struct Timed { double& worst; float& cost; int64_t t0 = juce::Time::getHighResolutionTicks(); // each track's slowest block (--live) and its cost
+                       ~Timed() { const double ms = juce::Time::highResolutionTicksToSeconds(juce::Time::getHighResolutionTicks() - t0) * 1000.0;
+                                  worst = juce::jmax(worst, ms); cost += 0.05f * (float(ms) - cost); } } timed { trackMaxMs[i], t.cost };
         // Glide the filter towards its target over about a quarter second (a wobbling bass: its own `glide`).
         t.filterNow += (t.filterTarget - t.filterNow) * juce::jmin(1.0f, float(len / (t.glide * sampleRate_)));
         // A kept track sounds on through a silence, 7 dB down (14 in a soft one, the hole); where the tails ring,
         // a track's own echo is silenced at its input instead of its output, so what it already holds rings on.
         const bool kept = (hushKeep_ >> i) & 1, preEcho = hushTails_ && t.hasEcho && !kept;
         const float floor = hushSoft_ ? 0.2f : 0.45f;
-        for (int n = 0; n < len; ++n) gains_[size_t(n)] = t.gain.getNextValue() * (kept ? floor + (1 - floor) * hushCurve_[size_t(n)] : preEcho ? ringCurve_[size_t(n)] : hushCurve_[size_t(n)]);
+        for (int n = 0; n < len; ++n) t.gains[size_t(n)] = t.gain.getNextValue() * (kept ? floor + (1 - floor) * hushCurve_[size_t(n)] : preEcho ? ringCurve_[size_t(n)] : hushCurve_[size_t(n)]);
         auto echo = [&](float* l, float* r) {
             if (preEcho) { juce::FloatVectorOperations::multiply(l, hushCurve_.data(), len); juce::FloatVectorOperations::multiply(r, hushCurve_.data(), len); }
             t.echo.process(l, r, len);
@@ -1713,7 +1805,7 @@ void Engine::renderChunk(float* const* out, int numChannels, int offset, int len
                 slot.midi.clear();
                 if (slot.state.load() == Tail) slot.state = Idle;
             }
-            continue;
+            return;
         }
 
         if (t.internal)
@@ -1725,7 +1817,7 @@ void Engine::renderChunk(float* const* out, int numChannels, int offset, int len
             if (t.hasEcho) echo(t.buffer.getWritePointer(0), t.buffer.getWritePointer(1));
             for (int c = 0; c < 2; ++c) juce::FloatVectorOperations::multiply(t.buffer.getWritePointer(c), slot.gain, len);
             mixTrack(i, t.buffer.getReadPointer(0), t.buffer.getReadPointer(1));
-            continue;
+            return;
         }
         t.mix.clear(0, 0, len);
         t.mix.clear(1, 0, len);
@@ -1775,6 +1867,28 @@ void Engine::renderChunk(float* const* out, int numChannels, int offset, int len
         // sound's slot then carried the echo, never fell quiet, and the track sat 11 dB hot for 20 s).
         if (t.hasEcho) echo(t.mix.getWritePointer(0), t.mix.getWritePointer(1));
         mixTrack(i, t.mix.getReadPointer(0), t.mix.getReadPointer(1));
+    };
+    int order[kMaxTracks];
+    for (int i = 0; i < numTracks_; ++i) { order[i] = i; tracks_[i].out = false; }
+    std::sort(order, order + numTracks_, [this](int a, int b) { return tracks_[a].cost > tracks_[b].cost; }); // the longest first
+    if (parallel)
+        TrackPool::get().run(numTracks_, order, [](void* f, int i) { (*static_cast<decltype(renderTrack)*>(f))(i); }, &renderTrack);
+    else
+        for (int i = 0; i < numTracks_; ++i) renderTrack(i);
+    for (int i = 0; i < numTracks_; ++i) // into the mix and the sends, in track order (the same sums one thread made)
+    {
+        const auto& t = tracks_[i];
+        if (!t.out) continue;
+        const float sends[2] = { palette_.sends[i][0] >= 0 ? palette_.sends[i][0] : palette_.info->sends[i][0],
+                                 palette_.sends[i][1] >= 0 ? palette_.sends[i][1] : palette_.info->sends[i][1] };
+        for (int c = 0; c < 2; ++c)
+        {
+            const float* x = t.mix.getReadPointer(c);
+            juce::FloatVectorOperations::add(pa[c], x, len);
+            juce::FloatVectorOperations::addWithMultiply(delayIn.getWritePointer(c), x, sends[0], len);
+            juce::FloatVectorOperations::addWithMultiply(reverbIn.getWritePointer(c), x, sends[1], len);
+            juce::FloatVectorOperations::addWithMultiply(fbIn[c], x, palette_.feeds[i], len);
+        }
     }
 
     // The drum pad (input 2): a note of the chord sounding now, played live, so the song's silences do not touch it

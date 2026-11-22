@@ -489,6 +489,7 @@ private:
         loadedRate = dev ? dev->getCurrentSampleRate() : 48000.0;
         loadedBlock = dev ? dev->getCurrentBufferSizeSamples() : 512;
         mixBuf.setSize(8, juce::jmax(8192, loadedBlock));
+        Engine::setAudioWorkgroup(deviceManager.getDeviceAudioWorkgroup()); // the track threads run with the audio thread
         improvK = 0;
         chainSeed = seed;
         { std::unique_ptr<Engine> gone; { const juce::SpinLock::ScopedLockType sl(audioLock); gone = std::move(engine); } }

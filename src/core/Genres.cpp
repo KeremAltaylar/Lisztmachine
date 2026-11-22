@@ -855,8 +855,12 @@ void GenreComposer::emitDrone(int bar, std::vector<Event>& out)
     }
     for (int p : droneHeld_)
         if (std::find(want.begin(), want.end(), p) == want.end()) out.push_back({ t0, Event::NoteOff, Drone, uint8_t(p), 0 });
+    // strummed, low string first, about 10 ms apart: a whole chord struck at once cost the sampled guitar 19 ms of one
+    // audio block (Doom, 4 notes; the Mac dropped out, 2026-11-22), a string at a time spreads it over several
+    const int64_t strum = std::max<int64_t>(1, std::llround(kPPQ * bpm_ / 6000.0));
+    int64_t at = t0;
     for (int p : want)
-        if (std::find(droneHeld_.begin(), droneHeld_.end(), p) == droneHeld_.end()) out.push_back({ t0, Event::NoteOn, Drone, uint8_t(p), .8f });
+        if (std::find(droneHeld_.begin(), droneHeld_.end(), p) == droneHeld_.end()) { out.push_back({ at, Event::NoteOn, Drone, uint8_t(p), .8f }); at += strum; }
     droneHeld_ = want;
     if (bar + 1 == totalBars())
     {

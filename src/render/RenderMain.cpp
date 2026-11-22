@@ -287,6 +287,7 @@ static float feedbackBus = -1;                 // --feedback-bus 0..0.8: the fee
 static bool gRaw = false;                      // --raw: without the mix stage (ducking, low cuts, width, glue)
 static double gPadEvery = 0;                   // --pad-every <beats>: a drum-pad hit that often (testing the pad's sound)
 static int gBlock = 512;                       // --block <samples>
+static bool gSerial = false;                    // --serial: every track on one thread (the parallel tracks checked against it)
 static bool gStems = false;                  // --stems: also <out>.<track>.wav per track and <out>.delay/.reverb.wav, before the glue
 
 // Improvisation as the app plays it (src/app/Main.cpp): song k in one engine, song k+1 made ready silent beside it and
@@ -396,6 +397,7 @@ static int renderConcert(uint64_t seed, double seconds, const juce::File& out, i
     if (auto e = engine.load(sr, block, palette); e.isNotEmpty()) { std::cerr << e << "\n"; return 1; }
     if (solo >= 0) engine.enabledTracks = uint32_t(1u << solo);
     engine.feedbackOverride = feedbackOverride;
+    engine.parallel = !gSerial;
     engine.feedbackBus = feedbackBus;
     for (auto& kv : juce::StringArray::fromTokens(masterFx, ",", ""))
         for (int k = 0; k < MasterFx::NumParams; ++k)
@@ -541,6 +543,7 @@ int main(int argc, char** argv)
     juce::StringArray args(argv + 1, argc - 1);
     setOfflineRendering(!args.contains("--live")); // a render is not live: sfizz may wait for its disk streaming (--live: as the app, timing)
     gRaw = args.contains("--raw");
+    gSerial = args.contains("--serial");
     gStems = args.contains("--stems");
     if (int i = args.indexOf("--pad-every"); i >= 0) gPadEvery = args[i + 1].getDoubleValue();
     if (int i = args.indexOf("--block"); i >= 0) gBlock = juce::jlimit(32, 4096, args[i + 1].getIntValue());
