@@ -555,6 +555,11 @@ int main(int argc, char** argv)
     gStems = args.contains("--stems");
     if (int i = args.indexOf("--pad-every"); i >= 0) gPadEvery = args[i + 1].getDoubleValue();
     if (int i = args.indexOf("--block"); i >= 0) gBlock = juce::jlimit(32, 4096, args[i + 1].getIntValue());
+    if (args[0] == "--head") // --head <scene> [silence s] [seed part s]: the song as the app announces it to the page (testing)
+    {
+        std::cout << showHead(args[1].toStdString(), 1, 20.0, args[2].getDoubleValue(), args[3].getDoubleValue()) << "}";
+        return 0;
+    }
     if (args[0] == "--plan") // --plan <scene>...: each song's parts and length, no sound (planning the concert)
     {
         const uint64_t seed = args.contains("--seed") ? uint64_t(args[args.indexOf("--seed") + 1].getLargeIntValue()) : 1;
