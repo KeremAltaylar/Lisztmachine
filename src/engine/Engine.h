@@ -416,6 +416,7 @@ public:
     std::atomic<int> padStruckNote { 60 };
     juce::String padInfo() const { return pad_.patch.isEmpty() ? juce::String("no sound") : pad_.patch + pad_.info + (pad_.plugin ? "" : " (not loaded)"); } // which sound, and anything its envelope refused
     std::atomic<float> padLevel { 1.0f }; // the app's pad volume (gain)
+    double trackMaxMs[kMaxTracks] = {};   // audio thread: each track's slowest block in ms (read after a render)
     std::atomic<double> padSq { 0 };      // the pad's sum of squares, both channels, for measuring its level
     std::atomic<int64_t> padN { 0 };
     // Set by a caller that loads off the message thread (the app's next Improvisation song): every plugin is made and

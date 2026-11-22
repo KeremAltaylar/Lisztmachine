@@ -1692,6 +1692,8 @@ void Engine::renderChunk(float* const* out, int numChannels, int offset, int len
 
     for (int i = 0; i < numTracks_; ++i)
     {
+        struct Timed { double& worst; int64_t t0 = juce::Time::getHighResolutionTicks();   // each track's slowest block (the renderer's --live)
+                       ~Timed() { worst = juce::jmax(worst, juce::Time::highResolutionTicksToSeconds(juce::Time::getHighResolutionTicks() - t0) * 1000.0); } } timed { trackMaxMs[i] };
         auto& t = tracks_[i];
         // Glide the filter towards its target over about a quarter second (a wobbling bass: its own `glide`).
         t.filterNow += (t.filterTarget - t.filterNow) * juce::jmin(1.0f, float(len / (t.glide * sampleRate_)));

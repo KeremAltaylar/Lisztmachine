@@ -463,6 +463,7 @@ static int renderConcert(uint64_t seed, double seconds, const juce::File& out, i
     const auto t0 = juce::Time::getMillisecondCounterHiRes();
     int64_t done = 0;
     std::vector<std::array<float, 7>> levels;
+    std::vector<std::pair<double, double>> blockMs; // each block's render time (ms) and where it fell (s)
     double lastSq[kMaxTracks + 2] = {}, mixSq = 0;
     while (done < total && !engine.isFinished())
     {
@@ -470,7 +471,9 @@ static int renderConcert(uint64_t seed, double seconds, const juce::File& out, i
         stemBuf.clear();
         if (gPadEvery > 0 && int64_t(double(done + block) * c->bpm() / 60.0 / sr / gPadEvery) > int64_t(double(done) * c->bpm() / 60.0 / sr / gPadEvery))
             engine.padHit(0.8f);
+        const auto tb = juce::Time::getMillisecondCounterHiRes();
         engine.render(buf.getArrayOfWritePointers(), 2, block);
+        blockMs.push_back({ juce::Time::getMillisecondCounterHiRes() - tb, double(done) / sr }); // a spike here is a crackle live
         writer->writeFromAudioSampleBuffer(buf, 0, block);
         for (size_t k = 0; k < stemWriters.size(); ++k)
         {
@@ -517,6 +520,17 @@ static int renderConcert(uint64_t seed, double seconds, const juce::File& out, i
     if (engine.padN.load() > 0 && done > 0)
         std::cout << "drum pad rms " << juce::String(juce::Decibels::gainToDecibels(std::sqrt(engine.padSq.load() / double(engine.padN.load())), -120.0), 1)
                   << " dBFS, the mix " << juce::String(juce::Decibels::gainToDecibels(std::sqrt(mixSq / (2.0 * double(done))), -120.0), 1) << " dBFS\n";
+    { // the slowest blocks against the time a block has: over 100 % the app's audio would drop out there
+        std::sort(blockMs.begin(), blockMs.end(), [](auto& x, auto& y) { return x.first > y.first; });
+        const double budget = 1000.0 * block / sr;
+        std::cout << "slowest blocks (budget " << juce::String(budget, 2) << " ms):";
+        for (size_t k = 0; k < juce::jmin<size_t>(12, blockMs.size()); ++k)
+            std::cout << " " << juce::String(blockMs[k].first, 1) << " ms @" << int(blockMs[k].second / 60) << ":"
+                      << juce::String(std::fmod(blockMs[k].second, 60.0), 1);
+        std::cout << "\nslowest block per track (ms):";
+        for (int t = 0; t < info.numTracks; ++t) std::cout << " " << info.trackNames[t] << " " << juce::String(engine.trackMaxMs[t], 1);
+        std::cout << "\n";
+    }
     std::cout << "sound changes made " << engine.changesMade << ", missed " << engine.missedChanges << "\n";
     return 0;
 }
@@ -524,8 +538,8 @@ static int renderConcert(uint64_t seed, double seconds, const juce::File& out, i
 int main(int argc, char** argv)
 {
     juce::ScopedJuceInitialiser_GUI init;
-    setOfflineRendering(true); // a render is not live: sfizz may wait for its disk streaming
     juce::StringArray args(argv + 1, argc - 1);
+    setOfflineRendering(!args.contains("--live")); // a render is not live: sfizz may wait for its disk streaming (--live: as the app, timing)
     gRaw = args.contains("--raw");
     gStems = args.contains("--stems");
     if (int i = args.indexOf("--pad-every"); i >= 0) gPadEvery = args[i + 1].getDoubleValue();
