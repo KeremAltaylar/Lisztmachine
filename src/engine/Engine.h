@@ -256,6 +256,23 @@ struct Biquad
     float process(float x) { const float y = b0 * x + z1; z1 = b1 * x - a1 * y + z2; z2 = b2 * x - a2 * y; return y; }
 };
 
+// The ears' guard, always on, last before the limiter (Kerem, 2026-11-23: "some harsh upper frequencies are dangerous to
+// play loud"): the 2-6 kHz band is pulled down, up to 8 dB, only while it stands out of the mix (more than `threshold`
+// dB of the whole), and nothing above 16 kHz reaches the speakers (a fourth-order low-pass: the synths' and the
+// shapers' near-ultrasonic tones, which tweeters and ears take worst).
+class EarGuard
+{
+public:
+    float threshold = -8.0f;  // Doom and Working Class Curse sit at -10 half the time (their gnarl): only what stands out more
+    float cutDb = 0;         // the 2-6 kHz cut now (for the measuring)
+    void prepare(double sampleRate);
+    void process(float* l, float* r, int n);
+private:
+    double sr_ = 48000;
+    Biquad hp_, lp_, bell_[2], top_[2][2];
+    float eBand_ = 0, eAll_ = 0, a_ = 0;
+};
+
 // The master bus before the limiter: a gentle stereo-linked compressor (2:1, soft knee) that
 // glues the mix, then makeup gain into a tanh soft clipper with its ceiling at -1 dBFS, which
 // is where the loudness comes from. ponytail: no oversampling, so a hard drive aliases a little;
@@ -364,7 +381,8 @@ public:
 
     MasterFx() { for (int i = 0; i < NumParams; ++i) p[i] = defaults[i]; }
     void prepare(double sampleRate, int maxBlock);
-    void process(float* left, float* right, int numSamples, double bpm);
+    // add (the drum pad, Kerem 2026-11-23: "add it"): mixed in after the drive and the delay, so only the EQ shapes it
+    void process(float* left, float* right, int numSamples, double bpm, const float* addL = nullptr, const float* addR = nullptr, float addGain = 0);
 
 private:
     double sr_ = 48000;
@@ -472,6 +490,7 @@ public:
     std::atomic<bool> clickToMain { false };
     PeakLimiter limiter;
     GlueBus glue;
+    EarGuard guard;
     MasterFx masterFx;             // the app's master FX panel: the whole PA mix, before the glue
     bool mixStage = true;          // false: no ducking, low cuts, width or glue (the renderer's --raw)
     uint32_t enabledTracks = 0xFFFFFFFF; // bit per track; the renderer's --solo

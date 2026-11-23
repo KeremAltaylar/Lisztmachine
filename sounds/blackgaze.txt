@@ -89,10 +89,10 @@ arp      18.2    2983  sfz/aliexpress-erhu_v1000/Programs/02-erhu_long.sfz
 riff     0.0    1000  internal/guitar
 drone    0.0       0  internal/none  # the second guitar: only Doom has one so far
 gain riff    -4.9
-# 2026-11-23 (Kerem: more black metal): thinner and fizzier, the lows cut at 220 (was 160), no thump, the top open
-# to 8 kHz (was 6.5), the presence up to 3.6 kHz (was 3.2)
-drive riff 1.0 8000
-amp riff  1.0 3600 1.0 220 9 8000 0 300
+# 2026-11-23 (Kerem: more black metal): thinner and fizzier, the lows cut at 220 (was 160), no thump (the top went to 8 kHz
+# that day and was too harsh to play loud: back to 6.5)
+drive riff 1.0 6500
+amp riff  1.0 3200 1.0 220 9 6500 0 300
 delay riff 0.75 0.35 0.25
 
 # 2026-10-31 (Kerem: no high percussion, industrial; "really gnarly", Filosofem): ground = low struck iron

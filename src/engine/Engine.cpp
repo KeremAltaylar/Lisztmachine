@@ -1238,6 +1238,7 @@ juce::String Engine::load(double sampleRate, int maxBlock, const Palette& palett
 
     limiter.prepare(sampleRate, -1.0f, 150.0f);
     glue.prepare(sampleRate);
+    guard.prepare(sampleRate);
     masterFx.prepare(sampleRate, maxBlock);
     glue.makeupDb = palette.masterDb;
     for (auto& f : reverbLowCut_) f.highpass(sampleRate, 180);
@@ -1995,14 +1996,19 @@ void Engine::renderChunk(float* const* out, int numChannels, int offset, int len
         }
     }
 
-    if (numChannels > 1) masterFx.process(pa[0], pa[1], len, composer_ ? composer_->bpm() : 120.0);
     // the drum pad straight to the master, dry: no song echo, reverb or feedback, no master drive or delay (Kerem,
-    // 2026-11-22: "I don't want the drum hits to be affected by the general feedback")
-    if (pad_.plugin)
-        for (int c = 0; c < 2; ++c)
+    // 2026-11-22: "I don't want the drum hits to be affected by the general feedback"), but through the master EQ
+    // (2026-11-23: "add it")
+    const auto padCh = [&](int c) { return pad_.buf.getReadPointer(juce::jmin(c, pad_.buf.getNumChannels() - 1)); };
+    if (numChannels > 1)
+        masterFx.process(pa[0], pa[1], len, composer_ ? composer_->bpm() : 120.0, pad_.plugin ? padCh(0) : nullptr,
+                         pad_.plugin ? padCh(1) : nullptr, pad_.gain * padLevel.load());
+    else if (pad_.plugin)
+        for (int c = 0; c < numChannels; ++c)
             juce::FloatVectorOperations::addWithMultiply(pa[c], pad_.buf.getReadPointer(juce::jmin(c, pad_.buf.getNumChannels() - 1)),
                                                          pad_.gain * padLevel.load(), len);
     if (mixStage && numChannels > 1) glue.process(pa[0], pa[1], len);
+    if (numChannels > 1) guard.process(pa[0], pa[1], len);
     float pre = 0;
     for (int c = 0; c < 2; ++c)
         pre = juce::jmax(pre, juce::FloatVectorOperations::findMaximum(pa[c], len), -juce::FloatVectorOperations::findMinimum(pa[c], len));
@@ -2581,7 +2587,7 @@ float MasterFx::shape(float x, int style, float k, int c)
     }
 }
 
-void MasterFx::process(float* l, float* r, int n, double bpm)
+void MasterFx::process(float* l, float* r, int n, double bpm, const float* addL, const float* addR, float addGain)
 {
     // ponytail: the shapers run at twice the rate by midpoint only, so the fuzz aliases a little; oversample properly if it fizzes
     const int style = juce::jlimit(0, 4, int(p[Style].load()));
@@ -2664,6 +2670,8 @@ void MasterFx::process(float* l, float* r, int n, double bpm)
         r[i] += echoR_[size_t(i)] * delayMix_;
     }
 
+    if (addL) { juce::FloatVectorOperations::addWithMultiply(l, addL, addGain, n); juce::FloatVectorOperations::addWithMultiply(r, addR, addGain, n); }
+
     // the EQ: each band glides a block at a time (about 30 ms across), flat when off; a flat band is passed by
     const bool eqOn = p[EqOn] > 0.5f;
     const float step = juce::jmin(1.0f, glide_ * float(n));
@@ -2677,6 +2685,45 @@ void MasterFx::process(float* l, float* r, int n, double bpm)
         else t.peak(sr_, eqHz[b], 0.9, eqDb_[b]);
         for (auto& ch : eq_) ch[b].retune(t);
         for (int i = 0; i < n; ++i) { l[i] = eq_[0][b].process(l[i]); r[i] = eq_[1][b].process(r[i]); }
+    }
+}
+
+// ---------------------------------------------------------------- the ears' guard
+void EarGuard::prepare(double sr)
+{
+    sr_ = sr;
+    hp_.highpass(sr, 2000);
+    lp_.lowpass(sr, 6000);
+    for (int c = 0; c < 2; ++c)
+    {
+        bell_[c].peak(sr, 3500, 0.45, 0);
+        top_[c][0].lowpass(sr, juce::jmin(16000.0, 0.45 * sr), 0.5412); // Butterworth, fourth order
+        top_[c][1].lowpass(sr, juce::jmin(16000.0, 0.45 * sr), 1.3066);
+    }
+    eBand_ = eAll_ = cutDb = 0;
+    a_ = 1.0f - std::exp(-1.0f / float(0.05 * sr)); // 50 ms: the level a listener's ear integrates
+}
+
+void EarGuard::process(float* l, float* r, int n)
+{
+    for (int i = 0; i < n; ++i)
+    {
+        const float m = 0.5f * (l[i] + r[i]), b = lp_.process(hp_.process(m));
+        eBand_ += (b * b - eBand_) * a_;
+        eAll_ += (m * m - eAll_) * a_;
+    }
+    // how far the band stands out, in dB of the whole; the cut follows in 5 ms, lets go over half a second
+    const float over = eAll_ > 1e-9f ? 10.0f * std::log10(juce::jmax(1e-12f, eBand_) / eAll_) - threshold : -1.0f;
+    const float want = juce::jlimit(0.0f, 8.0f, 2.0f * over); // two dB down for each it stands out: a peak comes back under
+    const float dt = float(n / sr_);
+    cutDb += (want - cutDb) * (want > cutDb ? juce::jmin(1.0f, dt / 0.005f) : juce::jmin(1.0f, dt / 0.5f));
+    Biquad t;
+    t.peak(sr_, 3500, 0.45, -cutDb); // wide: the whole 2-6 kHz band
+    for (auto& b : bell_) b.retune(t);
+    for (int i = 0; i < n; ++i)
+    {
+        l[i] = top_[0][1].process(top_[0][0].process(bell_[0].process(l[i])));
+        r[i] = top_[1][1].process(top_[1][0].process(bell_[1].process(r[i])));
     }
 }
 
