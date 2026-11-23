@@ -534,7 +534,7 @@ static int renderConcert(uint64_t seed, double seconds, const juce::File& out, i
         std::sort(blockMs.begin(), blockMs.end(), [](auto& x, auto& y) { return x.first > y.first; });
         const double budget = 1000.0 * block / sr;
         std::cout << "slowest blocks (budget " << juce::String(budget, 2) << " ms):";
-        for (size_t k = 0; k < juce::jmin<size_t>(12, blockMs.size()); ++k)
+        for (size_t k = 0; k < std::min<size_t>(12, blockMs.size()); ++k)
             std::cout << " " << juce::String(blockMs[k].first, 1) << " ms @" << int(blockMs[k].second / 60) << ":"
                       << juce::String(std::fmod(blockMs[k].second, 60.0), 1);
         std::cout << "\nslowest block per track (ms):";
