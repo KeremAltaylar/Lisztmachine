@@ -109,6 +109,10 @@ public:
     // turns brighter or darker (peakMode); both return after it, so the song still ends where its Release pivots
     int lift = 0;
     const Mode* peakMode = nullptr;
+    // the storms (Kerem, 2026-11-23, Blackgaze "more black metal"): every part of .75 and up turns to darkMode and plays
+    // darkProg (the flat second's chord), the guitar's low string droning the tonic under its shapes
+    const Mode* darkMode = nullptr;
+    std::array<int, 4> darkProg {};
     // its memory: the song before's theme (degrees above the chord's root), heard softly in the Seed, under the old
     // song's Release, in this song's key, tempo and arp instrument
     struct MotifNote { int8_t step, len, deg; float vel; };
@@ -132,7 +136,8 @@ public:
     // through the summit the key may lift (spec.lift) and the mode change colour (spec.peakMode)
     bool atPeak(int bar) const { return bar >= peakFrom_ && bar < peakTo_; }
     int tonicAt(int bar) const { return (tonicPc_ + (atPeak(bar) ? spec_.lift + 12 : 0)) % 12; }
-    const Mode& modeAt(int bar) const { return spec_.peakMode && atPeak(bar) ? *spec_.peakMode : *spec_.mode; }
+    const Mode& modeAt(int bar) const { return spec_.peakMode && atPeak(bar) ? *spec_.peakMode : dark(bar) ? *spec_.darkMode : *spec_.mode; }
+    bool dark(int bar) const { return spec_.darkMode && sectionAt(bar).energy >= .75f; }
     int rootAt(int bar) const { return rootOfBar_[size_t(bar)]; }
     int tradeTurn(int bar) const; // 0: both play; 1: the soloist sings, the arpeggio rests; 2: the arpeggio answers
     bool flipBar(int bar) const;  // a bar of the harpsichord and the choir alone

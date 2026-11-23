@@ -181,11 +181,11 @@ int main()
             // the fills throw their last hit into the echo
             const auto throws = std::count_if(ev.begin(), ev.end(), [](auto& x) { return x.type == Event::Throw && x.value > 0; });
             CHECK(throws > c.totalBars() / 16, "%s: %d echo throws in %d bars", spec->scene, int(throws), c.totalBars()); // one a 16-bar phrase
-            // the summit plays the home progression, four bars a chord (a new theme brings its own)
+            // the summit plays the home progression, four bars a chord (a new theme brings its own, a dark summit the storms')
             for (auto& s : c.sections())
                 if (s.restoreTheme && spec->summit != G::Summit::NewTheme)
                     for (int b = 0; b < s.bars; ++b)
-                        CHECK(c.rootAt(s.startBar + b) == c.homeProgression()[size_t((b / 4) % 4)], "%s: the summit leaves the home progression at bar %d", spec->scene, s.startBar + b);
+                        CHECK(c.rootAt(s.startBar + b) == (spec->darkMode ? spec->darkProg : c.homeProgression())[size_t((b / 4) % 4)], "%s: the summit leaves the home progression at bar %d", spec->scene, s.startBar + b);
             // every track the form asks for actually plays
             for (int t = 0; t < G::kGenreTracks; ++t)
             {

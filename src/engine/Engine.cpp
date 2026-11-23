@@ -2179,6 +2179,16 @@ void InternalSynth::startGuitar(int note, float velocity)
                 hz = o.hz * (note - o.note == 7 ? 1.5 : 3.0);
         Str* st = nullptr;
         for (auto& o : strings_) if (o.note == note && o.side == side) { st = &o; break; }  // the same string, picked again
+        // the second take re-picking fast (a tremolo, under 110 ms since its last pick): 1 to 7 ms behind the first,
+        // a different amount each stroke, as a second player's hand is (2026-11-23, Kerem: "not like a machine")
+        if (st && side == 1 && st->age < int64_t(0.11 * sr_))
+        {
+            seed_ = seed_ * 1664525u + 1013904223u;
+            st->repick = 1 + int((0.001 + 0.006 * double(seed_ >> 8) / 16777216.0) * sr_);
+            st->repickVel = velocity;
+            st->repickPalm = palm;
+            continue;
+        }
         if (!st) for (auto& o : strings_) if (o.note < 0) { st = &o; break; }
         if (!st) { st = &strings_[0]; for (auto& o : strings_) if (o.age > st->age) st = &o; } // steal the oldest
         if (st->note != note || st->side != side)
@@ -2208,11 +2218,19 @@ void InternalSynth::runGuitar(float* l, float* r, int from, int to)
     for (auto& st : strings_)
     {
         if (st.note < 0) continue;
-        const float g = st.held ? st.g : st.gOff, pl = st.side == 0 ? 0.88f : 0.12f, pr = 1 - pl;
+        float g = st.held ? st.g : st.gOff;
+        const float pl = st.side == 0 ? 0.88f : 0.12f, pr = 1 - pl;
         float peak = 0;
         for (int n = from; n < to; ++n)
         {
             if (st.wait > 0) { --st.wait; continue; }
+            if (st.repick > 0 && --st.repick == 0)
+            {
+                const bool held = st.held; // a note-off that came first still stands
+                pluck(st, st.repickVel, st.repickPalm, 0.21f);
+                st.held = held;
+                g = held ? st.g : st.gOff;
+            }
             const float out = st.buf[size_t(st.w)];
             const float lp = (1 - st.s) * out + st.s * st.lpX;
             st.lpX = out;

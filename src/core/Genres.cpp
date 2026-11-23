@@ -239,8 +239,8 @@ const G::Spec kBlackgaze {
     // tremolo carries a melody on its top string.
     .bpmLo = 150, .bpmHi = 158, .mode = &kAeolian, .tonics = { 4, 11, 9, 2, 6 },
     .progs = { { { 0, 5, 2, 6 }, { 5, 6, 0, 0 }, { 0, 3, 5, 6 } } }, .preRoot = 6,
-    .form = { { { "Haze", 16, .20f, "PFTRG" }, { "Rise", 24, .50f, "PRBUTGYCA" }, { "Storm", 40, .80f, "PRBUKSCDTGYI" },
-                { "Clearing", 24, .35f, "PAFTG" }, { "Sunbather", 48, 1.0f, "PRBUKSCDTGYAFI" },
+    .form = { { { "Haze", 16, .20f, "PFTRG" }, { "Rise", 24, .50f, "PRBUTGYCA" }, { "Storm", 40, .80f, "PRBUKSCTGYI" },
+                { "Clearing", 24, .35f, "PAFTG" }, { "Sunbather", 48, 1.0f, "PRBUKSCTGYFI" },
                 { "Afterglow", 16, .20f, "PRT" } } },
     .pulse = part("X.......X.......", "X...X...X...X...", "X.X.X.X.X.X.X.X."), // the blast's weight, as ghost pumps
     .metal = part("", "..............1.", "......1.......2."),
@@ -248,7 +248,9 @@ const G::Spec kBlackgaze {
     .perc = part("", "......1.......1.", "1..1..1...1..1.."),
     // the bass grooves where the song is between its storms (Rise, Ascent: 3+3+2, then a push to the
     // fifth) and is plain under the blasts (Kerem: "main parts are cool simple")
-    .bass = part("x---------------", "x--x--x-.xx-5-x-", "x---x---x---x---"),
+    // 2026-11-23 (Kerem: "more black metal", "not sounding like a machine"): in the storms the bass follows the
+    // guitar's roots in eighths; the keys (piano) and the erhu sit the storms out, the organ and the choir stay
+    .bass = part("x---------------", "x--x--x-.xx-5-x-", "x-x-x-x-x-x-x-x-"),
     .chord = part("", "x---------------", "x-------x-------"),
     .sub = part("x---------------", "x---------------", "x-------x-------"),
     .ground = part("1...............", "1.......1..1....", "1.1.1.1.1.1.1.1."),
@@ -256,7 +258,10 @@ const G::Spec kBlackgaze {
     .mallet = part("", "", ""),
     .texture = part("x---------------", "x---------------", "x-------x-------"),
     .arpLo = 64, .arpHi = 88, .percLo = 36, .percHi = 52,
-    .chordSweep = .30f, .riff = G::RiffStyle::Tremolo, .riffLo = 40, .summit = G::Summit::NewTheme, .ends = false, .pedal = true,
+    // the storms turn phrygian: i, the flat II, i, the flat VI, over and over; the summit is no new theme but the
+    // Storm's own line come back, a second guitar joining it halfway (repetition, opening up)
+    .chordSweep = .30f, .riff = G::RiffStyle::Tremolo, .riffLo = 40, .summit = G::Summit::Theme, .ends = false, .pedal = true,
+    .darkMode = &kPhrygian, .darkProg = { 0, 1, 0, 5 },
 };
 
 // ---- 2026-11-21 (Kerem: "combine the ideas in wake and saint into one song, remove the fast one, I don't want abrupt
@@ -456,7 +461,8 @@ void GenreComposer::planHarmony()
         // The summit is not reached by transposing: it keeps the key (Kerem: find other ways to establish
         // the main parts). A new theme brings the third progression with it.
         std::array<int, 4> third = spec_.progs[size_t(3 - h - a)];
-        const auto& prog = sec.restoreTheme && spec_.summit == Summit::NewTheme ? third : away ? away_ : home_;
+        const auto& prog = spec_.darkMode && sec.energy >= .75f ? spec_.darkProg
+                         : sec.restoreTheme && spec_.summit == Summit::NewTheme ? third : away ? away_ : home_;
         for (int b = 0; b < sec.bars; ++b)
         {
             const size_t at = size_t(sec.startBar + b);
@@ -1446,7 +1452,23 @@ std::vector<GenreComposer::RHit> GenreComposer::riffHits(int bar) const
         // picked eighths in the calm, sixteenths as it drives, thirty-seconds at the height; the beats leaning
         const int n = tr == 0 ? 8 : tr == 1 ? 16 : 32;
         const int64_t d = kBarTicks / n;
-        for (int i = 0; i < n; ++i) h.push_back({ t0 + i * d, d - 8, 0, i % (n / 4) == 0 ? .85f : .6f, false });
+        // played, not sequenced (Kerem, 2026-11-23: "not sounding like a machine"): the hand drifts a few ms ahead and
+        // behind over the bar, each stroke a little off that, the upstroke later and lighter than the down, and the
+        // phrase breathes: harder into each two bars' head, easing off through them
+        Rng hand(uint64_t(bar) * 0x9E3779B97F4A7C15ull + uint64_t(tonicPc_) * 131 + 17);
+        const double drift = hand.uniform() * 6.283;
+        const double ms = kPPQ * bpm_ / 60000.0; // ticks in a millisecond
+        for (int i = 0; i < n; ++i)
+        {
+            const double ph = double(i) / n;
+            int64_t off = int64_t(std::lround(ms * (2.5 * std::sin(drift + 6.283 * ph) + (hand.uniform() * 3 - 1.5) + ((i & 1) ? 1.5 : 0))));
+            if (i == 0) off = std::max<int64_t>(0, off);
+            const float head = (bar & 1) ? .9f - .08f * float(ph) : 1.0f - .1f * float(ph);
+            const float v = (i % (n / 4) == 0 ? .85f : (i & 1) ? .55f : .65f) * head + float(hand.uniform() * .08 - .04);
+            h.push_back({ t0 + i * d + off, 0, 0, std::clamp(v, .5f, 1.0f), false });
+        }
+        // each stroke rings up to the next one (the same strings: they must not overlap), the bar's last to the bar line
+        for (size_t k = 0; k < h.size(); ++k) h[k].len = (k + 1 < h.size() ? h[k + 1].t : t0 + kBarTicks) - h[k].t - 8;
         return h;
     }
     if (spec_.riff == RiffStyle::Drone) { h.push_back({ t0, kBarTicks - 10, 0, tr == 2 ? .9f : tr == 1 ? .7f : .5f, false }); return h; }
@@ -1496,10 +1518,17 @@ void GenreComposer::emitRiff(int bar, std::vector<Event>& out)
                 // calm: the open shimmer (root, fifth, ninth) let ring; driving: the power chord with the
                 // northern line on the top string, at the height a third under it as a second guitar
                 std::vector<int> ps { root, root + over(bar, x.deg, 4) };
+                // the storms: the low string rings the tonic under every shape (the flat II grinds a semitone over it)
+                if (dark(bar) && tier(bar) > 0)
+                {
+                    int ped = root;
+                    while ((ped - tonicAt(bar)) % 12 != 0) --ped;
+                    if (ped != root && ped >= spec_.riffLo - 2) ps.push_back(ped);
+                }
                 if (tier(bar) == 0) ps.push_back(root + over(bar, x.deg, 8));
                 else
                 {
-                    const auto& mel = sectionAt(bar).restoreTheme ? melB_ : melA_;
+                    const auto& mel = sectionAt(bar).restoreTheme && spec_.summit == Summit::NewTheme ? melB_ : melA_;
                     const int half = int((x.t - int64_t(bar) * kBarTicks) * 2 / kBarTicks);
                     const int d = mel[size_t(((bar - sectionAt(bar).startBar) * 2 + half) % 16)];
                     // the line glides: it takes the octave nearest its last note, so a chord's root
@@ -1512,7 +1541,11 @@ void GenreComposer::emitRiff(int bar, std::vector<Event>& out)
                     }
                     lastTop_ = top;
                     const int under = top - (over(bar, x.deg, d) - over(bar, x.deg, d - 2));
-                    for (int p : { top, tier(bar) == 2 ? under : -1 })
+                    // the second guitar's third under the line: at the height, but in a dark summit only from its
+                    // second half, so the repeated line opens up
+                    const auto& sc = sectionAt(bar);
+                    const bool second = tier(bar) == 2 && (!dark(bar) || (sc.restoreTheme && bar - sc.startBar >= sc.bars / 2));
+                    for (int p : { top, second ? under : -1 })
                         if (p > ps[1] && std::find(ps.begin(), ps.end(), p) == ps.end()) ps.push_back(p);
                 }
                 for (int p : ps) note(Riff, x.t, rlen(x), p, v);

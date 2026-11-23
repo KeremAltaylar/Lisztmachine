@@ -126,7 +126,7 @@ private:
     // The guitar: plucked strings (Karplus-Strong, a fractional allpass keeping the pitch exact),
     // two for every note, one each side, as a rhythm part is doubled: played twice, not detuned.
     // A velocity under .5 is palm-muted. A fifth or a twelfth over a sounding root is tuned pure (3:2).
-    struct Str { std::vector<float> buf; int len = 1, w = 0, wait = 0, note = -1, side = 0; float a = 0, apX = 0, apY = 0, lpX = 0, g = 0, gOff = 0, s = .3f, hz = 0, dcX = 0, dcY = 0, env = 0;
+    struct Str { std::vector<float> buf; int len = 1, w = 0, wait = 0, repick = 0, note = -1, side = 0; float repickVel = 0; bool repickPalm = false; float a = 0, apX = 0, apY = 0, lpX = 0, g = 0, gOff = 0, s = .3f, hz = 0, dcX = 0, dcY = 0, env = 0;
                  bool held = false; int64_t age = 0; };
     std::vector<Str> strings_;
     void startGuitar(int note, float velocity);
