@@ -249,8 +249,11 @@ const G::Spec kBlackgaze {
     // the bass grooves where the song is between its storms (Rise, Ascent: 3+3+2, then a push to the
     // fifth) and is plain under the blasts (Kerem: "main parts are cool simple")
     // 2026-11-23 (Kerem: "more black metal", "not sounding like a machine"): in the storms the bass follows the
-    // guitar's roots in eighths; the keys (piano) and the erhu sit the storms out, the organ and the choir stay
-    .bass = part("x---------------", "x--x--x-.xx-5-x-", "x-x-x-x-x-x-x-x-"),
+    // guitar's roots in eighths; the keys (piano) and the erhu sit the storms out, the organ and the choir stay.
+    // Then ("keep the clarity of the first minute in all sections"): the eighths played soft, the Growlybass's soft
+    // layer, cleaner (its loud one is grit above 400 Hz, over the guitar's notes: the storms' harmony measured 0.57
+    // of its energy in its three strongest notes, 0.64 with this and the tonic pedal gone; Rise 0.73)
+    .bass = part("x---------------", "x--x--x-.xx-5-x-", "o-o-o-o-o-o-o-o-"),
     .chord = part("", "x---------------", "x-------x-------"),
     .sub = part("x---------------", "x---------------", "x-------x-------"),
     .ground = part("1...............", "1.......1..1....", "1.1.1.1.1.1.1.1."),
@@ -258,7 +261,8 @@ const G::Spec kBlackgaze {
     .mallet = part("", "", ""),
     .texture = part("x---------------", "x---------------", "x-------x-------"),
     .arpLo = 64, .arpHi = 88, .percLo = 36, .percHi = 52,
-    // the storms turn phrygian: i, the flat II, i, the flat VI, over and over; the summit is no new theme but the
+    // the storms turn phrygian: i, the flat II, i, the flat VI, over and over (no tonic pedal under the guitar: it
+    // clouded them); the summit is no new theme but the
     // Storm's own line come back, a second guitar joining it halfway (repetition, opening up)
     .chordSweep = .30f, .riff = G::RiffStyle::Tremolo, .riffLo = 40, .summit = G::Summit::Theme, .ends = false, .pedal = true,
     .darkMode = &kPhrygian, .darkProg = { 0, 1, 0, 5 },
@@ -1518,13 +1522,6 @@ void GenreComposer::emitRiff(int bar, std::vector<Event>& out)
                 // calm: the open shimmer (root, fifth, ninth) let ring; driving: the power chord with the
                 // northern line on the top string, at the height a third under it as a second guitar
                 std::vector<int> ps { root, root + over(bar, x.deg, 4) };
-                // the storms: the low string rings the tonic under every shape (the flat II grinds a semitone over it)
-                if (dark(bar) && tier(bar) > 0)
-                {
-                    int ped = root;
-                    while ((ped - tonicAt(bar)) % 12 != 0) --ped;
-                    if (ped != root && ped >= spec_.riffLo - 2) ps.push_back(ped);
-                }
                 if (tier(bar) == 0) ps.push_back(root + over(bar, x.deg, 8));
                 else
                 {

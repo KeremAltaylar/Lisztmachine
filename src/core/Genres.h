@@ -110,7 +110,7 @@ public:
     int lift = 0;
     const Mode* peakMode = nullptr;
     // the storms (Kerem, 2026-11-23, Blackgaze "more black metal"): every part of .75 and up turns to darkMode and plays
-    // darkProg (the flat second's chord), the guitar's low string droning the tonic under its shapes
+    // darkProg (the flat second's chord)
     const Mode* darkMode = nullptr;
     std::array<int, 4> darkProg {};
     // its memory: the song before's theme (degrees above the chord's root), heard softly in the Seed, under the old
