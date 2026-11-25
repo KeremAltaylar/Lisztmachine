@@ -132,3 +132,7 @@ boom    -1.0    1000  internal/boom  # about 4 dB under the 808, +3 under the gu
 
 # the drum pad (input 2): its own voice at this song's level, 5 dB under the summit's mix (2026-11-22)
 drumpad -1.7
+
+# 2026-11-25 (Kerem: "a new synth introduced when it is finished and new parts come"): after the Monument the soloist
+# turns into a new synth, a distant lead, and keeps it through Embers, Pyre, Pillar and the Dust. Gain measured on the line.
+enter Embers lead 3.0 1500 Leads/In The Distance  # measured 2026-11-25 at 0.0: 5 dB under the mix in Pyre/Pillar (Dark Heart 1-3), in tune (median 2-10 c)

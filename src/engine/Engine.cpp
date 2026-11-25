@@ -870,8 +870,13 @@ TrackMix mixFor(const std::string& name)
 } // namespace
 
 // The drum pad's own voice (input 2) and its gain, dB: the pad's rms about 6 dB under the mix (measured 2026-11-20)
-static constexpr const char* kPadVoice = "3rd/Bluelight/Keys/Donna's Glass Hammers";
+// 2026-11-25: Donna's Glass Hammers with its three effects off (two delays, one feeding back 71 %, and a frequency shifter's
+// echo: Kerem's "plays twice"), carried in sounds/surge-patches; the engine's room (padVerb_) instead
+static constexpr const char* kPadVoice = "3rd/Lisztmachine/Pad/Glass Hammers Dry";
 static constexpr float kPadVoiceDb = 1.0f; // with the octave under it, at 3.0: -3.7 (halftime), -4.4 (doom) dB under the mix
+// 2026-11-25 (Kerem: "put its gain low or make its volume adjustable"): every song's pad 6 dB lower than it was
+// (the 'drumpad' lines: 5 dB under the summit's mix), the page's Drum pad slider on top of that
+static constexpr float kPadTrimDb = -12.0f; // -6 net: without its effects the patch measured 5.5 dB louder (rms -22.2 at -6 vs -22.7 before)
 // The engine's own synths: no Surge instance, one sound for the whole song.
 static bool isEngineSound(const juce::String& patch) { return patch.startsWith("internal/"); }
 
@@ -913,6 +918,16 @@ juce::String Palette::load(const juce::File& file, const std::string& sceneName)
         auto tokens = juce::StringArray::fromTokens(line, " \t", "");
         tokens.removeEmptyStrings();
         const auto where = file.getFileName() + " line " + juce::String(n + 1) + ": ";
+        // "enter <part> <track> gain bright patch" (Kerem, 2026-11-25, Doom: "a new synth introduced when it's finished
+        // and new parts come"): the track takes this sound at that part and keeps it to the end
+        juce::String from;
+        if (tokens[0] == "enter" && tokens.size() >= 6)
+        {
+            from = tokens[1];
+            line = line.fromFirstOccurrenceOf(tokens[1], false, false).trim();
+            tokens.remove(0);
+            tokens.remove(0);
+        }
         if (tokens[0] == "master" && tokens.size() >= 2) { masterDb = tokens[1].getFloatValue(); continue; }
         if (tokens[0] == "drumpad" && tokens.size() >= 2) // "drumpad <dB>": the pad's own voice at this song's level
         {
@@ -980,10 +995,10 @@ juce::String Palette::load(const juce::File& file, const std::string& sceneName)
             DBG(where + "no Surge patch '" + patch + "', skipped");
             continue;
         }
-        for (int t : targets) parts[t].push_back({ patch, tokens[1].getFloatValue(), tokens[2].getFloatValue() });
+        for (int t : targets) parts[t].push_back({ patch, tokens[1].getFloatValue(), tokens[2].getFloatValue(), from });
     }
-    for (auto& p : parts)
-        std::stable_sort(p.begin(), p.end(), [](auto& a, auto& b) { return a.brightness < b.brightness; });
+    for (auto& p : parts) // dark to bright; the entering sounds last, out of the plan's draw
+        std::stable_sort(p.begin(), p.end(), [](auto& a, auto& b) { return a.from.isEmpty() != b.from.isEmpty() ? a.from.isEmpty() : a.brightness < b.brightness; });
     for (int t = 0; t < info->numTracks; ++t)
         if (parts[t].empty())
         {   // none of its sounds installed here: one of the engine's own, so the song still plays (and says nothing it cannot)
@@ -999,9 +1014,9 @@ juce::String Palette::load(const juce::File& file, const std::string& sceneName)
 
 // What the visuals follow, for a song (the renderer's show.json without its levels; the app sends it live): its tempo,
 // key, sections, voices and every note with its role.
-juce::String showHead(const std::string& sceneName, uint64_t seed, double blockRate, double silence, double seedSeconds)
+juce::String showHead(const std::string& sceneName, uint64_t seed, double blockRate, double silence, double seedSeconds, double bridge)
 {
-    auto cp = makeComposer(sceneName, seed, silence, seedSeconds);
+    auto cp = makeComposer(sceneName, seed, silence, seedSeconds, bridge);
     auto& c = *cp;
     std::vector<Event> ev;
     for (int b = 0; b < c.totalBars(); ++b) c.generateBar(b, ev);
@@ -1091,24 +1106,36 @@ std::vector<SoundChange> planSounds(const Composer& composer, const Palette& pal
             continue;
         }
         if (palette.parts[t].size() == 1 && isEngineSound(palette.parts[t][0].patch)) { plan.push_back({ 0, t, 0 }); continue; }
-        const int n = int(palette.parts[t].size());
+        // a sound entering at a named part ("enter"): from there on the track keeps it, nothing drawn
+        int n = int(palette.parts[t].size()), enterBar = 1 << 30;
+        for (int e = 0; e < int(palette.parts[t].size()); ++e)
+            if (const auto& f = palette.parts[t][size_t(e)].from; f.isNotEmpty())
+            {
+                n = juce::jmin(n, e);
+                for (auto& sec : sections)
+                    if (f == sec.name && sec.startBar < enterBar) { enterBar = sec.startBar; plan.push_back({ sec.startBar, t, e }); }
+            }
         int last = -1, beforeLast = -1;
-        for (int s = 0; s < int(sections.size()); ++s)
+        // s counts the song's own parts: a part set aside (the concert's bridge before the song) changes nothing, the
+        // song's sounds come out as without it and the bridge plays its first ones
+        for (int k = 0, s = -1; k < int(sections.size()); ++k)
         {
+            if (sections[size_t(k)].aside) continue;
+            ++s;
             // Pad and sequence change on even sections, bass and lead on odd ones.
             const bool evenPart = t % 2 == 0;
             if (s > 0 && (s % 2 == 0) != evenPart) continue;
 
             // Energy picks a place on the dark-to-bright line, with a little seeded wander,
             // and never one of the last two sounds again.
-            const double target = sections[size_t(s)].energy * (n - 1) + (rng.uniform() - 0.5) * n * 0.3;
+            const double target = sections[size_t(k)].energy * (n - 1) + (rng.uniform() - 0.5) * n * 0.3;
             int best = -1;
             for (int e = 0; e < n; ++e)
                 if ((n <= 2 || (e != last && e != beforeLast)) && (best < 0 || std::abs(e - target) < std::abs(best - target)))
                     best = e;
-            const auto& sec = sections[size_t(s)];
+            const auto& sec = sections[size_t(k)];
             const int bar = s == 0 ? 0 : juce::jmin(sec.startBar + offsetBars[t], sec.startBar + sec.bars - 1);
-            plan.push_back({ bar, t, best });
+            if (sec.startBar < enterBar) plan.push_back({ bar, t, best }); // drawn all the same: the other tracks' draws stay
             beforeLast = last;
             last = best;
         }
@@ -1232,8 +1259,17 @@ juce::String Engine::load(double sampleRate, int maxBlock, const Palette& palett
             pad_.buf.setSize(juce::jmax(2, p->getTotalNumInputChannels(), p->getTotalNumOutputChannels()), maxBlock);
             pad_.plugin = std::move(p);
         });
-        pad_.gain = juce::Decibels::decibelsToGain(padDb);
+        pad_.gain = juce::Decibels::decibelsToGain(padDb + kPadTrimDb);
         pad_.midi.ensureSize(1024);
+        juce::Reverb::Parameters rp; // a soft, wide room, about three seconds: the hit blooms and fades, never repeats
+        rp.roomSize = 0.86f;
+        rp.damping = 0.55f;
+        rp.wetLevel = 0.42f;
+        rp.dryLevel = 0.62f;
+        rp.width = 1.0f;
+        padVerb_.setParameters(rp);
+        padVerb_.setSampleRate(sampleRate);
+        padVerb_.reset();
     }
 
     limiter.prepare(sampleRate, -1.0f, 150.0f);
@@ -1377,7 +1413,7 @@ juce::String Engine::currentPatch(int track) const
 
 void Engine::start(uint64_t seed, int startBar, bool play)
 {
-    auto next = makeComposer(scene, seed, silence, seedSeconds);
+    auto next = makeComposer(scene, seed, silence, seedSeconds, bridge);
     startBar = juce::jlimit(0, next->totalBars() - 1, startBar);
 
     // Starting later: compose the bars before it silently (the sequences mutate as they go,
@@ -1906,13 +1942,12 @@ void Engine::renderChunk(float* const* out, int numChannels, int offset, int len
         if (mask) padMask_ = mask;
         if (const float v = padHit_.exchange(0); v > 0 && padMask_)
         {
-            if (pad_.note >= 0) { pad_.midi.addEvent(juce::MidiMessage::noteOff(1, pad_.note), 0); pad_.midi.addEvent(juce::MidiMessage::noteOff(1, pad_.note - 12), 0); }
+            if (pad_.note >= 0) pad_.midi.addEvent(juce::MidiMessage::noteOff(1, pad_.note), 0);
             int pcs[12], n = 0;
             for (int pc = 0; pc < 12; ++pc) if (padMask_ & (1 << pc)) pcs[n++] = pc;
             const int k = pad_.count++ % (2 * n); // up the chord over two octaves from middle C, then again
             pad_.note = 60 + pcs[k % n] + 12 * (k / n);
             pad_.midi.addEvent(juce::MidiMessage::noteOn(1, pad_.note, v), 0);
-            pad_.midi.addEvent(juce::MidiMessage::noteOn(1, pad_.note - 12, 0.85f * v), 0); // and an octave under it (Kerem, 2026-11-20)
             pad_.left = int64_t(kPPQ * samplesPerTick_); // let go after a beat: the ring goes on in the release
             padStruckNote = pad_.note;
             ++padStruck;
@@ -1920,13 +1955,14 @@ void Engine::renderChunk(float* const* out, int numChannels, int offset, int len
         else if (pad_.note >= 0 && (pad_.left -= len) <= 0)
         {
             pad_.midi.addEvent(juce::MidiMessage::noteOff(1, pad_.note), 0);
-            pad_.midi.addEvent(juce::MidiMessage::noteOff(1, pad_.note - 12), 0);
             pad_.note = -1;
         }
         pad_.buf.clear();
         juce::AudioBuffer<float> view(pad_.buf.getArrayOfWritePointers(), pad_.buf.getNumChannels(), len);
         pad_.plugin->processBlock(view, pad_.midi);
         pad_.midi.clear();
+        if (view.getNumChannels() >= 2) padVerb_.processStereo(view.getWritePointer(0), view.getWritePointer(1), len);
+        else padVerb_.processMono(view.getWritePointer(0), len);
         const float g = pad_.gain * padLevel.load();
         double sq = 0;
         for (int c = 0; c < 2; ++c)
@@ -2065,7 +2101,7 @@ void Engine::renderClick(float* const* out, int numChannels, int offset, int len
         if (gn > 0 && s >= glideAt_[0]) // the glide into the next song
         {
             while (glideI_ < gn && glideAt_[glideI_] < s) ++glideI_;
-            if (glideI_ < gn && glideAt_[glideI_] == s) beat = glideJ_ + glideI_;
+            if (glideI_ < gn && glideAt_[glideI_] == s) beat = (gn - glideI_) % 4 == 0 ? 0 : 1; // its downbeats: whole bars before the landing
         }
         // the nearest beat, then whether this is its sample: ceil() overshot to the next beat whenever the beat's sample was
         // rounded up, and at most tempos about half the clicks never sounded (Kerem, 2026-11-14: "some of the metronome
@@ -2100,9 +2136,14 @@ void Engine::glideClick(double b1, double land, double minSec, double maxSec)
     for (int jj = int(std::floor((land - minSec) / spb / 4)) * 4; jj > 0 && land - jj * spb <= maxSec; jj -= 4)
     {
         const double d = land - jj * spb;
-        const int n = std::max(4, int(std::lround(mean * d / 240)) * 4);
-        const double cc = 6 * (n * 60 / d - mean);
-        if (N == 0 || std::abs(cc) < std::abs(c)) { j = jj; N = n; D = d; c = cc; }
+        // beats, fewer or more (2026-11-25: whole bars rounded to the nearest, the glide into Liquid first slowed 144 ->
+        // 141 then rose to 166): the count with the least bend, so the tempo moves one way; the accents are counted back
+        // from the landing (renderClick), so the high click still falls on the new song's downbeats
+        for (const int n : { std::max(4, int(std::floor(mean * d / 60))), std::max(4, int(std::ceil(mean * d / 60))) })
+        {
+            const double cc = 6 * (n * 60 / d - mean);
+            if (N == 0 || std::abs(cc) < std::abs(c)) { j = jj; N = n; D = d; c = cc; }
+        }
     }
     if (N == 0 || N > kMaxGlide || seconds.load() > j * spb - 0.3) return; // too late to glide: the click keeps its tempo
     const auto phi = [&](double u) { return D / 60 * (b0 * u + (b1 - b0) * u * u / 2 + c * (u * u / 2 - u * u * u / 3)); }; // beats

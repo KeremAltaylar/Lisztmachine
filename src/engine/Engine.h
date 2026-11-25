@@ -24,6 +24,7 @@ struct PaletteEntry
     juce::String patch; // Surge XT factory patch, "Category/Name"
     float gainDb;       // this patch's level in the mix
     float brightness;   // measured spectral centroid, Hz: the dark-to-bright order
+    juce::String from;  // "enter <part> ...": a sound that enters at that part of the song and stays (not in the plan's draw)
 };
 // A per-track echo, ping-pong between left and right: its time in beats, how much comes back,
 // and how much is heard.
@@ -83,7 +84,7 @@ inline float ceilingClip(float x)
     return a <= k ? x : std::copysign(k + (top - k) * std::tanh((a - k) / (top - k)), x);
 }
 // A song's show for the visuals, through its notes (JSON without the closing brace): what liszt_render writes, and the app sends live
-juce::String showHead(const std::string& scene, uint64_t seed, double levelRate, double silence = 0, double seedSeconds = 0);
+juce::String showHead(const std::string& scene, uint64_t seed, double levelRate, double silence = 0, double seedSeconds = 0, double bridge = 0);
 
 // When each part changes sound, and to which palette entry.
 struct SoundChange { int bar, track, entry; };
@@ -444,7 +445,7 @@ public:
     // enough for Hollow Wake on the Mac mini, 13 dropouts); false: all on the calling thread (the renderer's --serial)
     bool parallel = true;
     // Message thread, before start(): the concert's options for this song's composer (makeComposer)
-    double silence = 0, seedSeconds = 0;
+    double silence = 0, seedSeconds = 0, bridge = 0;
     // Message thread: the audio device's workgroup, which the helper threads join (Apple Silicon schedules them with the
     // audio thread, on the performance cores)
     static void setAudioWorkgroup(juce::AudioWorkgroup workgroup);
@@ -602,6 +603,7 @@ private:
         int64_t left = 0; // samples until the note lets go
         juce::String patch, info;
     } pad_;
+    juce::Reverb padVerb_; // the pad's own room (2026-11-25: the patch's echoes off, "one, more reverby synth")
     std::atomic<float> padHit_ { 0 };
     std::atomic<float> fadeStep_ { 0 }; // the fade's factor per sample (0: none)
     float fade_ = 1;

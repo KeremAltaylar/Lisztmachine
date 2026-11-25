@@ -191,7 +191,7 @@ const PIECES = {
       palette: [[0.5, 0.4, 1], [0.95, 0.9, 1], [1, 0.25, 0.4], [0.3, 0.8, 1], [1, 1, 1], [0.8, 0.3, 1]] } },
   // 2026-11-04: fast stoner and Stetson saxophones; the one study no other song has
   stoner: { name: 'Working Class Curse', study: 'mill', strobeBeats: 1, media: 'media/stoner1', ranges: [[36, 86], [22, 64], [33, 62], [40, 82]],
-    images: [1, 2, 3, 4, 5, 6].map(k => `media/img/stoner/${k}.jpg`),   // 2026-11-05: Library of Congress FSA/OWI photographs, public domain
+    images: [1, 2, 3, 4, 5, 6, 7, 8].map(k => `media/img/stoner/${k}.jpg`),   // 2026-11-05: Library of Congress FSA/OWI photographs, public domain (two blast furnaces added 2026-11-25)
     world: { name: 'Rust', lo: [0.45, 0.22, 0.05], hi: [1.0, 0.82, 0.5],           // oil black, rust, sodium amber over the yard
       palette: [[1, 0.6, 0.15], [0.85, 0.35, 0.08], [1, 0.85, 0.5], [1, 0.95, 0.85], [0.4, 0.15, 0.05], [0.95, 0.7, 0.3]] } },
   doom: { name: 'Doom', study: 'lumen', strobeBeats: 2, media: 'media/doom1', ranges: [[36, 86], [22, 64], [33, 62], [55, 80]],
@@ -223,7 +223,8 @@ const PIECES = {
 };
 // 2026-11-05: each song's photographs for the image layer, public domain (Library of Congress FSA/OWI and
 // Gottlieb, NASA, NOAA, US Forest Service, the Met, old maps and prints, via Wikimedia Commons), one per story
-for (const [k, n] of Object.entries({ berlin: 4, jungle: 4, ecstatic: 4, noir: 4, deconstructed: 4, halftime: 4, doom: 4, blackgaze: 2, wake: 8, bleach: 8 }))
+// 2026-11-25 (Kerem: "I want more images and visuals integrated"): eight for every concert song, ten for Hollow Wake
+for (const [k, n] of Object.entries({ berlin: 8, jungle: 8, ecstatic: 8, noir: 8, deconstructed: 4, halftime: 8, doom: 8, blackgaze: 2, wake: 10, bleach: 8 }))
   PIECES[k].images = Array.from({ length: n }, (_, i) => `media/img/${k}/${i + 1}.jpg`);
 // Every song's body (2026-11-10, Kerem: "create these kind of interactivities for each song"), on Berlin's rule: one
 // voice owns one property. The main harmony the light, the second harmony the colour, the lead melody the camera,
@@ -2865,15 +2866,17 @@ registerProcessor('master-fx', MasterFx);`;
   })();
   // The image score (Kerem, 2026-11-05: "a score for the whole concert, in some parts the images open, in
   // some parts closed"). A song's first and last parts stay pure; every driving part has its photographs;
-  // a few of the parts between take them too (about 45 % of the concert with photographs), chosen once,
-  // the same every night.
-  const imgScore = sec.map((s, i) => {
-    const prev = sec[i - 1], nx = sec[i + 1];
+  // some of the parts between take them too, chosen once, the same every night. 2026-11-25 (Kerem: "more images
+  // and visuals integrated"): half of the parts between (was a fifth), and live from the app the same rule (it had
+  // only the driving parts)
+  const IMG_SHARE = 0.5;
+  const imgPick = (s, prev, nx, i) => {
     if (!prev || prev.song !== s.song || !nx || nx.song !== s.song) return false;
     if (s.energy >= 0.6 && s.energy > prev.energy + 0.1) return true;
     const x = Math.sin(i * 57.3 + 4.1) * 43758.5453;
-    return x - Math.floor(x) < 0.22;
-  });
+    return x - Math.floor(x) < IMG_SHARE;
+  };
+  const imgScore = sec.map((s, i) => imgPick(s, sec[i - 1], sec[i + 1], i));
   if (LIVE) {
     $('form').hidden = true;   // no timeline (Kerem, 2026-11-14)
     const add = (fresh, secs) => {
@@ -2882,10 +2885,9 @@ registerProcessor('master-fx', MasterFx);`;
       F.notes.length = 0; F.notes.push(...all);
       show.notes = F.notes;
       F.pad = F.notes.filter(n => n[2] === 0);
-      for (const x of secs) {
+      for (const [j, x] of secs.entries()) {
         sec.push(x);
-        const prev = sec[sec.length - 2];
-        imgScore.push(!!prev && prev.song === x.song && x.energy >= 0.6 && x.energy > prev.energy + 0.1);
+        imgScore.push(imgPick(x, j > 0 ? secs[j - 1] : null, secs[j + 1] ?? null, sec.length - 1));   // a song's sections come together
         const i = sec.length - 1, d = x.bars * 240 / (show.songs[x.song]?.bpm ?? 120), h = k => { const v = Math.sin(k * 91.7 + 17.3) * 43758.5453; return v - Math.floor(v); };
         LIVE.codeT = (LIVE.codeT ?? 0) + d;
         const pick = i > 0 && ((LIVE.codeOn ?? 0) + d / 2) / LIVE.codeT < 0.3 + (h(i) - 0.5) * 0.16;
@@ -3201,6 +3203,23 @@ registerProcessor('master-fx', MasterFx);`;
     pad.agit = Math.min(1.5, pad.agit + vel * 0.35 * padK().s);
     pad.bright = bright;
     pad.lit = 6;
+    kickShapes(vel);
+  }
+  // 2026-11-25 (Kerem: "flickers with only kick, and kick to influence the visuals not just in terms of rotate or
+  // flicker but its structure as well"): every kick is the director's only flash (direct() reads D.kickVel) and it
+  // rebuilds part of the picture: a soft kick moves one number of the genome (the study's own shape: its lattice,
+  // walls, folds, spacing), a hard one replaces two, and every fourth hard one rewires the feedback network (tunnel,
+  // spiral or fractal, its folds), so the picture is made of something else after it. Numbers only: no GPU cost.
+  function kickShapes(vel) {
+    D.kickVel = Math.max(D.kickVel ?? 0, vel);
+    D.kicks = (D.kicks ?? 0) + 1;
+    const r = k => hash01(D.salt + D.kicks * 31.7 + k);
+    const hard = vel > 0.7;
+    for (let k = 0; k < (hard ? 2 : 1); k++) {
+      const g = Math.floor(r(k) * 16);
+      D.gene[g] = hard ? r(k + 5) : Math.max(0, Math.min(0.999, D.gene[g] + (r(k + 5) - 0.5) * 0.4 * vel));
+    }
+    if (hard && (D.hardKicks = (D.hardKicks ?? 0) + 1) % 4 === 0) { D.fbg[0] = r(20); D.fbg[4] = r(21); D.fbg[5] = r(22); D.fbg[6] = r(23); }
   }
   const WORKLET = `
     class Onset extends AudioWorkletProcessor {
@@ -3341,12 +3360,14 @@ registerProcessor('master-fx', MasterFx);`;
     for (let k = 0; k < 3; k++) D.cam[k] += (D.target[k] - D.cam[k]) * glide;
     D.cam[3] = (F.hit[1] * (0.05 + 0.35 * e) + pad.kick * 0.25) * CAM.shake / 50;
     let flash = D.fx[0] * Math.exp(-dt / 0.07);
-    if (D.strobe && playing) {
-      // a flash on the bass; a piece can limit it (once a beat, or rolling 16ths whiten every frame)
-      const gap = (piece.strobeBeats ?? 0) * 60 / show.bpm * 0.9;
-      if (F.since[1] < dt && e > 0.4 && t - (D.flashAt ?? -9) >= gap) { flash = Math.max(flash, F.vel[1] * (e - 0.2) * 1.2); D.flashAt = t; }
-      if (F.since[2] < dt && e > 0.85 && t - (D.flashAt ?? -9) >= gap) { flash = Math.max(flash, 0.35); D.flashAt = t; }
-      if (sectionStart) { flash = 1; if (e > 0.5) D.invertUntil = t + 0.4; }
+    const kick = D.kickVel ?? 0;
+    D.kickVel = 0;
+    if (D.strobe && playing && kick > 0 && t - (D.flashAt ?? -9) >= 0.33) {
+      // his kick, and nothing else, flashes (2026-11-25; the bass, the ticks and the part changes no longer do), at most
+      // three a second (the flash-safety cap); a hard kick in a loud part flickers inverted for a moment
+      flash = Math.max(flash, kick * (0.35 + 0.65 * e));
+      D.flashAt = t;
+      if (kick > 0.75 && e > 0.5) D.invertUntil = t + 0.15;
     }
     D.fx[0] = flash;
     D.fx[2] = D.cut;
@@ -3683,12 +3704,27 @@ registerProcessor('master-fx', MasterFx);`;
       [0.3, "There is a train that leaves the city at nine and never arrives.", 0, 0],
       [0.3, "Passengers say the ride is beautiful.", 0, 10],
       [0.3, "Nobody has ever said where they got off.", 0, 20],
+      // 2026-11-25 (Kerem: "the stories are good, you can increase the number"): one or two more in every song
+      [0.55, "For twenty-eight years, trains under Berlin ran through stations that were closed.", 0, 0],
+      [0.55, "The platforms were dark. Armed guards stood on them and watched the carriages go by.", 0, 10],
+      [0.55, "The trains slowed down. They never stopped.", 0, 20],
+      [0.55, "Some maps of the city simply left the stations out.", 0, 30],
+      [0.82, "A conductor once punched a ticket for a passenger he could not see.", 0, 0],
+      [0.82, "The ticket said: one way.", 0, 10],
+      [0.82, "He kept the little paper circle that fell out of it. He says it is still warm.", 0, 20],
     ],
     stoner: [
       [0.12, "John Henry drove steel for the railroad, with a hammer in each hand.", 0, 0],
       [0.12, "One morning the company brought a steam drill to the mountain, to do the work of ten men.", 0, 10],
       [0.12, "He raced it through the rock from sunrise to dusk, and he beat it.", 0, 20],
       [0.12, "Then he laid the hammer down and died with it still warm. The drill kept the job.", 0, 30],
+      [0.45, "Lawrence, Massachusetts, 1912. The mills cut the workers' pay by thirty-two cents a week.", 0, 0],
+      [0.45, "Thirty-two cents was three loaves of bread. More than twenty thousand people walked out.", 0, 10],
+      [0.45, "They came from dozens of countries. They marched in the snow for two months.", 0, 20],
+      [0.45, "They won. What people remember is a line about wanting bread, and roses too.", 0, 30],
+      [0.8, "A factory whistle blew at six every evening for ninety years.", 0, 0],
+      [0.8, "Then the factory closed. The whistle kept blowing.", 0, 10],
+      [0.8, "Nobody knows who pulls it. Everybody still goes home.", 0, 20],
     ],
     jungle: [
       [0.1, "In the 1930s, two mapmakers put a town that did not exist on a road in New York. They called it Agloe.", 0, 0],
@@ -3699,6 +3735,10 @@ registerProcessor('master-fx', MasterFx);`;
       [0.6, "Its gates held the water back. A princess stole the key for her lover.", 0, 10],
       [0.6, "The sea came in that night and took the whole city.", 0, 20],
       [0.6, "Fishermen say that on calm days you can still hear its bells under the water.", 0, 30],
+      [0.35, "For more than a century, maps showed an island in the Coral Sea called Sandy Island.", 0, 0],
+      [0.35, "In 2012 a research ship went to have a look.", 0, 10],
+      [0.35, "There was only open ocean, more than a kilometre deep.", 0, 20],
+      [0.35, "The island was taken off the maps. Nobody has said where it went.", 0, 30],
     ],
     ecstatic: [
       [0.12, "In 1977 two spacecraft left Earth, each carrying a golden record.", 0, 0],
@@ -3709,6 +3749,10 @@ registerProcessor('master-fx', MasterFx);`;
       [0.5, "The keeper lit it every night anyway, for ships nobody had ever seen.", 0, 10],
       [0.5, "One night a ship came. It was empty, and every light on it was on.", 0, 20],
       [0.5, "He never lit the lamp again. He said it was no longer needed.", 0, 30],
+      [0.8, "In 1974 a radio telescope in Puerto Rico sent a message to a cluster of stars.", 0, 0],
+      [0.8, "Numbers, a strand of DNA, a small drawing of a person.", 0, 10],
+      [0.8, "It will get there in about twenty-five thousand years.", 0, 20],
+      [0.8, "The telescope collapsed in 2020. The message is still on its way.", 0, 30],
     ],
     noir: [
       [0.08, "A woman in the city collected silences. She kept them in jars.", 0, 0],
@@ -3719,6 +3763,13 @@ registerProcessor('master-fx', MasterFx);`;
       [0.55, "Each night it gave her back one hour.", 0, 10],
       [0.55, "She grew younger, then smaller, until she was only a voice in the house.", 0, 20],
       [0.55, "He still winds it every evening.", 0, 30],
+      [0.3, "A pianist on 52nd Street only ever played the black keys.", 0, 0],
+      [0.3, "Asked why, he said the white ones were for the daytime.", 0, 10],
+      [0.3, "When the club closed, they found the white keys worn down.", 0, 20],
+      [0.3, "Somebody else had been playing them at night.", 0, 30],
+      [0.82, "A saxophone player lost his voice and kept the reed in his pocket for thirty years.", 0, 0],
+      [0.82, "When he died they buried it with him.", 0, 10],
+      [0.82, "The gravedigger swears it hums when it rains.", 0, 20],
     ],
     deconstructed: [
       [0.12, "Strasbourg, July 1518. A woman named Frau Troffea steps into the street and starts to dance.", 0, 0],
@@ -3738,6 +3789,10 @@ registerProcessor('master-fx', MasterFx);`;
       [0.6, "It plays a fraction late, so nobody ever hears it.", 0, 10],
       [0.6, "When the drummer stops, the shadow plays one more beat.", 0, 20],
       [0.6, "Drummers who hear that beat never stop again.", 0, 30],
+      [0.32, "Conlon Nancarrow wrote music too fast for any pair of human hands.", 0, 0],
+      [0.32, "So he stopped writing for people. He punched it by hand, hole by hole, into rolls for a player piano.", 0, 10],
+      [0.32, "One piece could take him months.", 0, 20],
+      [0.32, "The piano plays them perfectly. It has never once been nervous.", 0, 30],
     ],
     doom: [
       [0.08, "Georgia, 1999. Kris Angylus turns his late grandmother's house into a recording studio.", 0, 0],
@@ -3749,6 +3804,14 @@ registerProcessor('master-fx', MasterFx);`;
       [0.6, "They lowered a lantern. The rope came back up warm.", 0, 10],
       [0.6, "They sealed it with stones. The song went on underneath.", 0, 20],
       [0.6, "Now the whole village hums the tune without knowing why.", 0, 30],
+      [0.36, "In August 1883 the volcano Krakatoa blew itself apart.", 0, 0],
+      [0.36, "On an island nearly five thousand kilometres away, people heard it and thought a ship was firing its guns.", 0, 10],
+      [0.36, "The pressure wave went round the Earth several times.", 0, 20],
+      [0.36, "For days, barometers everywhere kept recording it. The planet rang like a bell.", 0, 30],
+      [0.86, "A bellmaker cast one last bell and never rang it.", 0, 0],
+      [0.86, "He said a town should keep one sound it has not heard yet.", 0, 10],
+      [0.86, "The bell still hangs there, silent.", 0, 20],
+      [0.86, "Every night, somebody stands under it and listens anyway.", 0, 30],
     ],
     wake: [
       [0.08, "In 1861 the photographer Nadar carried electric light into the catacombs under Paris.", 0, 0],
@@ -3757,6 +3820,12 @@ registerProcessor('master-fx', MasterFx);`;
       [0.6, "A village prayed to a saint whose name nobody could remember.", 0, 0],
       [0.6, "The statue was hollow. Every winter, something inside it moved.", 0, 10],
       [0.6, "They kept praying. It seemed to be listening.", 0, 20],
+      [0.34, "In 1797 two young poets walked the hills of Somerset, making up a ghost story about a sailor.", 0, 0],
+      [0.34, "One of them had read about a voyage where a sailor shot an albatross for bad luck. He suggested it.", 0, 10],
+      [0.34, "The other one wrote the poem. Since then, plenty of sailors have refused to harm one.", 0, 20],
+      [0.84, "A ferryman rowed the same river every night for fifty years.", 0, 0],
+      [0.84, "Nobody ever crossed with him. He was paid every morning anyway.", 0, 10],
+      [0.84, "When he died, the coins in his box were all from the same year.", 0, 20],
     ],
     bleach: [
       [0.08, "Naples, 1590. The prince Carlo Gesualdo comes home early and finds his wife with her lover.", 0, 0],

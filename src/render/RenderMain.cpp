@@ -285,6 +285,7 @@ static float feedbackOverride = -1;            // --feedback 0..0.95: every trac
 static juce::String masterFx;                  // --master-fx Name=value,...: the app's master FX panel
 static float feedbackBus = -1;                 // --feedback-bus 0..0.8: the feedback bus's amount (the app's slider)
 static bool gRaw = false;                      // --raw: without the mix stage (ducking, low cuts, width, glue)
+static double gBridge = 0;                      // --bridge <s>: the song after its concert bridge (Bridge, Composer.cpp)
 static double gPadEvery = 0;                   // --pad-every <beats>: a drum-pad hit that often (testing the pad's sound)
 static int gBlock = 512;                       // --block <samples>
 static bool gSerial = false;                    // --serial: every track on one thread (the parallel tracks checked against it)
@@ -307,13 +308,14 @@ static int renderChain(uint64_t seed, int songs, const juce::File& out, bool con
         e->scene = sc;
         if (concert && k == 0) e->silence = kConcertSolo;
         if (concert && kConcert[k].longIn) e->seedSeconds = kLongChange;
+        if (concert && k > 0) e->bridge = kBridge;
         if (auto err = e->load(sr, block, palette); err.isNotEmpty()) { std::cerr << err << "\n"; return nullptr; }
         e->start(seed, 0, false);
         return e;
     };
     int k = 0;
-    auto overlap = [&] { return !concert || (k + 1 < songs && kConcert[k + 1].longIn); }; // into the next song: a long change
-    auto changeTime = [&](const Composer& c) { return overlap() ? c.sections().back().startBar * 240.0 / c.bpm() : c.totalBars() * 240.0 / c.bpm() + 2.0; };
+    // as the app: Improvisation's next song starts at this one's Release; the concert's at this one's end, its bridge
+    auto changeTime = [&](const Composer& c) { return !concert ? c.sections().back().startBar * 240.0 / c.bpm() : c.totalBars() * 240.0 / c.bpm(); };
     auto seedSeconds = [](const Composer& c) { return c.sections().front().bars * 240.0 / c.bpm(); };
 
     out.deleteFile();
@@ -348,9 +350,9 @@ static int renderChain(uint64_t seed, int songs, const juce::File& out, bool con
         if (!next && k + 1 < songs && cur->seconds.load() > 2.0) next = build(k + 1);   // the app does this on a thread
         if (next && !armed && cur->isPlaying()) // the glide, and where the next song starts (the app's improvise())
         {
-            const double seed = overlap() ? seedSeconds(*next->composer()) : 0.0;
-            if (overlap()) cur->glideClick(next->composer()->bpm(), changeTime(*cur->composer()) + seed, 24, 40);
-            else cur->glideClick(next->composer()->bpm(), changeTime(*cur->composer()));
+            const double seed = !concert ? seedSeconds(*next->composer()) : bridgeLanding(*next->composer());
+            if (!concert) cur->glideClick(next->composer()->bpm(), changeTime(*cur->composer()) + seed, 24, 40);
+            else cur->glideClick(next->composer()->bpm(), changeTime(*cur->composer()) + seed, seed - 0.05, seed + 0.05);
             const int64_t seedSamples = std::llround(seed * sr);
             next->clickFrom = seedSamples > 0 ? seedSamples - 16 : 0;
             startAt = cur->landing() - seedSamples - next->preRollSamples();
@@ -360,7 +362,6 @@ static int renderChain(uint64_t seed, int songs, const juce::File& out, bool con
         {
             next->goIn(cur->isPlaying() ? juce::jmax<int64_t>(0, startAt - cur->position()) : 0);
             if (!cur->gliding()) cur->clickLevel = 0;
-            if (concert && overlap()) cur->fadeOut(12); // as the app: a long change, the old song fades from under the Seed
             old = cur->isFinished() ? nullptr : std::move(cur);
             cur = std::move(next);
             armed = false;
@@ -402,6 +403,7 @@ static int renderConcert(uint64_t seed, double seconds, const juce::File& out, i
             palette.parts[t] = { { p.fromFirstOccurrenceOf("=", false, false), 0.0f, 0.0f } };
     Engine engine;
     engine.scene = sceneName;
+    engine.bridge = gBridge;
     if (auto e = engine.load(sr, block, palette); e.isNotEmpty()) { std::cerr << e << "\n"; return 1; }
     if (solo >= 0) engine.enabledTracks = uint32_t(1u << solo);
     engine.feedbackOverride = feedbackOverride;
@@ -554,10 +556,11 @@ int main(int argc, char** argv)
     gSerial = args.contains("--serial");
     gStems = args.contains("--stems");
     if (int i = args.indexOf("--pad-every"); i >= 0) gPadEvery = args[i + 1].getDoubleValue();
+    if (int i = args.indexOf("--bridge"); i >= 0) gBridge = args[i + 1].getDoubleValue();
     if (int i = args.indexOf("--block"); i >= 0) gBlock = juce::jlimit(32, 4096, args[i + 1].getIntValue());
     if (args[0] == "--head") // --head <scene> [silence s] [seed part s]: the song as the app announces it to the page (testing)
     {
-        std::cout << showHead(args[1].toStdString(), 1, 20.0, args[2].getDoubleValue(), args[3].getDoubleValue()) << "}";
+        std::cout << showHead(args[1].toStdString(), 1, 20.0, args[2].getDoubleValue(), args[3].getDoubleValue(), args.size() > 4 ? args[4].getDoubleValue() : 0.0) << "}";
         return 0;
     }
     if (args[0] == "--plan") // --plan <scene>...: each song's parts and length, no sound (planning the concert)

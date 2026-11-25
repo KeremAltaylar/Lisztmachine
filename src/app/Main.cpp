@@ -666,14 +666,12 @@ private:
     }
     // seconds into a song where the next one begins: Improvisation at its Release (the next song's Seed, ~30 s, sounds
     // under it; Kerem 2026-11-18: "30 seconds or so between songs that they can intersect"); the concert when the song's
-    // last bar has ended and two seconds of its tail have rung
+    // last bar has ended: the next one's bridge starts under its tail (2026-11-25)
     double changeTime(const Composer& c) const
     {
-        if (concert() && !longNext()) return c.totalBars() * 240.0 / c.bpm() + 2.0;
+        if (concert()) return c.totalBars() * 240.0 / c.bpm();
         return c.sections().back().startBar * 240.0 / c.bpm();
     }
-    // the concert's next song comes in by a long change (kConcert: a minute for Kerem's drums, Improvisation's way)
-    bool longNext() const { return concert() && improvK + 1 < int(std::size(kConcert)) && kConcert[size_t(improvK + 1)].longIn; }
     // how long a song's Seed is (Improvisation): its first beat after it is where the click's glide lands
     static double seedSeconds(const Composer& c) { return c.sections().front().bars * 240.0 / c.bpm(); }
     std::unique_ptr<Engine> build(int k, juce::String& err, bool offThread)
@@ -693,6 +691,7 @@ private:
         e->scene = sc;
         if (concert() && k == 0) e->silence = kConcertSolo;                     // the drum solo before Berlin
         if (concert() && kConcert[size_t(k) % std::size(kConcert)].longIn) e->seedSeconds = kLongChange; // a long change in
+        if (concert() && k > 0) e->bridge = kBridge;                            // its bridge
         err = e->load(loadedRate, juce::jmax(512, loadedBlock), palette);
         if (err.isNotEmpty()) return nullptr;
         return e;
@@ -742,14 +741,14 @@ private:
         const bool more = !concert() || improvK + 1 < int(std::size(kConcert)); // the concert ends after its last song
         if (going && more && !loader && !nextEngine && !starting && engine->seconds.load() > 2.0) prepareNext();
         // the click glides into the next song's tempo and the audio thread starts that song so the glide lands on its
-        // first beat: the concert's at its bar 0, over 12-24 s; Improvisation's after its Seed, which starts at this song's
-        // Release, over 24-40 s while the two songs overlap (the new song's own click waits for the end of its Seed)
+        // beat: the concert's over its bridge, which starts at this song's end, landing on the bridge's last bar;
+        // Improvisation's after its Seed, which starts at this song's Release, over 24-40 s while the two songs overlap
+        // (the new song's own click waits for the glide's landing)
         if (nextEngine && !starting && engine->isPlaying())
         {
-            const bool overlap = improv() || longNext();
-            const double seed = overlap ? seedSeconds(*nextEngine->composer()) : 0.0;
-            if (overlap) engine->glideClick(nextEngine->composer()->bpm(), changeAt + seed, 24, 40);
-            else engine->glideClick(nextEngine->composer()->bpm(), changeAt);
+            const double seed = improv() ? seedSeconds(*nextEngine->composer()) : bridgeLanding(*nextEngine->composer());
+            if (improv()) engine->glideClick(nextEngine->composer()->bpm(), changeAt + seed, 24, 40);
+            else engine->glideClick(nextEngine->composer()->bpm(), changeAt + seed, seed - 0.05, seed + 0.05);
             const int64_t seedSamples = std::llround(seed * loadedRate);
             nextEngine->clickFrom = seedSamples > 0 ? seedSamples - 16 : 0;
             const juce::SpinLock::ScopedLockType sl(audioLock);
@@ -773,7 +772,6 @@ private:
         std::unique_ptr<Engine> gone;
         const bool started = starting != nullptr; // already started by the audio thread
         if (!started || !engine->gliding()) engine->clickLevel = 0; // else its glide clicks on into the new song's first beat
-        if (started && longNext()) engine->fadeOut(12); // a long change: the old song leaves the bed to the new one's Seed
         {
             const juce::SpinLock::ScopedLockType sl(audioLock);
             gone = std::move(oldEngine);
@@ -892,7 +890,7 @@ private:
         if (!e.composer()) return;
         const double at = LiveLink::now() + (head < 1e8 ? -head : double(e.preRollSamples()) / loadedRate) + outLatency();
         juce::MemoryOutputStream j;
-        j << showHead(e.scene, uint64_t(improv() ? chainSeed : seed), 20.0, e.silence, e.seedSeconds) << ",\"at\":" << juce::String(at, 4) << ",\"now\":" << juce::String(LiveLink::now(), 4) << ",\"k\":" << k
+        j << showHead(e.scene, uint64_t(improv() ? chainSeed : seed), 20.0, e.silence, e.seedSeconds, e.bridge) << ",\"at\":" << juce::String(at, 4) << ",\"now\":" << juce::String(LiveLink::now(), 4) << ",\"k\":" << k
           << ",\"piece\":\"" << (improv() ? juce::String("improv") : juce::String(e.scene)) << "\"";
         if (improv()) j << ",\"plan\":" << juce::String(improvJson(improvSong(uint64_t(chainSeed), k)));
         j << "}";
@@ -967,6 +965,7 @@ private:
         float hp = 0, px = 0, lp = 0, fast = 0, slow = 0, peak = 0, meter = 0;
         double hi = 0, lo = 0;
         int hold = 0, refr = 0;
+        bool armed = true; // after a hit, not again until it has died down (a pad's ring and rebound were a second note)
         double holdS = 0.006; // the wait for the true peak: the kick 6 ms, the pad 1 ms (Kerem, 2026-11-22: "shortest delay")
         std::atomic<float> thr { 0.02f }, meterOut { 0 }, lastPeak { 0 }, lastRatio { 0 };
         std::atomic<int> hits { 0 };
@@ -988,9 +987,10 @@ private:
                     if (--hold == 0) { lastPeak = peak; lastRatio = float(hi / (lo + 1e-12)); hits.fetch_add(1); }
                 }
                 if (refr > 0) --refr;
+                else if (!armed) armed = fast < juce::jmax(t, 0.3f * lastPeak.load());
                 else if (fast > t && fast > slow * 2.2f)
                 {
-                    hold = juce::jmax(1, int(holdS * sr)); peak = a; hi = lo = 0; refr = int(0.045 * sr);
+                    hold = juce::jmax(1, int(holdS * sr)); peak = a; hi = lo = 0; refr = int(0.045 * sr); armed = false;
                 }
             }
             meterOut = meter;

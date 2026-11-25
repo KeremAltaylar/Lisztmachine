@@ -902,6 +902,78 @@ private:
     std::unique_ptr<Composer> song_;
     int n_ = 1;
 };
+// The concert's way from one song into the next (Kerem, 2026-11-25: "the metronome changes while the other song
+// continues ... when the metronome becomes the new one then the next song starts, but some of the elements may enter
+// before the song starts"; and Berlin into Working Class Curse: "a slight silence and then starts with the click"):
+// bars with no beat before the song, at its tempo. The song before has played to its end and rings out here while the
+// click glides from its tempo into this one (the old engine's glideClick), landing a bar before the song: one bar of
+// the new click alone, steady, then the song. What enters early is held, nothing on a beat: the pad on the song's first
+// chord from the first bar, at once (no dip after the old song's end), growing to halfway; the drone, root and fifth,
+// from halfway. At the song's first bar each hands over: to the song's own part if the song plays that track there,
+// else it fades out over that bar. The song itself is composed exactly as without the bridge.
+class Bridge : public Composer
+{
+public:
+    Bridge(std::unique_ptr<GenreComposer> song, double seconds) : Composer(0), song_(std::move(song))
+    {
+        bpm_ = song_->bpm();
+        n_ = std::max(2, 2 * int(std::ceil(seconds * bpm_ / 480.0)));
+        sections_.push_back({ "Bridge", 0, n_, 0.0f, 0u, false, true });
+        for (auto sec : song_->sections()) { sec.startBar += n_; sections_.push_back(sec); }
+        sectionOfBar_.assign(size_t(n_), 0);
+        energyOfBar_.assign(size_t(n_), 0.0f);
+        for (int b = 0; b < song_->totalBars(); ++b)
+        {
+            sectionOfBar_.push_back(1 + int(&song_->sectionAt(b) - song_->sections().data()));
+            energyOfBar_.push_back(song_->energyAt(b));
+        }
+        const auto& m = song_->modeAt(0);
+        const int root = song_->rootAt(0), r = foldInto(song_->tonicAt(0) + degreeSemis(m, root), 48, 59);
+        voices_[0] = { GenreComposer::Pad, 0, { r, r + degreeSemis(m, root + 2) - degreeSemis(m, root), r + degreeSemis(m, root + 4) - degreeSemis(m, root) } };
+        const int d = foldInto(r, 40, 51);
+        voices_[1] = { GenreComposer::Drone, n_ / 2, { d, d + 7, -1 } };
+    }
+    void generateBar(int bar, std::vector<Event>& out) override
+    {
+        const int64_t t0 = int64_t(bar) * kBarTicks;
+        if (bar < n_)
+        {
+            for (auto& v : voices_)
+            {
+                if (bar < v.from) continue;
+                if (bar == v.from)
+                    for (int p : v.pitches) if (p >= 0) out.push_back({ t0, Event::NoteOn, uint8_t(v.track), uint8_t(p), .6f });
+                for (int beat = 0; beat < 4; ++beat) // up from .7 to 1 over the first half of its time here (at .45-.8 the
+                {                                    // bridge into Ecstatic fell to -37 dB)
+                    const double u = ((bar - v.from) * 4 + beat) / std::max(1.0, (n_ - v.from) * 2.0);
+                    out.push_back({ t0 + beat * kPPQ, Event::Level, uint8_t(v.track), 0, float(.7 + .3 * std::min(1.0, u)) });
+                }
+            }
+            return;
+        }
+        const size_t from = out.size();
+        song_->generateBar(bar - n_, out);
+        for (size_t k = from; k < out.size(); ++k) out[k].tick += int64_t(n_) * kBarTicks;
+        if (bar != n_) return;
+        for (auto& v : voices_) // the hand-over, over the song's first bar
+        {
+            float to = 0;
+            for (size_t k = from; k < out.size(); ++k)
+                if (out[k].type == Event::Level && out[k].track == v.track && out[k].tick == t0) { to = out[k].value; out[k].value = 1.0f; }
+            const bool plays = song_->active(v.track, 0);
+            for (int p : v.pitches) if (p >= 0) out.push_back({ plays ? t0 : t0 + kBarTicks, Event::NoteOff, uint8_t(v.track), uint8_t(p), 0 });
+            for (int beat = 1; beat < 4; ++beat)
+                out.push_back({ t0 + beat * kPPQ, Event::Level, uint8_t(v.track), 0, float(1.0 + (to - 1.0) * beat / 3.0) });
+        }
+    }
+    std::string describe() const override { return song_->describe() + " · after a bridge of " + std::to_string(n_) + " bars"; }
+
+private:
+    struct Voice { int track, from; std::array<int, 3> pitches; };
+    std::unique_ptr<GenreComposer> song_;
+    int n_ = 2;
+    std::array<Voice, 2> voices_ {};
+};
 // A genre song with its own copy of the table (the composer keeps a reference to it): the concert's stretched Seed.
 struct SpecHolder { GenreComposer::Spec spec; };
 class StretchedSeed : private SpecHolder, public GenreComposer
@@ -911,19 +983,22 @@ public:
 };
 } // namespace
 
-std::unique_ptr<Composer> makeComposer(const std::string& scene, uint64_t seed, double silence, double seedSeconds)
+std::unique_ptr<Composer> makeComposer(const std::string& scene, uint64_t seed, double silence, double seedSeconds, double bridge)
 {
     std::unique_ptr<Composer> c;
     if (int k; improvScene(scene, k)) c = std::make_unique<GenreComposer>(improvSong(seed, k).spec, seed * 7919 + uint64_t(k) + 1);
     else if (auto* g = GenreComposer::find(scene))
     {
+        std::unique_ptr<GenreComposer> song;
         if (seedSeconds > 0) // the first part about that long, at the song's middle tempo (its own is drawn within a few %)
         {
             auto spec = *g;
             spec.form[0].bars = std::max(spec.form[0].bars, int(std::lround(seedSeconds * 0.5 * (spec.bpmLo + spec.bpmHi) / 240.0)));
-            c = std::make_unique<StretchedSeed>(spec, seed);
+            song = std::make_unique<StretchedSeed>(spec, seed);
         }
-        else c = std::make_unique<GenreComposer>(*g, seed);
+        else song = std::make_unique<GenreComposer>(*g, seed);
+        if (bridge > 0) c = std::make_unique<Bridge>(std::move(song), bridge);
+        else c = std::move(song);
     }
     else c = std::make_unique<BerlinComposer>(seed);
     if (silence > 0) c = std::make_unique<AfterSilence>(std::move(c), silence);

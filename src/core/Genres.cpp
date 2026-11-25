@@ -150,8 +150,9 @@ const G::Spec kHalftime {
     .progs = { { { 0, 5, 3, 4 }, { 0, 3, 4, 0 }, { 5, 3, 4, 4 } } }, .preRoot = 4,
     // 2026-11-01 (Kerem): Breath a lot longer; the low and the mid percussion in more parts; Gravity and
     // Fall gone, the song ends in Breath; a bowed cello section (the drone track) holds the chords
-    .form = { { { "Smoke", 16, .15f, "PFT" }, { "Weight", 24, .35f, "PHBUTGY" }, { "Halftime", 40, .60f, "PKSHCBUDTGYMW" },
-                { "Hollow", 24, .40f, "PAFTYW" }, { "Mass", 48, .85f, "PKSHCBUADTGYMIRW" }, { "Breath", 24, .25f, "PATW" } } },
+    // 2026-11-25 (Kerem: "you can shorten the half time"): every part after the first 8 bars shorter, 176 -> 136 bars
+    .form = { { { "Smoke", 16, .15f, "PFT" }, { "Weight", 16, .35f, "PHBUTGY" }, { "Halftime", 32, .60f, "PKSHCBUDTGYMW" },
+                { "Hollow", 16, .40f, "PAFTYW" }, { "Mass", 40, .85f, "PKSHCBUADTGYMIRW" }, { "Breath", 16, .25f, "PATW" } } },
     // halftime: the tempo is 170, the body feels 85 (the live snare on three); the metal answers around it
     .pulse = part("X...............", "X.........x.....", "X.........x...x.X......x..x....."),
     .metal = part("..........1.....", "......1...2.....", "......1...2...3.......1...2..1.3"),
@@ -177,9 +178,17 @@ const G::Spec kDoom {
     // and the summit is all of the low end playing it as one.
     .bpmLo = 74, .bpmHi = 78, .mode = &kPhrygian, .tonics = { 1, 2, 11, 9, 4 }, // 2026-10-31 (Kerem): a little faster
     .progs = { { { 0, 1, 0, 5 }, { 0, 5, 3, 1 }, { 0, 3, 1, 0 } } }, .preRoot = 1,
+    // 2026-11-25 (Kerem: "extend the doom song, it is good, make additional parts, maybe a new synth introduced when
+    // it's finished and new parts come"; Doom is now the concert's last song): after the Monument it does not end. Embers:
+    // the band gone, a new synth (palette: enter Embers lead) alone over the drone and the pad; Pyre: the riff back under
+    // it; Pillar: a second summit, longer than the first, the new synth over all of it; then the Dust as before
     .form = { { { "Feedback", 8, .15f, "RFTW" }, { "Procession", 16, .45f, "PRBUTGW" }, { "Monolith", 16, .70f, "PRBUDCKSTGYMW" },
-                { "Shroud", 16, .40f, "PAFTW" }, 
-                { "Monument", 24, 1.0f, "PRBUDCKSTGYMAFIW" }, { "Dust", 8, .15f, "RFTW" } } },
+                { "Shroud", 16, .40f, "PAFTW" },
+                { "Monument", 24, 1.0f, "PRBUDCKSTGYMAFIW" },
+                // 2026-11-25 later (Kerem: "make doom 11-12 mins"): the new parts longer, and Requiem, the new synth over
+                // the hook in the calm, before the Dust
+                { "Embers", 24, .30f, "PFTW+" }, { "Pyre", 24, .65f, "PRBUDCSTGYW+" },
+                { "Pillar", 40, 1.0f, "PRBUDCKSTGYMAFIW+" }, { "Requiem", 16, .45f, "PAFTW+" }, { "Dust", 12, .15f, "RFTW" } } },
     .pulse = part("X...............", "X.......X.......", "X.......X...x..."),
     .metal = part("", "..........1.....", "......1.......2."), // far bells, chains
     .tick = part("", "", ""),
@@ -427,7 +436,9 @@ void GenreComposer::planForm()
         if (!t.name) break;
         const bool theme = !themed && t.energy >= peak; // the summit: the home arpeggio comes back
         themed = themed || theme;
-        sections_.push_back({ t.name, bar, t.bars, t.energy, layersOf(t.layers), theme });
+        // a + in its layers: a part added to a song Kerem had approved, which keeps the sounds it has there (the sound
+        // plan passes it by, so the parts before sound as they did; Doom's new parts, 2026-11-25)
+        sections_.push_back({ t.name, bar, t.bars, t.energy, layersOf(t.layers), theme, std::strchr(t.layers, '+') != nullptr });
         drummerLeads_.push_back(std::strchr(t.layers, 'L') != nullptr);
         halfSec_.push_back(std::strchr(t.layers, 'h') != nullptr);
         if (theme) { peakFrom_ = bar; peakTo_ = bar + t.bars; }

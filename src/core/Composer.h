@@ -67,6 +67,7 @@ struct Section
     float energy;   // reached halfway through the section
     uint32_t layers; // bit per track
     bool restoreTheme; // the original sequences come back here
+    bool aside = false; // not one of the song's own parts (the concert's bridge into it): the sound plan passes it by
 };
 
 struct Step
@@ -173,7 +174,8 @@ private:
 // until Kerem names them.
 // silence: that many seconds of silent bars before the song (the concert's drum solo); seedSeconds: a genre song's
 // first part stretched to about that long (the concert's long changes)
-std::unique_ptr<Composer> makeComposer(const std::string& scene, uint64_t seed, double silence = 0, double seedSeconds = 0);
+// bridge: a genre song after about that many seconds of a bridge with no beat (the concert's way between songs, Bridge)
+std::unique_ptr<Composer> makeComposer(const std::string& scene, uint64_t seed, double silence = 0, double seedSeconds = 0, double bridge = 0);
 inline const char* kScenes[] = { "berlin", "stoner", "jungle", "ecstatic", "noir", "deconstructed", "halftime",
                                  "doom", "blackgaze" };
 inline const char* kSceneTitles[] = { "Berlin", "Working Class Curse", "Liquid", "Ecstatic Arpeggios", "Noir", "Deconstructed Club",
@@ -182,13 +184,24 @@ inline const char* kSceneTitles[] = { "Berlin", "Working Class Curse", "Liquid",
 // two minutes of his drums alone on Berlin's visuals; a long change (longIn) gives him about a minute to improvise:
 // the song begins under the last part of the one before, its first part stretched to a minute (Improvisation's Seed),
 // the click gliding into its tempo. The others change as before.
+// 2026-11-25 (Kerem): Blackgaze out ("remove the last song"), Doom longer and the last; every song after Berlin comes
+// in by a bridge (Bridge, Composer.cpp): the song before plays to its end, the click glides over the bridge and the
+// new song starts once the click is at its tempo. A long change is now the bridge, then its first part a minute long.
 struct ConcertSong { const char* scene; const char* title; bool longIn; };
 inline const ConcertSong kConcert[] = { { "berlin", "Berlin", false }, { "stoner", "Working Class Curse", false },
                                         { "jungle", "Liquid", false }, { "wake", "Hollow Wake", true },
                                         { "ecstatic", "Ecstatic Arpeggios", false }, { "noir", "Noir", false },
-                                        { "halftime", "Halftime", true }, { "doom", "Doom", true }, { "blackgaze", "Blackgaze", true } };
+                                        { "halftime", "Halftime", true }, { "doom", "Doom", true } };
 constexpr double kConcertSolo = 120;  // seconds of drums alone before Berlin
-constexpr double kLongChange = 60;    // seconds of a long change
+constexpr double kLongChange = 60;    // seconds of a long change's first part
+constexpr double kBridge = 12;        // about this many seconds of bridge before each song after Berlin
+// seconds into a song where the click's glide lands: its bridge's last bar (one bar of the new click alone before the
+// song); 0 without a bridge
+inline double bridgeLanding(const Composer& c)
+{
+    const auto& s = c.sections().front();
+    return s.aside ? (s.bars - 1) * 240.0 / c.bpm() : 0.0;
+}
 // 2026-11-21: a song in Doom's style (Lantern Wake and Hollow Saint as one), playable on its own, not in the concert yet
 inline const char* kNewScenes[] = { "wake", "bleach" };
 inline const char* kNewTitles[] = { "Hollow Wake", "Bleach" };
