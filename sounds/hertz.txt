@@ -8,6 +8,7 @@ ground  -6.0    1000  internal/modal-wood     # the root, lowest
 perc     0.0    1000  internal/modal-wood     # the fifth
 body     0.0    1000  internal/modal-block    # the third
 metal    0.0    1000  internal/modal-block    # the ninth, highest
+sub      6.0      60  internal/808            # the root again, far down: the sub pulse (1-5 a second)
 
 # the drones on top (sounds Doom already uses: installed everywhere); gains measured 2026-11-25: pulses about
 # -14 dB each, the drones about -17 over them
@@ -19,7 +20,6 @@ drone    6.0     654  3rd/Databroth/Pads/Feed
 pulse    0.0      60  internal/none
 tick     0.0      60  internal/none
 bass     0.0      60  internal/none
-sub      0.0      60  internal/none
 arp      0.0      60  internal/none
 chord    0.0      60  internal/none
 fx       0.0      60  internal/none

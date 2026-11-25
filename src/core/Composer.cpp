@@ -990,13 +990,13 @@ public:
         bpm_ = 60;
         tonic_ = std::array<int, 4> { 2, 1, 4, 11 }[size_t(rng_.range(0, 3))];
         if (bridgeSeconds > 0) // the concert's bridge (Bridge): the pad alone, the drone from halfway, no pulse
-            add({ "Bridge", std::max(2, 2 * int(std::ceil(bridgeSeconds * bpm_ / 480.0))), 0.0f, { 0, 0, 0, 0 }, false, true }, true);
-        add({ "Hum", 8, .15f, { 4, 0, 0, 0 }, false, false });
-        add({ "Lattice", 12, .35f, { 6, 8, 0, 0 }, true, false });
-        add({ "Interference", 16, .60f, { 10, 12, 15, 0 }, true, true });
-        add({ "Standing Wave", 16, .90f, { 10, 12, 15, 20 }, true, true });
-        add({ "Afterimage", 12, .30f, { 0, 0, 5, 6 }, true, true });
-        add({ "Residue", 6, .10f, { 0, 0, 0, 0 }, false, true });
+            add({ "Bridge", std::max(2, 2 * int(std::ceil(bridgeSeconds * bpm_ / 480.0))), 0.0f, { 0, 0, 0, 0, 0 }, false, true }, true);
+        add({ "Hum", 8, .15f, { 4, 0, 0, 0, 2 }, false, false });
+        add({ "Lattice", 12, .35f, { 6, 8, 0, 0, 3 }, true, false });
+        add({ "Interference", 16, .60f, { 10, 12, 15, 0, 4 }, true, true });
+        add({ "Standing Wave", 16, .90f, { 10, 12, 15, 20, 5 }, true, true });
+        add({ "Afterimage", 12, .30f, { 0, 0, 5, 6, 2 }, true, true });
+        add({ "Residue", 6, .10f, { 0, 0, 0, 0, 1 }, false, true });
     }
     void generateBar(int bar, std::vector<Event>& out) override
     {
@@ -1014,10 +1014,12 @@ public:
             out.push_back({ at + len, Event::NoteOff, uint8_t(track), uint8_t(pitch), 0 });
         };
         // the four pulsing voices: track, register, chord degree, its swell's period in seconds
-        static constexpr int kTrack[4] = { GenreComposer::Ground, GenreComposer::Perc, GenreComposer::Body, GenreComposer::Metal };
-        static constexpr int kLo[4] = { 28, 35, 40, 48 }, kHi[4] = { 40, 47, 55, 62 }, kDeg[4] = { 0, 4, 2, 8 };
-        static constexpr double kSwell[4] = { 13, 17, 23, 29 };
-        for (int v = 0; v < 4; ++v)
+        // and a fifth (Kerem, 2026-11-25: "lower sub hertz ti ti ti as well"): the root in the sub, 33-62 Hz, slower (1-5 a
+        // second) so each low hit stays apart
+        static constexpr int kTrack[5] = { GenreComposer::Ground, GenreComposer::Perc, GenreComposer::Body, GenreComposer::Metal, GenreComposer::Sub };
+        static constexpr int kLo[5] = { 28, 35, 40, 48, 24 }, kHi[5] = { 40, 47, 55, 62, 35 }, kDeg[5] = { 0, 4, 2, 8, 0 };
+        static constexpr double kSwell[5] = { 13, 17, 23, 29, 11 };
+        for (int v = 0; v < 5; ++v)
         {
             out.push_back({ t0, Event::Level, uint8_t(kTrack[v]), 0, 1.0f });
             const int rate = p.rate[size_t(v)];
@@ -1075,7 +1077,7 @@ public:
 
 private:
     static constexpr int kGenreTracksN = GenreComposer::kGenreTracks;
-    struct Part { const char* name; int bars; float energy; std::array<int, 4> rate; bool harm, drone; };
+    struct Part { const char* name; int bars; float energy; std::array<int, 5> rate; bool harm, drone; };
     void add(const Part& p, bool aside = false)
     {
         const int start = totalBars();
