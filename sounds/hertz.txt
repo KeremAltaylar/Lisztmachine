@@ -1,0 +1,46 @@
+# Lisztmachine sound palette: Low Hertz (2026-11-25, Kerem: "a drone, establishing low hertz pulses, in harmony, 3-4
+# voices all playing low notes like ti ti ti ti in different speeds, 20 hertz, 10 hertz, and pad drones on top, an
+# ambient sound-artish song"). Composed by PulseComposer (Composer.cpp), 60 bpm: a voice's notes a beat = its hertz.
+# part   gain   bright  patch
+
+# the four pulsing voices: struck, tuned, short enough to stay separate at 20 a second
+ground  -6.0    1000  internal/modal-wood     # the root, lowest
+perc     0.0    1000  internal/modal-wood     # the fifth
+body     0.0    1000  internal/modal-block    # the third
+metal    0.0    1000  internal/modal-block    # the ninth, highest
+
+# the drones on top (sounds Doom already uses: installed everywhere); gains measured 2026-11-25: pulses about
+# -14 dB each, the drones about -17 over them
+pad      1.0     277  3rd/Nick Moritz/Pads/Nightmare
+harm     6.8     740  3rd/Giana Brotherz/Pads/Deep Choir
+drone    6.0     654  3rd/Databroth/Pads/Feed
+
+# not used
+pulse    0.0      60  internal/none
+tick     0.0      60  internal/none
+bass     0.0      60  internal/none
+sub      0.0      60  internal/none
+arp      0.0      60  internal/none
+chord    0.0      60  internal/none
+fx       0.0      60  internal/none
+mallet   0.0      60  internal/none
+texture  0.0      60  internal/none
+impact   0.0      60  internal/none
+riff     0.0      60  internal/none
+lead     0.0      60  internal/none
+boom     0.0      60  internal/none
+
+# the room: everything into a long reverb, an octave of shimmer; the pulses dry enough to keep their rate
+release pad   6.0
+release harm  6.0
+release drone 6.0
+send all reverb 0.30
+send ground reverb 0.12
+send perc reverb 0.15
+send body reverb 0.18
+send metal reverb 0.22
+shimmer 0.35
+return reverb 12
+
+# the drum pad (input 2)
+drumpad 0.0

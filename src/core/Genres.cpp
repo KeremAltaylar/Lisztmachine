@@ -384,10 +384,12 @@ const SceneInfo* genreSceneInfo(const std::string& scene)
     // arpeggio and the chords into the echo, the low end dry.
     static const std::vector<SceneInfo> infos = [] {
         std::vector<SceneInfo> v;
-        std::vector<const G::Spec*> songs = G::all();
-        songs.insert(songs.end(), G::extra().begin(), G::extra().end());
+        std::vector<const char*> songs;
+        for (auto* s : G::all()) songs.push_back(s->scene);
+        for (auto* s : G::extra()) songs.push_back(s->scene);
+        songs.push_back("hertz"); // Low Hertz (PulseComposer, Composer.cpp): the genre tracks, its own composer
         for (auto* s : songs)
-            v.push_back({ s->scene, 20, { "pad", "pulse", "metal", "tick", "perc", "bass", "sub", "arp", "chord", "fx", "harm",
+            v.push_back({ s, 20, { "pad", "pulse", "metal", "tick", "perc", "bass", "sub", "arp", "chord", "fx", "harm",
                                           "ground", "body", "mallet", "texture", "impact", "riff", "drone", "lead", "boom" },
                           { 0, 1, 2, 2, 2, 1, 1, 3, 0, 0, 0, 1, 2, 2, 2, 1, 1, 0, 3, 1 },
                           { { 0, .30f }, { 0, .02f }, { .05f, .12f }, { .03f, .08f }, { .10f, .15f }, { 0, .03f }, { 0, 0 }, { .20f, .20f }, { .20f, .25f }, { .10f, .35f }, { .08f, .40f },

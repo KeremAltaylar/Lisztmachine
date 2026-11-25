@@ -184,6 +184,7 @@ inline const char* kSceneTitles[] = { "Berlin", "Working Class Curse", "Liquid",
 // two minutes of his drums alone on Berlin's visuals; a long change (longIn) gives him about a minute to improvise:
 // the song begins under the last part of the one before, its first part stretched to a minute (Improvisation's Seed),
 // the click gliding into its tempo. The others change as before.
+// 2026-11-25 later (Kerem): Halftime out, Low Hertz in its place (PulseComposer, an ambient piece of low pulses).
 // 2026-11-25 (Kerem): Blackgaze out ("remove the last song"), Doom longer and the last; every song after Berlin comes
 // in by a bridge (Bridge, Composer.cpp): the song before plays to its end, the click glides over the bridge and the
 // new song starts once the click is at its tempo. A long change is now the bridge, then its first part a minute long.
@@ -191,7 +192,7 @@ struct ConcertSong { const char* scene; const char* title; bool longIn; };
 inline const ConcertSong kConcert[] = { { "berlin", "Berlin", false }, { "stoner", "Working Class Curse", false },
                                         { "jungle", "Liquid", false }, { "wake", "Hollow Wake", true },
                                         { "ecstatic", "Ecstatic Arpeggios", false }, { "noir", "Noir", false },
-                                        { "halftime", "Halftime", true }, { "doom", "Doom", true } };
+                                        { "hertz", "Low Hertz", false }, { "doom", "Doom", true } };
 constexpr double kConcertSolo = 120;  // seconds of drums alone before Berlin
 constexpr double kLongChange = 60;    // seconds of a long change's first part
 constexpr double kBridge = 12;        // about this many seconds of bridge before each song after Berlin
@@ -203,8 +204,8 @@ inline double bridgeLanding(const Composer& c)
     return s.aside ? (s.bars - 1) * 240.0 / c.bpm() : 0.0;
 }
 // 2026-11-21: a song in Doom's style (Lantern Wake and Hollow Saint as one), playable on its own, not in the concert yet
-inline const char* kNewScenes[] = { "wake", "bleach" };
-inline const char* kNewTitles[] = { "Hollow Wake", "Bleach" };
+inline const char* kNewScenes[] = { "wake", "bleach", "hertz" };
+inline const char* kNewTitles[] = { "Hollow Wake", "Bleach", "Low Hertz" };
 
 // Berlin-school scene: drone pad, sequenced bass, polymetric upper sequence and a
 // motif-based lead, over a slow modal progression shaped by a 10-minute energy arc.

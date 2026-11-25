@@ -974,6 +974,118 @@ private:
     int n_ = 2;
     std::array<Voice, 2> voices_ {};
 };
+// Low Hertz (Kerem, 2026-11-25: "instead of Halftime a drone, but establishing low hertz pulses, in harmony, 3-4 voices
+// all playing low notes, like ti ti ti ti but in different speeds, like 20 hertz, 10 hertz, and pad drones on top of it,
+// an ambient sound-artish song"). Exactly 60 bpm, so a voice's pulses a beat are its rate in hertz and every rate meets
+// the others again on each beat. Four low voices of one chord, root, fifth, third and ninth, each struck again and
+// again at its own rate (4-20 Hz), each swelling and fading on its own slow period so the four drift in and out of
+// phase; the rates rise through the piece and fall back. The chord moves once every four bars (16 s): i, VI, iv, VII.
+// Over them the pad holds the chord, the choir an open fifth high up, and the drone the tonic underneath. No stops, no
+// fills, no soloist: the parts flow into each other, each voice fading in over two bars and out over one.
+class PulseComposer : public Composer
+{
+public:
+    PulseComposer(uint64_t seed, double bridgeSeconds) : Composer(seed)
+    {
+        bpm_ = 60;
+        tonic_ = std::array<int, 4> { 2, 1, 4, 11 }[size_t(rng_.range(0, 3))];
+        if (bridgeSeconds > 0) // the concert's bridge (Bridge): the pad alone, the drone from halfway, no pulse
+            add({ "Bridge", std::max(2, 2 * int(std::ceil(bridgeSeconds * bpm_ / 480.0))), 0.0f, { 0, 0, 0, 0 }, false, true }, true);
+        add({ "Hum", 8, .15f, { 4, 0, 0, 0 }, false, false });
+        add({ "Lattice", 12, .35f, { 6, 8, 0, 0 }, true, false });
+        add({ "Interference", 16, .60f, { 10, 12, 15, 0 }, true, true });
+        add({ "Standing Wave", 16, .90f, { 10, 12, 15, 20 }, true, true });
+        add({ "Afterimage", 12, .30f, { 0, 0, 5, 6 }, true, true });
+        add({ "Residue", 6, .10f, { 0, 0, 0, 0 }, false, true });
+    }
+    void generateBar(int bar, std::vector<Event>& out) override
+    {
+        const int si = sectionOfBar_[size_t(bar)];
+        const auto& p = parts_[size_t(si)];
+        const auto& sec = sections_[size_t(si)];
+        const int64_t t0 = int64_t(bar) * kBarTicks;
+        const int in = bar - sec.startBar, left = sec.startBar + sec.bars - bar;
+        const bool first = bar == 0, last = bar + 1 == totalBars();
+        const int chordIdx = bar / 4, rootDeg = std::array<int, 4> { 0, 5, 3, 6 }[size_t(chordIdx % 4)];
+        const bool newChord = bar % 4 == 0 || first;
+        auto pc = [&](int deg) { return tonic_ + degreeSemis(kAeolian, rootDeg + deg); };
+        auto note = [&](int track, int pitch, int64_t at, int64_t len, float vel) {
+            out.push_back({ at, Event::NoteOn, uint8_t(track), uint8_t(pitch), std::clamp(vel, .05f, 1.0f) });
+            out.push_back({ at + len, Event::NoteOff, uint8_t(track), uint8_t(pitch), 0 });
+        };
+        // the four pulsing voices: track, register, chord degree, its swell's period in seconds
+        static constexpr int kTrack[4] = { GenreComposer::Ground, GenreComposer::Perc, GenreComposer::Body, GenreComposer::Metal };
+        static constexpr int kLo[4] = { 28, 35, 40, 48 }, kHi[4] = { 40, 47, 55, 62 }, kDeg[4] = { 0, 4, 2, 8 };
+        static constexpr double kSwell[4] = { 13, 17, 23, 29 };
+        for (int v = 0; v < 4; ++v)
+        {
+            out.push_back({ t0, Event::Level, uint8_t(kTrack[v]), 0, 1.0f });
+            const int rate = p.rate[size_t(v)];
+            if (rate <= 0) continue;
+            // in over two bars where the part before did not have it, out over the last bar where the next will not
+            const bool before = si > 0 && parts_[size_t(si - 1)].rate[size_t(v)] > 0;
+            const bool after = si + 1 < int(parts_.size()) && parts_[size_t(si + 1)].rate[size_t(v)] > 0;
+            const int pitch = foldInto(kLo[v] + ((pc(kDeg[v]) - kLo[v]) % 12 + 12) % 12, kLo[v], kHi[v]);
+            const int64_t step = kPPQ / rate;
+            const int n = 4 * rate;
+            for (int k = 0; k < n; ++k)
+            {
+                const int64_t at = t0 + k * step;
+                const double u = double(k) / n, sec = (bar + u) * 4.0;
+                float g = 1;
+                if (!before && in < 2) g *= float((in + u) / 2.0);
+                if (!after && left == 1) g *= float(1.0 - u);
+                const double swell = 0.55 + 0.45 * std::pow(std::sin(6.283185307179586 * sec / kSwell[v] + v * 1.3), 2.0);
+                const float accent = k % rate == 0 ? 1.15f : 1.0f; // the beat, where every rate meets
+                note(kTrack[v], pitch, at, step / 2, float((0.35 + 0.45 * p.energy) * swell) * accent * g);
+            }
+        }
+        // the pad: the chord held, re-voiced at each change (root, fifth, ninth, the third above)
+        const float fadeIn = std::min(1.0f, float(bar + 1) / 3.0f), fadeOut = std::min(1.0f, float(totalBars() - bar) / 3.0f);
+        out.push_back({ t0, Event::Level, uint8_t(GenreComposer::Pad), 0, std::min(fadeIn, fadeOut) * (.75f + .25f * p.energy) });
+        if (newChord)
+        {
+            const int r = foldInto(48 + ((pc(0) - 48) % 12 + 12) % 12, 48, 59);
+            for (int d : { 0, 4, 8, 9 }) note(GenreComposer::Pad, r + degreeSemis(kAeolian, rootDeg + d) - degreeSemis(kAeolian, rootDeg),
+                                            t0, std::min<int64_t>(4, totalBars() - bar) * kBarTicks - 20, .6f);
+        }
+        // the choir: an open fifth high up, from the parts that have it, swelling in
+        out.push_back({ t0, Event::Level, uint8_t(GenreComposer::Harm), 0, p.harm ? std::min(1.0f, float(in + 1) / 4.0f) * fadeOut : 0.0f });
+        if (p.harm && (newChord || in == 0))
+        {
+            const int len = std::min({ 4 - bar % 4, sec.startBar + sec.bars - bar });
+            const int h = foldInto(67 + ((pc(0) - 67) % 12 + 12) % 12, 67, 78);
+            note(GenreComposer::Harm, h, t0, len * kBarTicks - 20, .5f);
+            note(GenreComposer::Harm, h + 7, t0, len * kBarTicks - 20, .4f);
+        }
+        // the drone: the tonic underneath, held through each part that has it
+        out.push_back({ t0, Event::Level, uint8_t(GenreComposer::Drone), 0, p.drone ? std::min(1.0f, float(in + 1) / 2.0f) * fadeOut : 0.0f });
+        if (p.drone && in == 0)
+            note(GenreComposer::Drone, foldInto(36 + ((tonic_ - 36) % 12 + 12) % 12, 36, 47), t0, sec.bars * kBarTicks - 20, .6f);
+        if (last) for (int t = 0; t < kGenreTracksN; ++t) out.push_back({ t0 + kBarTicks, Event::Level, uint8_t(t), 0, 0.0f });
+    }
+    std::string describe() const override
+    {
+        static const char* names[12] = { "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B" };
+        const int s = int(std::lround(totalBars() * 240.0 / bpm_));
+        char b[96];
+        std::snprintf(b, sizeof b, "Low Hertz · %s aeolian · 60 bpm · %d bars · %d:%02d", names[tonic_], totalBars(), s / 60, s % 60);
+        return b;
+    }
+
+private:
+    static constexpr int kGenreTracksN = GenreComposer::kGenreTracks;
+    struct Part { const char* name; int bars; float energy; std::array<int, 4> rate; bool harm, drone; };
+    void add(const Part& p, bool aside = false)
+    {
+        const int start = totalBars();
+        sections_.push_back({ p.name, start, p.bars, p.energy, 0u, false, aside });
+        parts_.push_back(p);
+        for (int b = 0; b < p.bars; ++b) { sectionOfBar_.push_back(int(sections_.size()) - 1); energyOfBar_.push_back(p.energy); }
+    }
+    int tonic_ = 2;
+    std::vector<Part> parts_;
+};
 // A genre song with its own copy of the table (the composer keeps a reference to it): the concert's stretched Seed.
 struct SpecHolder { GenreComposer::Spec spec; };
 class StretchedSeed : private SpecHolder, public GenreComposer
@@ -987,6 +1099,7 @@ std::unique_ptr<Composer> makeComposer(const std::string& scene, uint64_t seed, 
 {
     std::unique_ptr<Composer> c;
     if (int k; improvScene(scene, k)) c = std::make_unique<GenreComposer>(improvSong(seed, k).spec, seed * 7919 + uint64_t(k) + 1);
+    else if (scene == "hertz") c = std::make_unique<PulseComposer>(seed, bridge); // composes its own bridge
     else if (auto* g = GenreComposer::find(scene))
     {
         std::unique_ptr<GenreComposer> song;

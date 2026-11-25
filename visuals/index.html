@@ -189,6 +189,11 @@ const PIECES = {
   halftime: { name: 'Halftime', study: 'horizon', strobeBeats: 1, media: 'media/halftime1', ranges: [[36, 86], [22, 64], [42, 62], [60, 86]],
     world: { name: 'Gravity', lo: [0.25, 0.1, 0.7], hi: [0.95, 0.9, 1.0],         // indigo weight, pale light
       palette: [[0.5, 0.4, 1], [0.95, 0.9, 1], [1, 0.25, 0.4], [0.3, 0.8, 1], [1, 1, 1], [0.8, 0.3, 1]] } },
+  // 2026-11-25 (Kerem: "instead of Halftime a drone ... low hertz pulses ... an ambient sound-artish song"): Low Hertz,
+  // the interference study (its moire is pulses beating against each other), an ultraviolet world
+  hertz: { name: 'Low Hertz', study: 'interference', strobeBeats: 4, ranges: [[36, 86], [22, 64], [33, 64], [55, 80]],
+    world: { name: 'Ultraviolet', lo: [0.12, 0.05, 0.35], hi: [0.85, 0.8, 1.0],      // a violet dark, pale cold light
+      palette: [[0.55, 0.4, 1], [0.8, 0.85, 1], [0.35, 0.2, 0.9], [1, 1, 1], [0.6, 0.9, 1], [0.75, 0.5, 1]] } },
   // 2026-11-04: fast stoner and Stetson saxophones; the one study no other song has
   stoner: { name: 'Working Class Curse', study: 'mill', strobeBeats: 1, media: 'media/stoner1', ranges: [[36, 86], [22, 64], [33, 62], [40, 82]],
     images: [1, 2, 3, 4, 5, 6, 7, 8].map(k => `media/img/stoner/${k}.jpg`),   // 2026-11-05: Library of Congress FSA/OWI photographs, public domain (two blast furnaces added 2026-11-25)
@@ -239,6 +244,7 @@ const BODIES = {
   doom:          { pad: 'light', harm: 'colour', lead: 'camera', arp: 'glow', riff: 'speed', bass: 'size', sub: 'gravity', boom: 'shock' },
   blackgaze:     { pad: 'light', harm: 'colour', lead: 'camera', arp: 'glow', riff: 'speed', bass: 'size', sub: 'gravity', boom: 'shock' },   // the tremolo guitar is the speed
   wake:          { pad: 'light', harm: 'colour', lead: 'camera', arp: 'glow', riff: 'speed', bass: 'size', sub: 'gravity', boom: 'shock' },   // Doom's voices, Doom's body
+  hertz:         { pad: 'light', harm: 'colour', metal: 'camera', body: 'glow', perc: 'speed', ground: 'size', drone: 'gravity' },   // the four pulses move it, the drones light it
   bleach:        { pad: 'light', harm: 'colour', lead: 'camera', chord: 'glow', arp: 'speed', bass: 'size', sub: 'gravity', boom: 'shock' },   // the harpsichord runs, the soprano steers
 };
 for (const k in BODIES) PIECES[k].body = BODIES[k];
@@ -2975,7 +2981,7 @@ registerProcessor('master-fx', MasterFx);`;
   });
   // a hue per song, for the concert's timeline (Kerem, 2026-11-04: "show some song colors ... so I can understand the
   // songs and transitions"); neighbours far apart on the wheel, each near its world's colour
-  const HUE = { berlin: 195, stoner: 70, jungle: 250, ecstatic: 310, noir: 25, deconstructed: 130, halftime: 275, doom: 50, blackgaze: 350, wake: 85, bleach: 185 };
+  const HUE = { berlin: 195, stoner: 70, jungle: 250, ecstatic: 310, noir: 25, deconstructed: 130, halftime: 275, doom: 50, blackgaze: 350, wake: 85, bleach: 185, hertz: 285 };
   const songCol = (k, l = 0.6, c = 0.13) => 'oklch(' + l + ' ' + c + ' ' + (HUE[songs[k].piece] ?? 75) + ')';
   const form = $('form');
   sec.forEach(s => {
@@ -3812,6 +3818,16 @@ registerProcessor('master-fx', MasterFx);`;
       [0.86, "He said a town should keep one sound it has not heard yet.", 0, 10],
       [0.86, "The bell still hangs there, silent.", 0, 20],
       [0.86, "Every night, somebody stands under it and listens anyway.", 0, 30],
+    ],
+    hertz: [
+      [0.15, "In 2003, scientists in London hid a seventeen-hertz tone under some of the music at a concert.", 0, 0],
+      [0.15, "Too low to hear. Nobody was told which pieces had it.", 0, 10],
+      [0.15, "About a fifth of the audience reported chills, sorrow, the sense of something in the room.", 0, 20],
+      [0.15, "Nobody heard it. Plenty of people felt it.", 0, 30],
+      [0.6, "An engineer kept seeing a grey figure at the edge of his eye, alone in his laboratory at night.", 0, 0],
+      [0.6, "One morning a fencing blade clamped in a vice began to quiver by itself.", 0, 10],
+      [0.6, "A new fan was shaking the air nineteen times a second. He switched it off.", 0, 20],
+      [0.6, "The figure has not been seen since. The fan is still in a drawer.", 0, 30],
     ],
     wake: [
       [0.08, "In 1861 the photographer Nadar carried electric light into the catacombs under Paris.", 0, 0],

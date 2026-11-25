@@ -271,6 +271,37 @@ int main()
                 songs, bands[0], bands[1], bands[2], bands[3], shapes[0], shapes[1], shapes[2], shapes[3], shapes[4], shapes[5], solos, drifts, halves, crosses, memories);
     seed = 0;
 
+    // Low Hertz (PulseComposer, 2026-11-25): 60 bpm, so each pulsing voice sounds exactly its rate in hertz in the
+    // Standing Wave (ground 10, perc 12, body 15, metal 20 a second); every note in the MIDI range; the concert's version
+    // opens on its bridge (aside), and its bridge plays no pulse
+    for (uint64_t hs = 1; hs <= 6; ++hs)
+    {
+        seed = hs;
+        auto hz = makeComposer("hertz", hs);
+        CHECK(hz->bpm() == 60 && hz->totalBars() == 70, "hertz: %.0f bpm, %d bars", hz->bpm(), hz->totalBars());
+        auto ev = generateAll(*hz);
+        int wave = -1;
+        for (auto& s : hz->sections()) if (std::string(s.name) == "Standing Wave") wave = s.startBar;
+        CHECK(wave >= 0, "hertz: no Standing Wave");
+        const int tracks[4] = { GenreComposer::Ground, GenreComposer::Perc, GenreComposer::Body, GenreComposer::Metal }, rates[4] = { 10, 12, 15, 20 };
+        for (int v = 0; v < 4; ++v)
+        {
+            int n = 0;
+            for (auto& e : ev)
+                if (e.type == Event::NoteOn && e.track == tracks[v] && e.tick >= int64_t(wave + 4) * kBarTicks && e.tick < int64_t(wave + 5) * kBarTicks) ++n;
+            CHECK(n == 4 * rates[v], "hertz: voice %d plays %d notes in a bar of 4 s, not %d", v, n, 4 * rates[v]);
+        }
+        for (auto& e : ev) CHECK(e.pitch < 128 && (e.type != Event::NoteOn || e.pitch >= 24), "hertz: pitch %d", e.pitch);
+        auto br = makeComposer("hertz", hs, 0, 0, 12);
+        CHECK(br->sections().front().aside && bridgeLanding(*br) > 0, "hertz: the concert's version has no bridge");
+        int bridgePulses = 0;
+        for (auto& e : generateAll(*br))
+            if (e.type == Event::NoteOn && e.tick < int64_t(br->sections().front().bars) * kBarTicks
+                && (e.track == GenreComposer::Ground || e.track == GenreComposer::Perc || e.track == GenreComposer::Body || e.track == GenreComposer::Metal)) ++bridgePulses;
+        CHECK(bridgePulses == 0, "hertz: %d pulses in its bridge", bridgePulses);
+    }
+    seed = 0;
+
     std::printf("%s (%d failures)\n", failures ? "FAILED" : "all checks passed", failures);
     std::printf("e.g. seed 1: %s\n", BerlinComposer(1).describe().c_str());
     return failures ? 1 : 0;
