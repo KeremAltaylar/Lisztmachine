@@ -37,7 +37,9 @@ const G::Spec kJungle {
     // (dorian: the major fourth chord's soul), Rhodes on the two-step's off-beats, a rolling bass, the
     // choir; the guitar's long chords only where it opens out. A little under the floor's 174 so the
     // live kit can roll over it.
-    .bpmLo = 164, .bpmHi = 168, .mode = &kDorian, .tonics = { 2, 9, 4, 11, 7 },
+    // 2026-11-25 (Kerem: "make liquid a little bit more dark sounding and add some wobble bass"): natural minor (the
+    // flat sixth: the fourth chord minor), the same progressions; the 303's filter wobbles in the driving parts
+    .bpmLo = 164, .bpmHi = 168, .mode = &kAeolian, .tonics = { 2, 9, 4, 11, 7 },
     .progs = { { { 0, 3, 6, 2 }, { 2, 3, 0, 0 }, { 0, 4, 3, 6 } } }, .preRoot = 6,
     .form = { { { "Rainfall", 16, .15f, "PAT" }, { "Warm Front", 16, .35f, "PADHTMW" }, { "Roller", 48, .65f, "PKSHCBUADTGYMW" },
                 { "Undertow", 32, .40f, "PADFTMW" },
@@ -60,6 +62,7 @@ const G::Spec kJungle {
     .swing = .06f, .chordSweep = .35f, .riff = G::RiffStyle::Sludge, .riffLo = 35, .summit = G::Summit::NewTheme,
     .build = true, // 2026-11-01: the sharp part changes
     .lead = G::Drone, .sing = true, // 2026-11-02: the singer on the drone track
+    .wobble = 4, // a cycle a beat at the summit, every half bar in the Roller
 };
 
 const G::Spec kEcstatic {
