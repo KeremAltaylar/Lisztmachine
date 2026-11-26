@@ -41,9 +41,9 @@ const G::Spec kJungle {
     // flat sixth: the fourth chord minor), the same progressions; the 303's filter wobbles in the driving parts
     .bpmLo = 164, .bpmHi = 168, .mode = &kAeolian, .tonics = { 2, 9, 4, 11, 7 },
     .progs = { { { 0, 3, 6, 2 }, { 2, 3, 0, 0 }, { 0, 4, 3, 6 } } }, .preRoot = 6,
-    .form = { { { "Rainfall", 16, .15f, "PAT" }, { "Warm Front", 16, .35f, "PADHTMW" }, { "Roller", 48, .65f, "PKSHCBUADTGYMW" },
-                { "Undertow", 32, .40f, "PADFTMW" },
-                { "Liquid Gold", 48, 1.0f, "PKSHCBUADFTGYMRIW" }, { "Tide", 16, .15f, "PARTW" } } },
+    .form = { { { "Rainfall", 16, .15f, "PAT" }, { "Warm Front", 16, .35f, "PADHTMW" }, { "Roller", 32, .65f, "PKSHCBUADTGYMW" },   // 2026-11-26 (Kerem): a minute shorter: Roller, Undertow, Liquid Gold
+                { "Undertow", 24, .40f, "PADFTMW" },
+                { "Liquid Gold", 32, 1.0f, "PKSHCBUADFTGYMRIW" }, { "Tide", 16, .15f, "PARTW" } } },
     // the two-step's weight drives the pulse; rides and a shuffle of ticks around the live breaks
     .pulse = part("X.........X.....", "X.........X.....", "X.........X..x.."),
     .metal = part("", "..1...2...1...2.", "..1.2.1...1.3.2."),
@@ -74,9 +74,9 @@ const G::Spec kEcstatic {
     .progs = { { { 0, 5, 3, 4 }, { 0, 6, 5, 6 }, { 0, 2, 5, 4 } } }, .preRoot = 4,
     // 2026-11-01 (Kerem: "too many synths, rewrite it"): one sound per part, the chords gone (the sequence,
     // the pad and the choir carry the harmony), the sequence an octave deeper, the sharp part changes
-    .form = { { { "Dawn", 16, .15f, "PAT" }, { "Continuum", 16, .35f, "PATM" }, { "Lattice", 24, .55f, "PAHTRM" },
-                { "Suspension", 24, .40f, "PAFTGYMR" }, 
-                { "Computation", 40, 1.0f, "PKSHCBUAFTGYMRI" }, { "Halo", 16, .20f, "PART" } } },
+    .form = { { { "Dawn", 16, .15f, "PAT" }, { "Continuum", 8, .35f, "PATM" }, { "Lattice", 16, .55f, "PAHTRM" },   // 2026-11-26 (Kerem): a minute shorter
+                { "Suspension", 16, .40f, "PAFTGYMR" }, 
+                { "Computation", 32, 1.0f, "PKSHCBUAFTGYMRI" }, { "Halo", 16, .20f, "PART" } } },
     // no break here: the sequence is the rhythm; the pulse only lands at the summit
     .pulse = part("", "", "X...X...X...X..."),
     .metal = part("", "", "......1.......2."),

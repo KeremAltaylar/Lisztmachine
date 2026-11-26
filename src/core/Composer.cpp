@@ -992,10 +992,10 @@ public:
         if (bridgeSeconds > 0) // the concert's bridge (Bridge): the pad alone, the drone from halfway, no pulse
             add({ "Bridge", std::max(2, 2 * int(std::ceil(bridgeSeconds * bpm_ / 480.0))), 0.0f, { 0, 0, 0, 0, 0 }, false, true }, true);
         add({ "Hum", 8, .15f, { 4, 0, 0, 0, 2 }, false, false });
-        add({ "Lattice", 12, .35f, { 6, 8, 0, 0, 3 }, true, false });
-        add({ "Interference", 16, .60f, { 10, 12, 15, 0, 4 }, true, true });
-        add({ "Standing Wave", 16, .90f, { 10, 12, 15, 20, 5 }, true, true });
-        add({ "Afterimage", 12, .30f, { 0, 0, 5, 6, 2 }, true, true });
+        add({ "Lattice", 8, .35f, { 6, 8, 0, 0, 3 }, true, false });   // 2026-11-26 (Kerem): a minute shorter
+        add({ "Interference", 12, .60f, { 10, 12, 15, 0, 4 }, true, true });
+        add({ "Standing Wave", 12, .90f, { 10, 12, 15, 20, 5 }, true, true });
+        add({ "Afterimage", 8, .30f, { 0, 0, 5, 6, 2 }, true, true });
         add({ "Residue", 6, .10f, { 0, 0, 0, 0, 1 }, false, true });
     }
     void generateBar(int bar, std::vector<Event>& out) override
