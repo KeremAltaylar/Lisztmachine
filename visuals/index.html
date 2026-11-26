@@ -83,6 +83,13 @@ nav button[aria-pressed="true"] { color: var(--ember); }
 #voice.top { bottom: auto; top: 10vh; }
 #voice p { margin: 0; max-width: 32ch; text-wrap: balance; font: italic 500 clamp(22px, 3.3vw, 46px)/1.15 var(--display); color: var(--ink); }
 @media (prefers-reduced-motion: reduce) { #voice { transition: none; } }
+/* the end of the concert (Kerem, 2026-11-26): the last 10 s of Dust black, two sentences very big, the second stays */
+#finale { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; background: #000; opacity: 0; pointer-events: none;
+  transition: opacity 2s; padding: 0 max(16px, 4vw); }
+#finale.on { opacity: 1; }
+#finale p { grid-area: 1 / 1; margin: 0; max-width: 16ch; text-align: center; text-wrap: balance; color: #fff;
+  font: 600 clamp(40px, 8.5vw, 170px)/1.05 var(--display); opacity: 0; transition: opacity 1.5s; }
+#finale p.on { opacity: 1; }
 .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
 @media (prefers-reduced-motion: reduce) { #hud { transition: none; } }
 </style>
@@ -116,6 +123,7 @@ nav button[aria-pressed="true"] { color: var(--ember); }
 </div>
 
 <div id="voice" aria-live="polite"><p id="voice-line"></p></div>
+<div id="finale" aria-live="polite"><p>You may take your mask, Agent 1.</p><p>Or in other words: you should wear your mask now.</p></div>
 
 <div id="hud" class="gone">
   <div class="row">
@@ -3174,6 +3182,18 @@ registerProcessor('master-fx', MasterFx);`;
   pieceLook();
   // The concert: at each song its own study, colours, hits, pitch ranges and tempo.
   let songK = 0;
+  // The end (Kerem, 2026-11-26): from 10 s before Dust ends (Doom, the concert's last song) the picture goes black and the
+  // first sentence comes up; the second takes its place 4 s into the applause and stays.
+  const FIN = $('finale'), finLines = [...FIN.children];
+  const finale = t => {
+    const k = songs.length - 1, sg = songs[k];
+    const dust = k > 0 && sg.piece === 'doom' ? show.sections.find(s => s.name === 'Dust' && s.t >= sg.t - 0.01) : null;
+    const u = dust ? t - (dust.t + dust.bars * 240 / sg.bpm) : -1e9;   // seconds after Dust's last bar
+    FIN.classList.toggle('on', u > -10);
+    finLines[0].classList.toggle('on', u > -9 && u < 3);
+    finLines[1].classList.toggle('on', u >= 4.5);
+  };
+  window.__finale = finale;
   const enterSong = k => {
     songK = k;
     piece = PIECES[songs[k].piece];
@@ -3912,6 +3932,7 @@ registerProcessor('master-fx', MasterFx);`;
       if (tw >= 1) { study = next; next = null; tw = 0; } }
 
     const t = clock(now);
+    finale(t);
     if (songIndex(t) !== songK) enterSong(songIndex(t));
     queueNext(t);
     F.update(t);
