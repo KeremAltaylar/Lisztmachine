@@ -28,7 +28,6 @@ button:focus-visible { outline: 1px solid var(--ember); outline-offset: 3px; }
 .card { max-width: 34rem; display: grid; gap: 18px; }
 .card h1 { margin: 0; font: italic 500 clamp(44px, 9vw, 76px)/0.95 var(--display); letter-spacing: -0.01em; text-wrap: balance; }
 .meta { margin: 0; color: var(--dim); letter-spacing: 0.06em; text-transform: uppercase; font-size: 11px; font-variant-numeric: tabular-nums; }
-.lede { margin: 0; color: var(--ink); max-width: 60ch; font-size: 14px; }
 .go { justify-self: start; padding: 11px 20px; border: 1px solid var(--ember); color: var(--ember); letter-spacing: 0.08em; text-transform: uppercase; font-size: 12px; }
 .go:hover { background: var(--ember); color: var(--void); }
 .pieces { display: flex; flex-wrap: wrap; gap: 12px; }
@@ -100,7 +99,6 @@ nav button[aria-pressed="true"] { color: var(--ember); }
   <div class="card">
     <h1>Lisztmachine</h1>
     <p class="meta" id="meta">Choose a piece</p>
-    <p class="lede">Nine pieces, one by one or the whole concert without a stop, and nine generative light studies for projecting onto the drummer, blending into each other. Each one reads the music itself: every note, every chord and the level of each part, so the light lands exactly with the sound.</p>
     <div class="pieces" id="pieces">
       <button class="go" id="piece-berlin" data-piece="berlin" disabled>Berlin</button>
       <button class="go" id="piece-stoner" data-piece="stoner" disabled>Working Class Curse</button>
