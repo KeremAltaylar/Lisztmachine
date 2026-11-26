@@ -602,7 +602,15 @@ private:
         int note = -1, count = 0;
         int64_t left = 0; // samples until the note lets go
         juce::String patch, info;
+        // the concert's drum solo (Kerem, 2026-11-26: "the tails longer, still with this attack, sustain and decay like
+        // 2 secs ... a melody, long like 32 notes, rather than a scale"): its own melody and a held, sustained note
+        std::array<int, 32> melody {};
+        int melodyAt = 0;
+        juce::AudioProcessorParameter* sustain[2] = {};
+        float sustainNormal[2] = {}, sustainSolo[2] = {};
+        bool soloEnv = false;
     } pad_;
+    int64_t soloEnd_ = 0; // the sample the concert's opening Solo ends (0: no solo)
     juce::Reverb padVerb_; // the pad's own room (2026-11-25: the patch's echoes off, "one, more reverby synth")
     std::atomic<float> padHit_ { 0 };
     std::atomic<float> fadeStep_ { 0 }; // the fade's factor per sample (0: none)

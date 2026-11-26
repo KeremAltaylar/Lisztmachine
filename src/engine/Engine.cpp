@@ -1257,6 +1257,17 @@ juce::String Engine::load(double sampleRate, int maxBlock, const Palette& palett
                 if (auto err = setParameterText(*p, juce::String(sc) + " Filter EG Attack", "0.00 ms"); err.isNotEmpty())
                     pad_.info << " · " << err.substring(0, 100);
             }
+            // the solo's envelope: the same, but sustaining at 60 % while held (the audio thread switches it by value)
+            for (int k = 0; k < 2; ++k)
+            {
+                const juce::String name = juce::String(k ? "B" : "A") + " Amp EG Sustain";
+                for (auto* q : p->getParameters()) if (q->getName(128) == name) pad_.sustain[k] = q;
+                if (!pad_.sustain[k]) continue;
+                pad_.sustainNormal[k] = pad_.sustain[k]->getValue();
+                setParameterText(*p, name, "60.00 %");
+                pad_.sustainSolo[k] = pad_.sustain[k]->getValue();
+                pad_.sustain[k]->setValue(pad_.sustainNormal[k]);
+            }
             p->reset();
             pad_.buf.setSize(juce::jmax(2, p->getTotalNumInputChannels(), p->getTotalNumOutputChannels()), maxBlock);
             pad_.plugin = std::move(p);
@@ -1488,7 +1499,27 @@ void Engine::start(uint64_t seed, int startBar, bool play)
         int tonic = -1;
         for (auto& w : words) for (int pc = 0; pc < 12 && tonic < 0; ++pc) if (w == names[pc]) tonic = pc;
         padMask_ = tonic >= 0 ? (1 << tonic) | (1 << ((tonic + 7) % 12)) : 0;
+        // the solo's melody: 32 notes in the song's key and mode, four phrases of eight, mostly steps, the second phrase
+        // ending on the fifth and the last on the tonic, between the A below middle C and two octaves up
+        const juce::String d = juce::String::fromUTF8(composer_->describe().c_str());
+        const Mode* mode = &kAeolian; // the first mode the description names (Berlin: "aeolian (shift: dorian)")
+        int first = 1 << 30;
+        for (const Mode* m : { &kPhrygianDominant, &kHungarianMinor, &kHarmonicMinor, &kMelodicMinor, &kLydian, &kPhrygian, &kDorian, &kAeolian })
+            if (const int at = d.indexOf(m->name); at >= 0 && at < first) { first = at; mode = m; }
+        const int base = 60 + (tonic < 0 ? 4 : tonic) - (tonic > 6 ? 12 : 0);
+        uint64_t r = seed * 2654435761u + 977;
+        auto rnd = [&r](int n) { r = r * 6364136223846793005ull + 1442695040888963407ull; return int((r >> 33) % uint64_t(n)); };
+        static const int steps[] = { -1, -1, 1, 1, 1, -2, 2, 2, -3, 3, 4, -4 };
+        int deg = 0;
+        for (int i = 0; i < 32; ++i)
+        {
+            if (i == 15 || i == 31) deg = i == 31 ? 7 * (deg >= 4) : 4 + 7 * (deg >= 8); // the cadences
+            else if (i > 0) { const int st = steps[rnd(12)]; deg += (deg + st < -2 || deg + st > 9) ? -st : st; } // turns back at the edges
+            pad_.melody[size_t(i)] = base + degreeSemis(*mode, deg);
+        }
+        pad_.melodyAt = 0;
     }
+    soloEnd_ = std::string(composer_->sections().front().name) == "Solo" ? sampleOf(int64_t(composer_->sections().front().bars) * kBarTicks) : 0;
     const double barSeconds = 4 * 60.0 / composer_->bpm();
     for (int i = 0; i < numTracks_; ++i)
     {
@@ -1942,15 +1973,29 @@ void Engine::renderChunk(float* const* out, int numChannels, int offset, int len
             if (mask) break;
         }
         if (mask) padMask_ = mask;
-        if (const float v = padHit_.exchange(0); v > 0 && padMask_)
+        const bool solo = pos_ < soloEnd_;
+        if (const float v = padHit_.exchange(0); v > 0 && (padMask_ || solo))
         {
             if (pad_.note >= 0) pad_.midi.addEvent(juce::MidiMessage::noteOff(1, pad_.note), 0);
-            int pcs[12], n = 0;
-            for (int pc = 0; pc < 12; ++pc) if (padMask_ & (1 << pc)) pcs[n++] = pc;
-            const int k = pad_.count++ % (2 * n); // up the chord over two octaves from middle C, then again
-            pad_.note = 60 + pcs[k % n] + 12 * (k / n);
+            if (solo != pad_.soloEnv) // the solo's held envelope, or back to the struck one
+            {
+                pad_.soloEnv = solo;
+                for (int k = 0; k < 2; ++k) if (pad_.sustain[k]) pad_.sustain[k]->setValue(solo ? pad_.sustainSolo[k] : pad_.sustainNormal[k]);
+            }
+            if (solo)
+            {
+                pad_.note = pad_.melody[size_t(pad_.melodyAt++ % 32)]; // the solo: the next note of its melody
+                pad_.left = int64_t(2.0 * sampleRate_);                  // held 2 s, then 2 s of release
+            }
+            else
+            {
+                int pcs[12], n = 0;
+                for (int pc = 0; pc < 12; ++pc) if (padMask_ & (1 << pc)) pcs[n++] = pc;
+                const int k = pad_.count++ % (2 * n); // up the chord over two octaves from middle C, then again
+                pad_.note = 60 + pcs[k % n] + 12 * (k / n);
+                pad_.left = int64_t(kPPQ * samplesPerTick_); // let go after a beat: the ring goes on in the release
+            }
             pad_.midi.addEvent(juce::MidiMessage::noteOn(1, pad_.note, v), 0);
-            pad_.left = int64_t(kPPQ * samplesPerTick_); // let go after a beat: the ring goes on in the release
             padStruckNote = pad_.note;
             ++padStruck;
         }

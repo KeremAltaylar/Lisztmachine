@@ -286,6 +286,7 @@ static juce::String masterFx;                  // --master-fx Name=value,...: th
 static float feedbackBus = -1;                 // --feedback-bus 0..0.8: the feedback bus's amount (the app's slider)
 static bool gRaw = false;                      // --raw: without the mix stage (ducking, low cuts, width, glue)
 static double gBridge = 0;                      // --bridge <s>: the song after its concert bridge (Bridge, Composer.cpp)
+static double gDrumSolo = 0;                   // --drum-solo <s>: the concert's opening Solo before the song (testing the drum pad in it)
 static double gPadEvery = 0;                   // --pad-every <beats>: a drum-pad hit that often (testing the pad's sound)
 static int gBlock = 512;                       // --block <samples>
 static bool gSerial = false;                    // --serial: every track on one thread (the parallel tracks checked against it)
@@ -403,6 +404,7 @@ static int renderConcert(uint64_t seed, double seconds, const juce::File& out, i
             palette.parts[t] = { { p.fromFirstOccurrenceOf("=", false, false), 0.0f, 0.0f } };
     Engine engine;
     engine.scene = sceneName;
+    engine.silence = gDrumSolo;
     engine.bridge = gBridge;
     if (auto e = engine.load(sr, block, palette); e.isNotEmpty()) { std::cerr << e << "\n"; return 1; }
     if (solo >= 0) engine.enabledTracks = uint32_t(1u << solo);
@@ -485,6 +487,7 @@ static int renderConcert(uint64_t seed, double seconds, const juce::File& out, i
             engine.padHit(0.8f);
         const auto tb = juce::Time::getMillisecondCounterHiRes();
         engine.render(buf.getArrayOfWritePointers(), 2, block);
+        if (gPadEvery > 0 && engine.padStruck.exchange(0) > 0) std::cout << "drum pad note " << engine.padStruckNote.load() << " at " << juce::String(double(done) / sr, 2) << " s" << std::endl;
         blockMs.push_back({ juce::Time::getMillisecondCounterHiRes() - tb, double(done) / sr }); // a spike here is a crackle live
         writer->writeFromAudioSampleBuffer(buf, 0, block);
         for (size_t k = 0; k < stemWriters.size(); ++k)
@@ -556,6 +559,7 @@ int main(int argc, char** argv)
     gSerial = args.contains("--serial");
     gStems = args.contains("--stems");
     if (int i = args.indexOf("--pad-every"); i >= 0) gPadEvery = args[i + 1].getDoubleValue();
+    if (int i = args.indexOf("--drum-solo"); i >= 0) gDrumSolo = args[i + 1].getDoubleValue();
     if (int i = args.indexOf("--bridge"); i >= 0) gBridge = args[i + 1].getDoubleValue();
     if (int i = args.indexOf("--block"); i >= 0) gBlock = juce::jlimit(32, 4096, args[i + 1].getIntValue());
     if (args[0] == "--head") // --head <scene> [silence s] [seed part s]: the song as the app announces it to the page (testing)
