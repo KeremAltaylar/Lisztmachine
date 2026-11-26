@@ -931,7 +931,9 @@ juce::String Palette::load(const juce::File& file, const std::string& sceneName)
         if (tokens[0] == "master" && tokens.size() >= 2) { masterDb = tokens[1].getFloatValue(); continue; }
         if (tokens[0] == "drumpad" && tokens.size() >= 2) // "drumpad <dB>": the pad's own voice at this song's level
         {
-            padGainDb = tokens[1].getFloatValue();
+            // "drumpad off" (Kerem, 2026-11-26, Doom: "shut the drum pad in the last song, but the visuals still affected"):
+            // silent, but still struck, so the page still gets its hits
+            padGainDb = tokens[1] == "off" ? -200.0f : tokens[1].getFloatValue();
             padGainSet = true;
             padPatch = line.trim().fromFirstOccurrenceOf(" ", false, false).trim().fromFirstOccurrenceOf(" ", false, false).trim();
             continue;
